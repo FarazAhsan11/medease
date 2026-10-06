@@ -1,64 +1,39 @@
-"use client";
+import type { ReactNode } from "react";
 
-import {
-  CalendarDaysIcon,
-  MessagesSquareIcon,
-  UserRoundIcon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { WelcomeBanner } from "@/features/doctor-dashboard/components/welcome-banner";
-
-export type DashboardTab = "Appointments" | "Patients" | "Messages" | "Profile";
-
-const tabIcons: Record<DashboardTab, LucideIcon> = {
-  Appointments: CalendarDaysIcon,
-  Patients: UsersIcon,
-  Messages: MessagesSquareIcon,
-  Profile: UserRoundIcon,
+type DashboardTab = {
+  value: string;
+  label: string;
+  content: ReactNode;
 };
 
 type DashboardTabsProps = {
-  doctorName: string;
-  panels: Record<DashboardTab, ReactNode>;
+  tabs: DashboardTab[];
 };
 
-export function DashboardTabs({ doctorName, panels }: DashboardTabsProps) {
-  const [activeTab, setActiveTab] = useState<DashboardTab>("Appointments");
-  const tabs = Object.keys(panels) as DashboardTab[];
-
+export function DashboardTabs({ tabs }: DashboardTabsProps) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <nav aria-label="Dashboard sections">
-        <h2 className="mt-6 mb-5 text-[28.8px] font-bold">Doctor Dashboard</h2>
-        <ul role="tablist" className="flex flex-wrap">
-          {tabs.map((tab) => {
-            const Icon = tabIcons[tab];
-
-            return (
-              <li key={tab} className="px-[15px] py-2.5">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  onClick={() => setActiveTab(tab)}
-                  className="inline-flex items-center gap-1 rounded-[5px] bg-brand-sky px-5 py-2.5 text-[13.33px] text-white hover:bg-brand-sky-hover"
-                >
-                  <Icon className="size-[13px]" aria-hidden />
-                  {tab}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      <div role="tabpanel">
-        <WelcomeBanner doctorName={doctorName} />
-        {panels[activeTab]}
-      </div>
-    </div>
+    <Tabs defaultValue={tabs[0]?.value} className="gap-6">
+      <TabsList
+        variant="line"
+        className="h-10 w-full justify-start gap-5 overflow-x-auto border-b p-0"
+      >
+        {tabs.map((tab) => (
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            className="flex-none px-0.5 group-data-horizontal/tabs:after:bottom-0"
+          >
+            {tab.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {tabs.map((tab) => (
+        <TabsContent key={tab.value} value={tab.value}>
+          {tab.content}
+        </TabsContent>
+      ))}
+    </Tabs>
   );
 }

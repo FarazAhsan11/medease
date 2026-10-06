@@ -1,3 +1,11 @@
+import {
+  CalendarDaysIcon,
+  MessageSquareIcon,
+  StarIcon,
+  UsersIcon,
+  type LucideIcon,
+} from "lucide-react";
+
 export type PatientAppointment = {
   id: string;
   patientName: string;
@@ -6,6 +14,7 @@ export type PatientAppointment = {
   age: number;
   gender: string;
   history: string;
+  lastVisit: string;
 };
 
 export type PatientMessage = {
@@ -13,6 +22,7 @@ export type PatientMessage = {
   sender: string;
   message: string;
   time: string;
+  unread: boolean;
 };
 
 export type DoctorProfile = {
@@ -26,17 +36,26 @@ export type DoctorProfile = {
   specialization: string;
   licenseNumber: string;
   memberSince: string;
+  photo: string;
+};
+
+export type DashboardStat = {
+  label: string;
+  value: string;
+  hint: string;
+  icon: LucideIcon;
 };
 
 export const patientAppointments: PatientAppointment[] = [
   {
     id: "pa-1",
-    patientName: "Sadiabano",
+    patientName: "Sadia Bano",
     reason: "Stomach pain",
     time: "10:00 AM",
     age: 25,
     gender: "Female",
     history: "No significant history",
+    lastVisit: "Aug 14, 2026",
   },
   {
     id: "pa-2",
@@ -46,6 +65,7 @@ export const patientAppointments: PatientAppointment[] = [
     age: 30,
     gender: "Female",
     history: "Hypertension",
+    lastVisit: "Sep 2, 2026",
   },
   {
     id: "pa-3",
@@ -55,6 +75,7 @@ export const patientAppointments: PatientAppointment[] = [
     age: 40,
     gender: "Male",
     history: "Migraine",
+    lastVisit: "Sep 21, 2026",
   },
 ];
 
@@ -64,12 +85,14 @@ export const patientMessages: PatientMessage[] = [
     sender: "Shabna Firdos",
     message: "Hi Doctor, I have a question about my prescription.",
     time: "10:15 AM",
+    unread: true,
   },
   {
     id: "msg-2",
     sender: "Ali Khan",
     message: "Can we reschedule my appointment?",
     time: "11:30 AM",
+    unread: false,
   },
 ];
 
@@ -81,7 +104,35 @@ export const doctorProfile: DoctorProfile = {
   address: "Lahore, Punjab",
   email: "nida.ali@medease.com",
   phone: "+92 300 1234567",
-  specialization: "Cardiologist",
+  specialization: "General Practitioner",
   licenseNumber: "PMC-12345",
-  memberSince: "1/10/2025",
+  memberSince: "Jan 10, 2025",
+  photo: "/images/doctor-avatar.png",
 };
+
+export const dashboardStats: DashboardStat[] = [
+  {
+    label: "Today's appointments",
+    value: "3",
+    hint: "Next at 10:00 AM",
+    icon: CalendarDaysIcon,
+  },
+  {
+    label: "Active patients",
+    value: "48",
+    hint: "+4 this week",
+    icon: UsersIcon,
+  },
+  {
+    label: "Unread messages",
+    value: "1",
+    hint: "2 conversations",
+    icon: MessageSquareIcon,
+  },
+  {
+    label: "Average rating",
+    value: "4.9",
+    hint: "214 reviews",
+    icon: StarIcon,
+  },
+];

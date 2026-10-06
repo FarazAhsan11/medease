@@ -1,89 +1,90 @@
+import { FormField } from "@/components/shared/form-field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+import { AccountFields } from "@/features/auth/components/account-fields";
 import { AuthFooterLink } from "@/features/auth/components/auth-footer-link";
-import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
-import { ContactFields } from "@/features/auth/components/contact-fields";
-import { NameFields } from "@/features/auth/components/name-fields";
-import { PasswordInput } from "@/features/auth/components/password-input";
 import { genders, specializations } from "@/features/auth/data/specializations";
-import { authFieldClass } from "@/features/auth/lib/field-styles";
-import { fileInputClass } from "@/lib/form-styles";
-import { cn } from "@/lib/utils";
-
-const selectClass = cn(authFieldClass, "text-black");
 
 export function DoctorRegisterForm() {
   return (
     <>
-      <form>
-        <NameFields />
-        <textarea
-          name="address"
-          required
-          aria-label="Address"
-          placeholder="Enter address"
-          className={cn(authFieldClass, "max-w-[300px] font-mono text-[13px]")}
-        />
-        <input
-          type="number"
-          name="age"
-          required
-          aria-label="Age"
-          placeholder="Enter age"
-          className={authFieldClass}
-        />
-        <select
-          name="gender"
-          required
-          aria-label="Gender"
-          defaultValue=""
-          className={selectClass}
-        >
-          <option value="">Select gender</option>
-          {genders.map((gender) => (
-            <option key={gender}>{gender}</option>
-          ))}
-        </select>
-        <ContactFields />
-        <PasswordInput />
-        <select
-          name="specialization"
-          required
-          aria-label="Specialization"
-          className={selectClass}
-        >
-          {specializations.map((specialization) => (
-            <option key={specialization}>{specialization}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          name="licenseNumber"
-          required
-          aria-label="License number"
-          placeholder="License Number"
-          className={authFieldClass}
-        />
-        <input
-          type="file"
-          name="profilePhoto"
-          accept="image/*"
-          required
-          aria-label="Profile photo"
-          className={cn(authFieldClass, fileInputClass)}
-        />
-        <input
-          type="file"
-          name="degreeDocument"
-          accept="application/pdf"
-          required
-          aria-label="Degree document"
-          className={cn(authFieldClass, fileInputClass)}
-        />
-        <AuthSubmitButton>Create account</AuthSubmitButton>
+      <form className="grid gap-4">
+        <AccountFields idPrefix="doctor" />
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField id="doctor-age" label="Age">
+            <Input id="doctor-age" name="age" type="number" min={21} />
+          </FormField>
+          <FormField id="doctor-gender" label="Gender">
+            <NativeSelect id="doctor-gender" name="gender" className="w-full">
+              <NativeSelectOption value="">Select</NativeSelectOption>
+              {genders.map((gender) => (
+                <NativeSelectOption key={gender} value={gender}>
+                  {gender}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </FormField>
+        </div>
+
+        <FormField id="doctor-specialization" label="Specialization">
+          <NativeSelect
+            id="doctor-specialization"
+            name="specialization"
+            className="w-full"
+          >
+            {specializations.map((specialization) => (
+              <NativeSelectOption key={specialization} value={specialization}>
+                {specialization}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </FormField>
+
+        <FormField id="doctor-license" label="License number">
+          <Input
+            id="doctor-license"
+            name="licenseNumber"
+            placeholder="PMC-00000"
+          />
+        </FormField>
+
+        <FormField id="doctor-address" label="Clinic address">
+          <Textarea id="doctor-address" name="address" rows={2} />
+        </FormField>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField id="doctor-photo" label="Profile photo">
+            <Input
+              id="doctor-photo"
+              name="profilePhoto"
+              type="file"
+              accept="image/*"
+            />
+          </FormField>
+          <FormField id="doctor-degree" label="Degree (PDF)">
+            <Input
+              id="doctor-degree"
+              name="degreeDocument"
+              type="file"
+              accept="application/pdf"
+            />
+          </FormField>
+        </div>
+
+        <Button type="button" className="mt-2 h-9 w-full">
+          Create doctor account
+        </Button>
       </form>
       <AuthFooterLink
-        prompt="Already have an account?"
-        href="/login"
-        label="Login here"
+        prompt="Already registered?"
+        href="/doctor/login"
+        label="Log in"
       />
     </>
   );

@@ -1,14 +1,21 @@
-export type ScheduleOption = {
+export type DateOption = {
+  value: string;
+  weekday: string;
+  day: string;
+  month: string;
+};
+
+export type TimeSlot = {
   value: string;
   label: string;
 };
 
-const BOOKING_WINDOW_DAYS = 30;
+const BOOKING_WINDOW_DAYS = 14;
 const OPENING_HOUR = 11;
 const CLOSING_HOUR = 16;
 
-export function getAvailableDates(from = new Date()): ScheduleOption[] {
-  const dates: ScheduleOption[] = [];
+export function getAvailableDates(from = new Date()): DateOption[] {
+  const dates: DateOption[] = [];
 
   for (let offset = 0; offset < BOOKING_WINDOW_DAYS; offset++) {
     const date = new Date(from);
@@ -18,19 +25,17 @@ export function getAvailableDates(from = new Date()): ScheduleOption[] {
 
     dates.push({
       value: date.toISOString().split("T")[0],
-      label: date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      }),
+      weekday: date.toLocaleDateString("en-US", { weekday: "short" }),
+      day: date.toLocaleDateString("en-US", { day: "numeric" }),
+      month: date.toLocaleDateString("en-US", { month: "short" }),
     });
   }
 
   return dates;
 }
 
-export function getTimeSlots(): ScheduleOption[] {
-  const slots: ScheduleOption[] = [];
+export function getTimeSlots(): TimeSlot[] {
+  const slots: TimeSlot[] = [];
 
   for (let hour = OPENING_HOUR; hour < CLOSING_HOUR; hour++) {
     for (const minutes of [0, 30]) {

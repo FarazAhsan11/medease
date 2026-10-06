@@ -1,33 +1,19 @@
 import type { Metadata } from "next";
 
-import { CallControls } from "@/features/video-call/components/call-controls";
-import { VideoTile } from "@/features/video-call/components/video-tile";
+import { Container } from "@/components/layout/container";
+import { CallStage } from "@/features/video-call/components/call-stage";
 
 export const metadata: Metadata = {
-  title: "Video Call",
+  title: "Video Consultation",
 };
-
-const connectionStatus = "Initializing...";
 
 export default function VideoCallPage() {
   return (
-    <div className="flex h-screen flex-col items-center bg-surface-call">
-      <div>
-        <p>{connectionStatus}</p>
-        <p>00:00</p>
-      </div>
-      <div className="flex flex-1 gap-5 p-5">
-        <VideoTile label="You" muted className="w-[180px]" />
-        <VideoTile
-          label="Waiting for connection..."
-          controls
-          className="w-[420px]"
-        />
-      </div>
-      <div className="mb-2.5 bg-surface-status p-2 text-center">
-        {connectionStatus}
-      </div>
-      <CallControls />
-    </div>
+    <Container className="max-w-7xl py-6">
+      <CallStage
+        participantName="Dr. Nida Ali"
+        participantRole="General Practitioner"
+      />
+    </Container>
   );
 }

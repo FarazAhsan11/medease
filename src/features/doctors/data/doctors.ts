@@ -1,12 +1,12 @@
 export type Doctor = {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   specialty: string;
   location: string;
-  experience: string;
+  experienceYears: number;
   consultationFee: number;
   rating: number;
+  reviews: number;
   availableNow: boolean;
   phone: string;
   email: string;
@@ -15,98 +15,98 @@ export type Doctor = {
 export const doctors: Doctor[] = [
   {
     id: "nida-ali",
-    firstName: "Nida",
-    lastName: "Ali",
+    name: "Dr. Nida Ali",
     specialty: "General Practitioner",
     location: "Lahore, Punjab",
-    experience: "10 years in practice",
+    experienceYears: 10,
     consultationFee: 3000,
     rating: 4.9,
+    reviews: 214,
     availableNow: true,
     phone: "+92 300 1234567",
     email: "nida.ali@medease.com",
   },
   {
     id: "ayesha-khan",
-    firstName: "Ayesha",
-    lastName: "Khan",
+    name: "Dr. Ayesha Khan",
     specialty: "Cardiologist",
     location: "Karachi, Sindh",
-    experience: "12 years in practice",
+    experienceYears: 12,
     consultationFee: 5000,
     rating: 4.8,
+    reviews: 186,
     availableNow: true,
     phone: "+92 300 7654321",
     email: "ayesha.khan@medease.com",
   },
   {
     id: "asim-raza",
-    firstName: "Asim",
-    lastName: "Raza",
+    name: "Dr. Asim Raza",
     specialty: "Neurologist",
     location: "Islamabad, Capital Territory",
-    experience: "8 years in practice",
+    experienceYears: 8,
     consultationFee: 4000,
     rating: 4.7,
+    reviews: 132,
     availableNow: false,
     phone: "+92 300 1122334",
     email: "asim.raza@medease.com",
   },
   {
     id: "sana-tariq",
-    firstName: "Sana",
-    lastName: "Tariq",
+    name: "Dr. Sana Tariq",
     specialty: "Dermatologist",
     location: "Rawalpindi, Punjab",
-    experience: "7 years in practice",
+    experienceYears: 7,
     consultationFee: 3500,
     rating: 4.6,
+    reviews: 98,
     availableNow: true,
     phone: "+92 300 5566778",
     email: "sana.tariq@medease.com",
   },
   {
     id: "faisal-ahmed",
-    firstName: "Faisal",
-    lastName: "Ahmed",
+    name: "Dr. Faisal Ahmed",
     specialty: "Orthopedic Surgeon",
     location: "Faisalabad, Punjab",
-    experience: "15 years in practice",
+    experienceYears: 15,
     consultationFee: 6000,
     rating: 4.9,
-    availableNow: true,
+    reviews: 251,
+    availableNow: false,
     phone: "+92 300 9988776",
     email: "faisal.ahmed@medease.com",
   },
   {
     id: "sara-malik",
-    firstName: "Sara",
-    lastName: "Malik",
+    name: "Dr. Sara Malik",
     specialty: "Pediatrician",
     location: "Multan, Punjab",
-    experience: "5 years in practice",
+    experienceYears: 5,
     consultationFee: 2000,
     rating: 4.5,
-    availableNow: false,
+    reviews: 77,
+    availableNow: true,
     phone: "+92 300 1324354",
     email: "sara.malik@medease.com",
   },
   {
     id: "usman-shah",
-    firstName: "Usman",
-    lastName: "Shah",
+    name: "Dr. Usman Shah",
     specialty: "Cardiologist",
     location: "Lahore, Punjab",
-    experience: "9 years in practice",
+    experienceYears: 9,
     consultationFee: 4500,
     rating: 4.7,
+    reviews: 143,
     availableNow: true,
     phone: "+92 300 1111111",
     email: "usman.shah@medease.com",
   },
 ];
 
-export const doctorTypes = [
+export const specialties = [
   "General Practitioner",
   "Cardiologist",
   "Neurologist",

@@ -1,53 +1,51 @@
-import { cn } from "@/lib/utils";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 type DoctorsPaginationProps = {
   totalPages: number;
   currentPage: number;
 };
 
-const navButtonClass =
-  "rounded bg-surface-call px-3 py-2 text-sm text-ink-body transition-colors duration-200 enabled:hover:bg-white disabled:text-ink-disabled max-[480px]:px-2.5 max-[480px]:py-1.5";
-
 export function DoctorsPagination({
   totalPages,
   currentPage,
 }: DoctorsPaginationProps) {
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+
   return (
     <nav
       aria-label="Pagination"
-      className="mt-5 flex items-center justify-center gap-2"
+      className="mt-8 flex items-center justify-center gap-1"
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         disabled={currentPage === 1}
-        className={navButtonClass}
+        className="gap-1"
       >
+        <ChevronLeftIcon aria-hidden />
         Previous
-      </button>
-      {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-        (page) => (
-          <button
-            key={page}
-            type="button"
-            aria-current={page === currentPage ? "page" : undefined}
-            className={cn(
-              "rounded px-3 py-2 text-sm font-semibold transition-colors duration-200 max-[480px]:px-2.5 max-[480px]:py-1.5",
-              page === currentPage
-                ? "bg-white text-black"
-                : "bg-brand-sky text-ink-body hover:bg-line-soft",
-            )}
-          >
-            {page}
-          </button>
-        ),
-      )}
-      <button
-        type="button"
+      </Button>
+      {pages.map((page) => (
+        <Button
+          key={page}
+          size="icon-sm"
+          variant={page === currentPage ? "default" : "ghost"}
+          aria-current={page === currentPage ? "page" : undefined}
+        >
+          {page}
+        </Button>
+      ))}
+      <Button
+        variant="ghost"
+        size="sm"
         disabled={currentPage === totalPages}
-        className={navButtonClass}
+        className="gap-1"
       >
         Next
-      </button>
+        <ChevronRightIcon aria-hidden />
+      </Button>
     </nav>
   );
 }

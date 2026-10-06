@@ -1,11 +1,13 @@
-import { ProfileField } from "@/features/doctor-dashboard/components/profile-field";
-import type { DoctorProfile } from "@/features/doctor-dashboard/data/dashboard";
+import { FormField } from "@/components/shared/form-field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  profileButtonClass,
-  profileFieldClass,
-} from "@/features/doctor-dashboard/lib/profile-styles";
-import { fileInputClass } from "@/lib/form-styles";
-import { cn } from "@/lib/utils";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+import { PanelCard } from "@/features/doctor-dashboard/components/panel-card";
+import type { DoctorProfile } from "@/features/doctor-dashboard/data/dashboard";
 
 type ProfileEditFormProps = {
   profile: DoctorProfile;
@@ -13,95 +15,74 @@ type ProfileEditFormProps = {
 };
 
 const textFields = [
-  { label: "Email", key: "email", type: "email" },
-  { label: "Phone", key: "phone", type: "tel" },
-  { label: "Specialization", key: "specialization", type: "text" },
-  { label: "License Number", key: "licenseNumber", type: "text" },
+  { id: "firstName", label: "First name", type: "text" },
+  { id: "lastName", label: "Last name", type: "text" },
+  { id: "email", label: "Email", type: "email" },
+  { id: "phone", label: "Phone", type: "tel" },
+  { id: "specialization", label: "Specialization", type: "text" },
+  { id: "licenseNumber", label: "License number", type: "text" },
 ] as const;
 
 export function ProfileEditForm({ profile, onCancel }: ProfileEditFormProps) {
   return (
-    <form className="w-[60%] rounded-xl bg-white p-8 shadow-soft max-md:w-full">
-      <div className="mb-4 grid grid-cols-2 gap-4 max-md:grid-cols-1">
-        <ProfileField label="First Name">
-          <input
-            defaultValue={profile.firstName}
-            className={profileFieldClass}
-          />
-        </ProfileField>
-        <ProfileField label="Last Name">
-          <input
-            defaultValue={profile.lastName}
-            className={profileFieldClass}
-          />
-        </ProfileField>
-      </div>
-      <div className="mb-4 grid grid-cols-2 gap-4 max-md:grid-cols-1">
-        <ProfileField label="Age">
-          <input
-            type="number"
-            defaultValue={profile.age}
-            className={profileFieldClass}
-          />
-        </ProfileField>
-        <ProfileField label="Gender">
-          <select
-            defaultValue={profile.gender}
-            className="w-full border border-ink-muted text-[13.33px]"
+    <PanelCard
+      title="Edit profile"
+      description="Keep your details up to date for patients."
+    >
+      <form className="grid gap-4 p-5 sm:grid-cols-2">
+        {textFields.map((field) => (
+          <FormField
+            key={field.id}
+            id={`profile-${field.id}`}
+            label={field.label}
           >
-            <option value="">Select Gender</option>
-            <option>Male</option>
-            <option>Female</option>
-            <option>Other</option>
-          </select>
-        </ProfileField>
-      </div>
-
-      {textFields.map((field) => (
-        <ProfileField key={field.key} label={field.label}>
-          <input
-            type={field.type}
-            defaultValue={profile[field.key]}
-            className={profileFieldClass}
+            <Input
+              id={`profile-${field.id}`}
+              type={field.type}
+              defaultValue={profile[field.id]}
+            />
+          </FormField>
+        ))}
+        <FormField id="profile-age" label="Age">
+          <Input id="profile-age" type="number" defaultValue={profile.age} />
+        </FormField>
+        <FormField id="profile-gender" label="Gender">
+          <NativeSelect
+            id="profile-gender"
+            defaultValue={profile.gender}
+            className="w-full"
+          >
+            {["Male", "Female", "Other"].map((gender) => (
+              <NativeSelectOption key={gender} value={gender}>
+                {gender}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </FormField>
+        <FormField
+          id="profile-address"
+          label="Address"
+          className="sm:col-span-2"
+        >
+          <Textarea
+            id="profile-address"
+            rows={2}
+            defaultValue={profile.address}
           />
-        </ProfileField>
-      ))}
-
-      <ProfileField label="Address">
-        <textarea
-          rows={3}
-          defaultValue={profile.address}
-          className={cn(
-            profileFieldClass,
-            "min-h-20 max-w-[300px] resize-y font-mono text-[13px]",
-          )}
-        />
-      </ProfileField>
-
-      <h4 className="my-[21px] font-bold text-ink-muted">Update Documents</h4>
-      <ProfileField label="Profile Photo">
-        <input
-          type="file"
-          accept="image/*"
-          className={cn(profileFieldClass, fileInputClass)}
-        />
-      </ProfileField>
-      <ProfileField label="Degree Document">
-        <input
-          type="file"
-          accept=".pdf,.doc,.docx"
-          className={cn(profileFieldClass, fileInputClass)}
-        />
-      </ProfileField>
-
-      <div className="mt-5 flex flex-col gap-2.5">
-        <button type="button" className={profileButtonClass}>
-          Save Changes
-        </button>
-        <button type="button" onClick={onCancel} className={profileButtonClass}>
-          Cancel
-        </button>
-      </div>
-    </form>
+        </FormField>
+        <FormField id="profile-photo" label="Profile photo">
+          <Input id="profile-photo" type="file" accept="image/*" />
+        </FormField>
+        <FormField id="profile-degree" label="Degree document">
+          <Input id="profile-degree" type="file" accept=".pdf,.doc,.docx" />
+        </FormField>
+        <div className="flex gap-2 border-t pt-4 sm:col-span-2 sm:justify-end">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button">Save changes</Button>
+        </div>
+      </form>
+    </PanelCard>
   );
 }

@@ -1,22 +1,20 @@
+import { Button } from "@/components/ui/button";
+import { AccountFields } from "@/features/auth/components/account-fields";
 import { AuthFooterLink } from "@/features/auth/components/auth-footer-link";
-import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
-import { ContactFields } from "@/features/auth/components/contact-fields";
-import { NameFields } from "@/features/auth/components/name-fields";
-import { PasswordInput } from "@/features/auth/components/password-input";
 
 export function RegisterForm() {
   return (
     <>
-      <form>
-        <NameFields />
-        <ContactFields />
-        <PasswordInput />
-        <AuthSubmitButton>Create account</AuthSubmitButton>
+      <form className="grid gap-4">
+        <AccountFields idPrefix="register" />
+        <Button type="button" className="mt-2 h-9 w-full">
+          Create account
+        </Button>
       </form>
       <AuthFooterLink
         prompt="Already have an account?"
         href="/login"
-        label="Login here"
+        label="Log in"
       />
     </>
   );

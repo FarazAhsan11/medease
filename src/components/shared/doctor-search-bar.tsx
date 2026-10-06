@@ -1,39 +1,58 @@
-import Image from "next/image";
+import { SearchIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 type DoctorSearchBarProps = {
-  options: string[];
+  specialties: string[];
   className?: string;
 };
 
-export function DoctorSearchBar({ options, className }: DoctorSearchBarProps) {
+export function DoctorSearchBar({
+  specialties,
+  className,
+}: DoctorSearchBarProps) {
   return (
-    <div
+    <form
       role="search"
-      className={cn("flex items-center rounded-lg bg-surface", className)}
+      action="/find-doctor"
+      className={cn(
+        "flex flex-col gap-2 rounded-2xl border bg-card p-2 shadow-soft sm:flex-row sm:items-center",
+        className,
+      )}
     >
-      <select
-        aria-label="Doctor type"
-        className="mr-5 w-[90px] bg-surface text-base outline-none"
+      <NativeSelect
+        name="specialty"
+        aria-label="Specialty"
+        className="w-full sm:w-48 [&_select]:h-10 [&_select]:border-0 [&_select]:bg-muted"
       >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
+        <NativeSelectOption value="">All specialties</NativeSelectOption>
+        {specialties.map((specialty) => (
+          <NativeSelectOption key={specialty} value={specialty}>
+            {specialty}
+          </NativeSelectOption>
         ))}
-      </select>
-      <Image
-        src="/images/search.svg"
-        alt=""
-        width={24}
-        height={24}
-        className="mr-2 size-6"
-      />
-      <input
-        type="text"
-        aria-label="Search doctors"
-        placeholder="Search the best doctor"
-        className="w-[300px] rounded-[5px] bg-surface p-2.5 text-base outline-none max-[480px]:w-full max-[480px]:text-center"
-      />
-    </div>
+      </NativeSelect>
+      <div className="relative flex-1">
+        <SearchIcon
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          name="q"
+          aria-label="Search doctors"
+          placeholder="Search by doctor name or condition"
+          className="h-10 border-0 pl-9 shadow-none focus-visible:ring-0"
+        />
+      </div>
+      <Button type="submit" className="h-10 px-5">
+        Search
+      </Button>
+    </form>
   );
 }

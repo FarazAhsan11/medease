@@ -1,9 +1,14 @@
+import Link from "next/link";
+
 import {
   FacebookIcon,
   InstagramIcon,
   TwitterIcon,
 } from "@/components/icons/social-icons";
+import { Container } from "@/components/layout/container";
+import { Logo } from "@/components/layout/logo";
 import { footerNav } from "@/config/navigation";
+import { siteConfig } from "@/config/site";
 
 const socialLinks = [
   { label: "Facebook", icon: FacebookIcon },
@@ -13,47 +18,51 @@ const socialLinks = [
 
 export function SiteFooter() {
   return (
-    <footer className="bg-footer px-[70px] pt-10 pb-5 text-white max-nav:px-5">
-      <div className="mx-auto max-w-[1200px]">
-        <div className="mb-5 flex items-center justify-between max-nav:flex-col max-nav:text-center">
-          <p className="text-[40px] font-bold">MEDEASE</p>
-          <div className="ml-[50px] flex flex-1 justify-end max-nav:mt-5 max-nav:ml-0 max-nav:justify-center">
-            {footerNav.map((section) => (
-              <div
-                key={section.title}
-                className="mr-[30px] max-nav:mr-0 max-nav:mb-5"
-              >
-                <h3 className="mb-2.5 font-bold uppercase">{section.title}</h3>
-                <ul>
-                  {section.links.map((link) => (
-                    <li key={link} className="my-[5px]">
-                      <a href="#" className="text-footer-link hover:text-brand">
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center justify-between border-t border-footer-line pt-2.5 max-nav:flex-col max-nav:text-center">
-          <p className="text-sm text-ink-muted">
-            &copy; 2024 All Rights Reserved Medease
-          </p>
-          <div className="flex">
+    <footer className="bg-ink text-ink-foreground">
+      <Container className="grid gap-10 py-12 md:grid-cols-[1.5fr_repeat(3,1fr)]">
+        <div className="max-w-xs space-y-4">
+          <Logo inverted />
+          <p className="text-sm leading-relaxed">{siteConfig.description}</p>
+          <div className="flex gap-3">
             {socialLinks.map(({ label, icon: Icon }) => (
               <a
                 key={label}
                 href="#"
                 aria-label={label}
-                className="mx-2.5 text-footer-link hover:text-brand"
+                className="flex size-8 items-center justify-center rounded-full bg-white/5 transition-colors hover:bg-white/10 hover:text-white"
               >
-                <Icon className="size-8" />
+                <Icon className="size-3.5" />
               </a>
             ))}
           </div>
         </div>
+
+        {footerNav.map((section) => (
+          <div key={section.title}>
+            <h3 className="text-sm font-semibold text-white">
+              {section.title}
+            </h3>
+            <ul className="mt-4 space-y-2.5">
+              {section.links.map((link) => (
+                <li key={link.title}>
+                  <Link
+                    href={link.href}
+                    className="text-sm transition-colors hover:text-white"
+                  >
+                    {link.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </Container>
+
+      <div className="border-t border-white/10">
+        <Container className="flex flex-col gap-2 py-6 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <p>&copy; 2024 {siteConfig.name}. All rights reserved.</p>
+          <p>Not a substitute for professional medical advice.</p>
+        </Container>
       </div>
     </footer>
   );

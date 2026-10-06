@@ -1,7 +1,15 @@
+import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { BookingPanel } from "@/features/booking/components/booking-panel";
+import { Container } from "@/components/layout/container";
+import { BookingForm } from "@/features/booking/components/booking-form";
+import { DoctorProfileCard } from "@/features/booking/components/doctor-profile-card";
+import {
+  getAvailableDates,
+  getTimeSlots,
+} from "@/features/booking/lib/schedule";
 import { getDoctorById } from "@/features/doctors/data/doctors";
 
 export async function generateMetadata({
@@ -10,11 +18,7 @@ export async function generateMetadata({
   const { doctorId } = await params;
   const doctor = getDoctorById(doctorId);
 
-  return {
-    title: doctor
-      ? `Book Dr. ${doctor.firstName} ${doctor.lastName}`
-      : "Doctor not found",
-  };
+  return { title: doctor ? `Book ${doctor.name}` : "Doctor not found" };
 }
 
 export default async function BookingPage({
@@ -25,5 +29,19 @@ export default async function BookingPage({
 
   if (!doctor) notFound();
 
-  return <BookingPanel doctor={doctor} />;
+  return (
+    <Container className="py-8">
+      <Link
+        href="/find-doctor"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeftIcon className="size-4" aria-hidden />
+        Back to doctors
+      </Link>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+        <DoctorProfileCard doctor={doctor} />
+        <BookingForm dates={getAvailableDates()} timeSlots={getTimeSlots()} />
+      </div>
+    </Container>
+  );
 }

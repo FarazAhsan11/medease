@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 
-import { AboutFooter } from "@/features/about/components/about-footer";
+import { CtaBanner } from "@/components/shared/cta-banner";
 import { AboutHero } from "@/features/about/components/about-hero";
-import { CtaSection } from "@/features/about/components/cta-section";
 import { FeaturesSection } from "@/features/about/components/features-section";
 import { MissionSection } from "@/features/about/components/mission-section";
 import { TestimonialsSection } from "@/features/about/components/testimonials-section";
@@ -13,13 +12,17 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="bg-surface">
+    <>
       <AboutHero />
       <MissionSection />
       <FeaturesSection />
       <TestimonialsSection />
-      <CtaSection />
-      <AboutFooter />
-    </div>
+      <CtaBanner
+        title="Ready to simplify your healthcare journey?"
+        description="Join thousands of patients who trust MedEase for appointments, lab tests, and records."
+        primary={{ label: "Create a free account", href: "/register" }}
+        secondary={{ label: "Contact us", href: "/contact" }}
+      />
+    </>
   );
 }

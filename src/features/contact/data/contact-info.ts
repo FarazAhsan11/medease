@@ -1,24 +1,41 @@
+import {
+  ClockIcon,
+  MailIcon,
+  MapPinIcon,
+  PhoneIcon,
+  type LucideIcon,
+} from "lucide-react";
+
+import { siteConfig } from "@/config/site";
+
 export type ContactInfo = {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: string;
+  href?: string;
 };
 
 export const contactInfo: ContactInfo[] = [
   {
-    icon: "/images/contact-email.svg",
+    icon: MailIcon,
     label: "Email",
-    value: "info@xpertflow.com",
+    value: siteConfig.contact.email,
+    href: `mailto:${siteConfig.contact.email}`,
   },
   {
-    icon: "/images/contact-phone.svg",
+    icon: PhoneIcon,
     label: "Phone",
-    value: "+92-51 889 6991",
+    value: siteConfig.contact.phone,
+    href: `tel:${siteConfig.contact.phone.replace(/[^+\d]/g, "")}`,
   },
   {
-    icon: "/images/contact-map.svg",
-    label: "Location",
-    value:
-      "Headquarters: XpertFlow, 39 Prince George's Park, BLK14/GSA, #12-37, S118431, Singapore.",
+    icon: MapPinIcon,
+    label: "Headquarters",
+    value: siteConfig.contact.address,
+  },
+  {
+    icon: ClockIcon,
+    label: "Support hours",
+    value: "Monday – Saturday, 9 AM to 6 PM",
   },
 ];

@@ -1,16 +1,32 @@
-import { AboutFeatureCard } from "@/features/about/components/about-feature-card";
-import { AboutSectionTitle } from "@/features/about/components/about-section-title";
+import { Container } from "@/components/layout/container";
+import { IconTile } from "@/components/shared/icon-tile";
+import { SectionHeading } from "@/components/shared/section-heading";
 import { aboutFeatures } from "@/features/about/data/about-content";
 
 export function FeaturesSection() {
   return (
-    <section className="px-[140px] py-5 max-lg:p-5">
-      <AboutSectionTitle>What Makes Us Special</AboutSectionTitle>
-      <div className="flex flex-wrap justify-center gap-5 max-lg:flex-col max-lg:gap-[15px]">
-        {aboutFeatures.map((feature) => (
-          <AboutFeatureCard key={feature.title} feature={feature} />
-        ))}
-      </div>
+    <section className="border-y bg-card py-16">
+      <Container>
+        <SectionHeading
+          eyebrow="What makes us special"
+          title="Built around the way you manage your health"
+          align="center"
+        />
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          {aboutFeatures.map((feature) => (
+            <div
+              key={feature.title}
+              className="rounded-2xl border bg-background p-6"
+            >
+              <IconTile icon={feature.icon} size="lg" />
+              <h3 className="mt-4 text-base font-semibold">{feature.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                {feature.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Container>
     </section>
   );
 }

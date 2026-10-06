@@ -1,34 +1,33 @@
+import {
+  HouseIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  type LucideIcon,
+} from "lucide-react";
+
 export type Highlight = {
-  icon: string;
-  iconWidth: number;
-  iconHeight: number;
+  icon: LucideIcon;
   title: string;
   description: string;
 };
 
 export const highlights: Highlight[] = [
   {
-    icon: "/images/why-ai.png",
-    iconWidth: 56,
-    iconHeight: 65,
-    title: "AI Doctor Recommendations",
+    icon: SparklesIcon,
+    title: "AI doctor recommendations",
     description:
-      "AI-powered recommendations to match you with the best specialists for your needs.",
+      "Our assistant matches you with the right specialist based on your symptoms and needs.",
   },
   {
-    icon: "/images/why-home-sample.svg",
-    iconWidth: 56,
-    iconHeight: 57,
-    title: "Home Sample Collection",
+    icon: HouseIcon,
+    title: "Home sample collection",
     description:
-      "Convenient lab test services with samples collected directly from your home.At your door steps",
+      "Skip the waiting room. A technician collects lab samples directly from your home.",
   },
   {
-    icon: "/images/why-doctor-kit.png",
-    iconWidth: 56,
-    iconHeight: 57,
-    title: "Secure Consultations",
+    icon: ShieldCheckIcon,
+    title: "Secure consultations",
     description:
-      "Private and encrypted online consultations to keep your health data secure.",
+      "Private, encrypted video consultations keep your health information safe.",
   },
 ];

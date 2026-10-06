@@ -1,27 +1,38 @@
+import {
+  MicIcon,
+  MonitorUpIcon,
+  PhoneOffIcon,
+  RefreshCwIcon,
+  VideoIcon,
+} from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 const controls = [
-  { label: "Mute", danger: false },
-  { label: "Turn Video Off", danger: false },
-  { label: "End Call", danger: true },
-  { label: "Refresh Video", danger: false },
+  { label: "Mute microphone", icon: MicIcon },
+  { label: "Turn camera off", icon: VideoIcon },
+  { label: "Share screen", icon: MonitorUpIcon },
+  { label: "Refresh video", icon: RefreshCwIcon },
+  { label: "End call", icon: PhoneOffIcon, danger: true },
 ];
 
 export function CallControls() {
   return (
-    <div className="flex justify-center gap-5 border-t border-line-soft bg-white p-5">
-      {controls.map((control) => (
+    <div className="flex items-center gap-2 rounded-full bg-ink/70 p-2 backdrop-blur-md">
+      {controls.map(({ label, icon: Icon, danger }) => (
         <button
-          key={control.label}
+          key={label}
           type="button"
+          aria-label={label}
+          title={label}
           className={cn(
-            "rounded-full px-6 py-3 font-semibold transition-all duration-200",
-            control.danger
-              ? "bg-danger-call text-white hover:bg-danger-call-hover"
-              : "bg-control text-ink-body hover:bg-line-soft",
+            "flex size-11 items-center justify-center rounded-full text-white transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+            danger
+              ? "w-14 bg-destructive hover:bg-destructive/90"
+              : "bg-white/10 hover:bg-white/20",
           )}
         >
-          {control.label}
+          <Icon className="size-5" aria-hidden />
         </button>
       ))}
     </div>

@@ -8,13 +8,11 @@ type AuthFooterLinkProps = {
 
 export function AuthFooterLink({ prompt, href, label }: AuthFooterLinkProps) {
   return (
-    <div className="mt-[70px] flex justify-center max-sm:mt-[30px]">
-      <p className="font-bold text-ink-muted">
-        {prompt}{" "}
-        <Link href={href} className="text-link-default underline">
-          {label}
-        </Link>
-      </p>
-    </div>
+    <p className="mt-6 text-center text-sm text-muted-foreground">
+      {prompt}{" "}
+      <Link href={href} className="font-medium text-primary hover:underline">
+        {label}
+      </Link>
+    </p>
   );
 }

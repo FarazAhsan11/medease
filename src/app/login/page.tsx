@@ -1,22 +1,21 @@
 import type { Metadata } from "next";
 
-import { AuthCard } from "@/features/auth/components/auth-card";
+import { AuthShell } from "@/features/auth/components/auth-shell";
 import { LoginForm } from "@/features/auth/components/login-form";
 
 export const metadata: Metadata = {
-  title: "Login",
+  title: "Log in",
 };
 
 export default function LoginPage() {
   return (
-    <AuthCard
-      image="/images/auth-patient.png"
-      imageAlt="Doctor"
-      switchHref="/doctor/login"
-      switchLabel="Login as Doctor"
-      title="Login"
+    <AuthShell
+      role="patient"
+      mode="login"
+      title="Welcome back"
+      description="Log in to manage your appointments and health records."
     >
       <LoginForm registerHref="/register" />
-    </AuthCard>
+    </AuthShell>
   );
 }

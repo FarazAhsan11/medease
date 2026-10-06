@@ -24,6 +24,7 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 - Server Components by default; `"use client"` only on the smallest interactive leaf.
 - Mutations via Server Actions, validated with Zod on the server.
 - Base UI uses the `render` prop, not `asChild`. Style links as buttons with `buttonVariants()`.
-- Use the brand tokens in `globals.css` (`bg-brand`, `bg-surface`, `text-ink-muted`), never hex colors. Add a token when a new color is needed. Support mobile.
+- Use the theme tokens in `globals.css` (`bg-primary`, `bg-card`, `text-muted-foreground`, `bg-success-soft`), never hex colors. Add a token when a new color is needed.
+- Keep the type scale restrained: page titles `text-2xl`/`text-3xl font-semibold`, card titles `text-sm`/`text-base font-semibold`, body `text-sm`. Support mobile.
 - Patient data is sensitive: never log it, put it in URLs, or store it client-side. Enforce auth on the server.
 - Commit messages: short, imperative, no co-author or tool attribution lines.

@@ -1,32 +1,45 @@
+import {
+  BotIcon,
+  FlaskConicalIcon,
+  PillIcon,
+  StethoscopeIcon,
+  type LucideIcon,
+} from "lucide-react";
+
 export type Service = {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   description: string;
+  href: string;
 };
 
 export const services: Service[] = [
   {
-    icon: "/images/service-ai.svg",
-    title: "Get AI Medical Assistant",
+    icon: BotIcon,
+    title: "AI Medical Assistant",
     description:
-      "Assess your symptoms instantly with our AI Medical Assistant and get personalized health recommendations, anytime, anywhere.",
+      "Describe your symptoms and get instant, personalized guidance on which specialist to see.",
+    href: "/talk-to-ai",
   },
   {
-    icon: "/images/service-find-doctor.svg",
+    icon: StethoscopeIcon,
     title: "Find a Doctor",
     description:
-      "Connect with top specialists for expert consultations, available at your convenience. At your door steps.",
+      "Browse verified specialists and book a consultation at a time that suits you.",
+    href: "/find-doctor",
   },
   {
-    icon: "/images/service-lab.svg",
+    icon: FlaskConicalIcon,
     title: "Lab Test Booking",
     description:
-      "Book lab tests online with home sample collection for your convenience. Get fast and reliable results delivered directly to you.",
+      "Book lab tests online with home sample collection and fast, reliable results.",
+    href: "#",
   },
   {
-    icon: "/images/service-medicine.svg",
+    icon: PillIcon,
     title: "Order Medicines",
     description:
-      "Order your medicines online and enjoy fast, hassle-free delivery. Stay stocked with essentials, right at your doorstep.",
+      "Order prescriptions online and get them delivered quickly to your doorstep.",
+    href: "#",
   },
 ];

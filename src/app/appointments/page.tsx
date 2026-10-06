@@ -1,9 +1,11 @@
+import { PlusIcon } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
-import { AppointmentsView } from "@/features/appointments/components/appointments-view";
-import { EmptyAppointments } from "@/features/appointments/components/empty-appointments";
-import { PastAppointmentCard } from "@/features/appointments/components/past-appointment-card";
-import { UpcomingAppointmentCard } from "@/features/appointments/components/upcoming-appointment-card";
+import { Container } from "@/components/layout/container";
+import { PageHeader } from "@/components/shared/page-header";
+import { buttonVariants } from "@/components/ui/button";
+import { AppointmentTabs } from "@/features/appointments/components/appointment-tabs";
 import {
   pastAppointments,
   upcomingAppointments,
@@ -15,31 +17,27 @@ export const metadata: Metadata = {
 
 export default function AppointmentsPage() {
   return (
-    <AppointmentsView
-      upcoming={
-        upcomingAppointments.length > 0 ? (
-          upcomingAppointments.map((appointment) => (
-            <UpcomingAppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-            />
-          ))
-        ) : (
-          <EmptyAppointments message="No upcoming appointments found." />
-        )
-      }
-      past={
-        pastAppointments.length > 0 ? (
-          pastAppointments.map((appointment) => (
-            <PastAppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-            />
-          ))
-        ) : (
-          <EmptyAppointments message="No past appointments found." />
-        )
-      }
-    />
+    <>
+      <PageHeader
+        eyebrow="Appointments"
+        title="Your appointments"
+        description="Manage upcoming consultations and review past visits."
+        actions={
+          <Link
+            href="/find-doctor"
+            className={buttonVariants({ className: "h-9 gap-1.5 px-4" })}
+          >
+            <PlusIcon aria-hidden />
+            Book appointment
+          </Link>
+        }
+      />
+      <Container className="py-8">
+        <AppointmentTabs
+          upcoming={upcomingAppointments}
+          past={pastAppointments}
+        />
+      </Container>
+    </>
   );
 }

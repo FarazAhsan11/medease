@@ -3,14 +3,22 @@ import type { Doctor } from "@/features/doctors/data/doctors";
 
 type DoctorListProps = {
   doctors: Doctor[];
+  total: number;
 };
 
-export function DoctorList({ doctors }: DoctorListProps) {
+export function DoctorList({ doctors, total }: DoctorListProps) {
   return (
-    <div className="ml-6 grid w-[86%] grid-cols-[repeat(3,1fr)] gap-5 max-[1400px]:grid-cols-[repeat(2,1fr)] max-md:ml-0 max-md:w-full max-md:grid-cols-[1fr] max-md:gap-[15px]">
-      {doctors.map((doctor) => (
-        <DoctorCard key={doctor.id} doctor={doctor} />
-      ))}
+    <div>
+      <p className="text-sm text-muted-foreground">
+        Showing{" "}
+        <span className="font-medium text-foreground">{doctors.length}</span> of{" "}
+        <span className="font-medium text-foreground">{total}</span> doctors
+      </p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {doctors.map((doctor) => (
+          <DoctorCard key={doctor.id} doctor={doctor} />
+        ))}
+      </div>
     </div>
   );
 }

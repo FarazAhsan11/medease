@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { AuthCard } from "@/features/auth/components/auth-card";
+import { AuthShell } from "@/features/auth/components/auth-shell";
 import { RegisterForm } from "@/features/auth/components/register-form";
 
 export const metadata: Metadata = {
@@ -9,14 +9,13 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <AuthCard
-      image="/images/auth-patient.png"
-      imageAlt="Doctor"
-      switchHref="/doctor/register"
-      switchLabel="Register as Doctor"
-      title="Create an account"
+    <AuthShell
+      role="patient"
+      mode="register"
+      title="Create your account"
+      description="Book doctors, order lab tests, and keep your records in one place."
     >
       <RegisterForm />
-    </AuthCard>
+    </AuthShell>
   );
 }

@@ -1,43 +1,52 @@
-const fieldClass =
-  "my-2 w-[300px] max-w-full rounded-md border-2 border-line-subtle bg-surface-subtle p-[0.8rem] text-base outline-none";
+import { SendIcon } from "lucide-react";
+
+import { FormField } from "@/components/shared/form-field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export function ContactForm() {
   return (
-    <section className="max-w-[45%] flex-[1_1_45%] rounded-2xl bg-white p-5 shadow-panel max-xl:max-w-[48%] max-xl:flex-[1_1_48%] max-lg:max-w-full max-lg:flex-[1_1_100%]">
-      <h1 className="my-[21px] text-[32px] font-bold max-sm:text-2xl">
-        Let&apos;s Chat, Reach Out to Us
-      </h1>
-      <p className="my-[5px] text-ink-muted">
-        Have questions or feedback? We&apos;re here to help. Send us a message,
-        and we&apos;ll respond within 24 hours.
+    <div className="rounded-2xl border bg-card p-6 sm:p-8">
+      <h2 className="text-lg font-semibold">Send us a message</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        We usually respond within 24 hours.
       </p>
-      <form>
-        <div className="mb-4 flex flex-col">
-          <input
-            type="email"
-            name="email"
-            required
-            aria-label="Email address"
-            placeholder="Email address"
-            className={fieldClass}
-          />
+
+      <form className="mt-6 grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField id="contact-name" label="Full name">
+            <Input id="contact-name" name="name" placeholder="Ali Raza" />
+          </FormField>
+          <FormField id="contact-email" label="Email">
+            <Input
+              id="contact-email"
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+            />
+          </FormField>
         </div>
-        <div className="mb-4 flex flex-col">
-          <textarea
+        <FormField id="contact-subject" label="Subject">
+          <Input
+            id="contact-subject"
+            name="subject"
+            placeholder="How can we help?"
+          />
+        </FormField>
+        <FormField id="contact-message" label="Message">
+          <Textarea
+            id="contact-message"
             name="message"
-            required
-            aria-label="Message"
-            placeholder="Leave us a message"
-            className={`${fieldClass} min-h-20 resize-y font-mono text-[13px]`}
+            rows={5}
+            placeholder="Tell us a bit more…"
           />
-        </div>
-        <button
-          type="button"
-          className="w-[300px] max-w-full rounded-lg bg-brand px-5 py-3 text-base text-white hover:bg-brand-deep"
-        >
-          Send Message
-        </button>
+        </FormField>
+        <Button type="button" className="h-9 w-full gap-2 sm:w-fit sm:px-5">
+          <SendIcon aria-hidden />
+          Send message
+        </Button>
       </form>
-    </section>
+    </div>
   );
 }

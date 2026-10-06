@@ -1,81 +1,69 @@
-import Image from "next/image";
+import { SlidersHorizontalIcon } from "lucide-react";
 
-import { FilterSelect } from "@/features/doctors/components/filter-select";
-import { filterFieldClass } from "@/features/doctors/lib/filter-styles";
+import { FormField } from "@/components/shared/form-field";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { specialties } from "@/features/doctors/data/doctors";
 
-const typeOptions = [
-  "General Practitioner",
-  "Cardiologist",
-  "Neurologist",
-  "Dermatologist",
-].map((type) => ({ value: type, label: type }));
+const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const genderOptions = ["Male", "Female"].map((gender) => ({
-  value: gender,
-  label: gender,
-}));
-
-const ratingOptions = [
-  { value: "4", label: "4+" },
-  { value: "4.5", label: "4.5+" },
-];
-
-const weekDays = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
+const selectFilters = [
+  { id: "filter-type", label: "Specialty", options: specialties },
+  { id: "filter-gender", label: "Gender", options: ["Male", "Female"] },
+  { id: "filter-rating", label: "Rating", options: ["4.5 & up", "4.0 & up"] },
 ];
 
 export function DoctorFilters() {
   return (
-    <aside className="flex w-1/4 flex-col gap-5 rounded-[15px] bg-surface-filter p-5 shadow-filter max-[1400px]:mr-[30px] max-[1400px]:mb-5 max-[1400px]:w-[40%] max-[480px]:p-2.5 max-md:w-full">
-      <div className="flex w-1/2 items-center justify-center rounded-lg bg-surface-filter-head max-md:h-12 max-md:w-[40%]">
-        <h2 className="mt-4 mb-5 text-xl font-bold text-white">Filters</h2>
-        <Image
-          src="/images/filter.svg"
-          alt=""
-          width={32}
-          height={32}
-          className="size-8 max-md:size-6"
-        />
+    <aside className="h-fit rounded-2xl border bg-card p-5 lg:sticky lg:top-20">
+      <div className="flex items-center gap-2">
+        <SlidersHorizontalIcon className="size-4 text-primary" aria-hidden />
+        <h2 className="text-sm font-semibold">Filters</h2>
       </div>
 
-      <form>
-        <FilterSelect
-          label="Type of Doctor"
-          name="type"
-          options={typeOptions}
-        />
-        <label className="mb-2.5 block text-sm text-ink-label">
-          Location:
-          <input
-            type="text"
-            name="location"
-            placeholder="Enter location"
-            className={filterFieldClass}
-          />
-        </label>
-        <FilterSelect label="Gender" name="gender" options={genderOptions} />
-        <FilterSelect label="Rating" name="rating" options={ratingOptions} />
+      <form className="mt-5 grid gap-4">
+        {selectFilters.map((filter) => (
+          <FormField key={filter.id} id={filter.id} label={filter.label}>
+            <NativeSelect id={filter.id} className="w-full">
+              <NativeSelectOption value="">Any</NativeSelectOption>
+              {filter.options.map((option) => (
+                <NativeSelectOption key={option} value={option}>
+                  {option}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </FormField>
+        ))}
 
-        <h3 className="mb-2.5 text-base font-bold text-ink-body">
-          Availability:
-        </h3>
-        <div className="flex flex-wrap gap-2.5">
-          {weekDays.map((day) => (
-            <label key={day} className="flex text-sm text-ink-label">
-              {day}:
-              <input
-                type="checkbox"
-                name={day.toLowerCase()}
-                className="mx-1 mb-[15px] size-[13px]"
-              />
-            </label>
-          ))}
+        <FormField id="filter-location" label="Location">
+          <Input id="filter-location" placeholder="City or area" />
+        </FormField>
+
+        <fieldset>
+          <legend className="text-sm font-medium">Availability</legend>
+          <div className="mt-2 grid grid-cols-4 gap-2 lg:grid-cols-3">
+            {weekDays.map((day) => (
+              <label
+                key={day}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground"
+              >
+                <Checkbox name="days" value={day} />
+                {day}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <Button type="reset" variant="outline">
+            Reset
+          </Button>
+          <Button type="button">Apply</Button>
         </div>
       </form>
     </aside>

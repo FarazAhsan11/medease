@@ -1,64 +1,69 @@
-import Image from "next/image";
+import { BotIcon, CheckCircle2Icon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 
+import { Container } from "@/components/layout/container";
+import { buttonVariants } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
+import { HeroVisual } from "@/features/home/components/hero-visual";
 import { cn } from "@/lib/utils";
 
-const heroTitle = "Your One-Stop Solution for Medical Assistance.";
-
-const primaryClass =
-  "flex h-[60px] items-center justify-center rounded-2xl bg-brand px-5 py-2.5 text-xl font-bold text-white";
-const secondaryClass =
-  "flex h-[60px] items-center justify-center rounded-2xl border-2 border-brand bg-surface px-5 py-2.5 text-xl font-bold text-brand";
+const trustPoints = [
+  "Verified specialists",
+  "Home sample collection",
+  "Secure consultations",
+];
 
 export function Hero() {
   return (
-    <section className="mb-10 flex items-center justify-between max-nav:flex-col max-nav:text-center">
-      <div className="w-[40%] pt-[70px] text-start max-md:hidden">
-        <h1 className="mt-8 mb-2.5 text-5xl font-bold max-nav:text-[28px]">
-          {heroTitle}
-        </h1>
-        <p className="mb-5 text-2xl text-ink-soft max-nav:text-base">
-          {siteConfig.description}
-        </p>
-        <div className="flex flex-col justify-center gap-2.5">
-          <Link href="/talk-to-ai" className={cn(primaryClass, "w-[281px]")}>
-            Talk to AI
-          </Link>
-          <Link href="/find-doctor" className={cn(secondaryClass, "w-[281px]")}>
-            Find a Doctor Now
-          </Link>
-        </div>
-      </div>
-      <Image
-        src="/images/home-doctor.png"
-        alt="Doctor"
-        width={540}
-        height={550}
-        priority
-        className="h-[550px] w-[540px] rounded-[10px] max-md:hidden"
-      />
+    <section className="overflow-hidden bg-card">
+      <Container className="grid items-center gap-12 py-12 lg:grid-cols-[1.1fr_1fr] lg:py-20">
+        <div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+            <SparklesIcon className="size-3.5" aria-hidden />
+            AI-powered healthcare
+          </span>
+          <h1 className="mt-5 text-4xl leading-tight font-semibold sm:text-5xl">
+            Your one-stop solution for{" "}
+            <span className="text-primary">medical assistance</span>
+          </h1>
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground">
+            {siteConfig.description}
+          </p>
 
-      <div className="flex flex-col items-center md:hidden">
-        <h1 className="my-[21px] text-[32px] font-bold">{heroTitle}</h1>
-        <p className="my-[5px] text-ink-muted">{siteConfig.description}</p>
-        <Image
-          src="/images/home-doctor-mobile.png"
-          alt="Doctor"
-          width={333}
-          height={286}
-          priority
-        />
-        <Link
-          href="/talk-to-ai"
-          className={cn(primaryClass, "mb-3.5 w-[340px]")}
-        >
-          Talk to AI
-        </Link>
-        <Link href="/find-doctor" className={cn(secondaryClass, "w-[340px]")}>
-          Find a Doctor Now
-        </Link>
-      </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/talk-to-ai"
+              className={cn(buttonVariants({ size: "lg" }), "h-10 gap-2 px-5")}
+            >
+              <BotIcon aria-hidden />
+              Talk to AI
+            </Link>
+            <Link
+              href="/find-doctor"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "h-10 px-5",
+              )}
+            >
+              Find a doctor
+            </Link>
+          </div>
+
+          <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2">
+            {trustPoints.map((point) => (
+              <li
+                key={point}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground"
+              >
+                <CheckCircle2Icon className="size-4 text-success" aria-hidden />
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <HeroVisual />
+      </Container>
     </section>
   );
 }

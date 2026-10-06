@@ -1,19 +1,26 @@
-import { AboutSectionTitle } from "@/features/about/components/about-section-title";
-import { AboutTestimonialCard } from "@/features/about/components/about-testimonial-card";
+import { Container } from "@/components/layout/container";
+import { SectionHeading } from "@/components/shared/section-heading";
+import { TestimonialCard } from "@/features/about/components/testimonial-card";
 import { aboutTestimonials } from "@/features/about/data/about-content";
 
 export function TestimonialsSection() {
   return (
-    <section className="bg-surface px-[140px] py-[30px] text-start max-lg:p-5">
-      <AboutSectionTitle>What Our Users Say</AboutSectionTitle>
-      <div className="flex flex-wrap justify-center gap-5 max-[480px]:items-center max-lg:flex-col max-lg:gap-[15px]">
-        {aboutTestimonials.map((testimonial) => (
-          <AboutTestimonialCard
-            key={testimonial.author}
-            testimonial={testimonial}
-          />
-        ))}
-      </div>
+    <section className="pt-16">
+      <Container>
+        <SectionHeading
+          eyebrow="Testimonials"
+          title="What our users say"
+          align="center"
+        />
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          {aboutTestimonials.map((testimonial) => (
+            <TestimonialCard
+              key={testimonial.author}
+              testimonial={testimonial}
+            />
+          ))}
+        </div>
+      </Container>
     </section>
   );
 }
