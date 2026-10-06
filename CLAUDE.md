@@ -15,7 +15,8 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 - `src/features/<name>/` all code for one feature (`components/`, `actions/`, `schemas/`, `data/`)
 - `src/components/ui/` shadcn primitives, added via `npx shadcn@latest add <name>`, don't hand-edit
 - `src/components/shared/` components used by 2+ features
-- `src/components/layout/` app shell
+- `src/components/layout/` app shell (header, mobile nav, footer)
+- Static mock data lives in each feature's `data/` folder until the backend is connected
 
 ## Rules
 
@@ -23,6 +24,6 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 - Server Components by default; `"use client"` only on the smallest interactive leaf.
 - Mutations via Server Actions, validated with Zod on the server.
 - Base UI uses the `render` prop, not `asChild`. Style links as buttons with `buttonVariants()`.
-- Use theme tokens (`bg-primary`, `text-muted-foreground`), never hex colors. Support dark mode and mobile.
+- Use the brand tokens in `globals.css` (`bg-brand`, `bg-surface`, `text-ink-muted`), never hex colors. Add a token when a new color is needed. Support mobile.
 - Patient data is sensitive: never log it, put it in URLs, or store it client-side. Enforce auth on the server.
 - Commit messages: short, imperative, no co-author or tool attribution lines.

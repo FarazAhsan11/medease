@@ -1,5 +1,5 @@
 export const siteConfig = {
   name: "MedEase",
   description:
-    "Book appointments, manage prescriptions, and keep your health records in one place.",
+    "AI-powered doctor recommendations, lab tests at your doorstep, and convenient online consultations.",
 } as const;
