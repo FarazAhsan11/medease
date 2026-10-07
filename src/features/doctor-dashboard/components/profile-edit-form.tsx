@@ -6,7 +6,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { PanelCard } from "@/features/doctor-dashboard/components/panel-card";
+import { PanelCard } from "@/components/shared/panel-card";
 import type { DoctorProfile } from "@/features/doctor-dashboard/data/dashboard";
 
 type ProfileEditFormProps = {

@@ -1,6 +1,6 @@
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
-import { DetailList } from "@/features/doctor-dashboard/components/detail-list";
+import { DetailList } from "@/components/shared/detail-list";
 import type { PatientAppointment } from "@/features/doctor-dashboard/data/dashboard";
 
 type PatientsPanelProps = {

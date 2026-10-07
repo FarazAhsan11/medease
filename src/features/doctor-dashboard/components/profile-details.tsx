@@ -1,7 +1,7 @@
 import { FileTextIcon } from "lucide-react";
 
-import { DetailList } from "@/features/doctor-dashboard/components/detail-list";
-import { PanelCard } from "@/features/doctor-dashboard/components/panel-card";
+import { DetailList } from "@/components/shared/detail-list";
+import { PanelCard } from "@/components/shared/panel-card";
 import type { DoctorProfile } from "@/features/doctor-dashboard/data/dashboard";
 
 type ProfileDetailsProps = {

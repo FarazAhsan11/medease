@@ -2,8 +2,8 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DetailList } from "@/features/doctor-dashboard/components/detail-list";
-import { PanelCard } from "@/features/doctor-dashboard/components/panel-card";
+import { DetailList } from "@/components/shared/detail-list";
+import { PanelCard } from "@/components/shared/panel-card";
 import type { PatientAppointment } from "@/features/doctor-dashboard/data/dashboard";
 
 type PatientDetailsCardProps = {

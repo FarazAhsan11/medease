@@ -1,16 +1,17 @@
 import Link from "next/link";
 
 import { FormField } from "@/components/shared/form-field";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthFooterLink } from "@/features/auth/components/auth-footer-link";
+import { AuthSubmitLink } from "@/features/auth/components/auth-submit-link";
 import { PasswordInput } from "@/features/auth/components/password-input";
 
 type LoginFormProps = {
   registerHref: string;
+  dashboardHref: string;
 };
 
-export function LoginForm({ registerHref }: LoginFormProps) {
+export function LoginForm({ registerHref, dashboardHref }: LoginFormProps) {
   return (
     <>
       <form className="grid gap-4">
@@ -28,7 +29,10 @@ export function LoginForm({ registerHref }: LoginFormProps) {
             <label htmlFor="login-password" className="text-sm font-medium">
               Password
             </label>
-            <Link href="#" className="text-xs text-primary hover:underline">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-primary hover:underline"
+            >
               Forgot password?
             </Link>
           </div>
@@ -39,9 +43,7 @@ export function LoginForm({ registerHref }: LoginFormProps) {
             placeholder="Enter your password"
           />
         </div>
-        <Button type="button" className="mt-2 h-9 w-full">
-          Log in
-        </Button>
+        <AuthSubmitLink href={dashboardHref}>Log in</AuthSubmitLink>
       </form>
       <AuthFooterLink
         prompt="Don't have an account?"

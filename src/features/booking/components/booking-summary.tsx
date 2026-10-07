@@ -1,7 +1,7 @@
 import { CalendarCheckIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { DateOption, TimeSlot } from "@/features/booking/lib/schedule";
+import type { DateOption, TimeSlot } from "@/lib/schedule";
 
 type BookingSummaryProps = {
   date: DateOption | null;
@@ -10,7 +10,7 @@ type BookingSummaryProps = {
 
 export function BookingSummary({ date, time }: BookingSummaryProps) {
   return (
-    <div className="mt-8 flex flex-col gap-4 rounded-xl bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 rounded-xl bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <CalendarCheckIcon
           className="size-5 text-muted-foreground"

@@ -33,13 +33,13 @@ export const services: Service[] = [
     title: "Lab Test Booking",
     description:
       "Book lab tests online with home sample collection and fast, reliable results.",
-    href: "#",
+    href: "/lab-tests",
   },
   {
     icon: PillIcon,
     title: "Order Medicines",
     description:
       "Order prescriptions online and get them delivered quickly to your doorstep.",
-    href: "#",
+    href: "/medicines",
   },
 ];

@@ -1,5 +1,4 @@
 import { FormField } from "@/components/shared/form-field";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   NativeSelect,
@@ -8,6 +7,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { AccountFields } from "@/features/auth/components/account-fields";
 import { AuthFooterLink } from "@/features/auth/components/auth-footer-link";
+import { AuthSubmitLink } from "@/features/auth/components/auth-submit-link";
 import { genders, specializations } from "@/features/auth/data/specializations";
 
 export function DoctorRegisterForm() {
@@ -77,13 +77,11 @@ export function DoctorRegisterForm() {
           </FormField>
         </div>
 
-        <Button type="button" className="mt-2 h-9 w-full">
-          Create doctor account
-        </Button>
+        <AuthSubmitLink href="/doctor">Create doctor account</AuthSubmitLink>
       </form>
       <AuthFooterLink
         prompt="Already registered?"
-        href="/doctor/login"
+        href="/login/doctor"
         label="Log in"
       />
     </>

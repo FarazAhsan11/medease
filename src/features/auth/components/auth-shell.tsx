@@ -1,23 +1,23 @@
 import type { ReactNode } from "react";
 
+import type { DashboardRole } from "@/config/dashboards";
 import { AuthVisual } from "@/features/auth/components/auth-visual";
 import {
   RoleSwitch,
   type AuthMode,
-  type AuthRole,
 } from "@/features/auth/components/role-switch";
 
 type AuthShellProps = {
   title: string;
   description: string;
-  role: AuthRole;
-  mode: AuthMode;
+  role: DashboardRole;
+  mode?: AuthMode;
   children: ReactNode;
 };
 
 const visuals: Record<
-  AuthRole,
-  { image: string; quote: string; author: string }
+  DashboardRole,
+  { image?: string; quote: string; author: string }
 > = {
   patient: {
     image: "/images/auth-patient.png",
@@ -30,6 +30,11 @@ const visuals: Record<
     quote:
       "MedEase lets me focus on my patients while it handles scheduling and records.",
     author: "Dr. Nida Ali, general practitioner",
+  },
+  lab: {
+    quote:
+      "Home collections, test queues, and report delivery finally live in one place.",
+    author: "CityCare Diagnostics",
   },
 };
 
@@ -45,7 +50,7 @@ export function AuthShell({
       <AuthVisual {...visuals[role]} />
       <div className="flex items-center justify-center py-10">
         <div className="w-full max-w-sm">
-          <RoleSwitch role={role} mode={mode} />
+          {mode && <RoleSwitch role={role} mode={mode} />}
           <h1 className="mt-8 text-2xl font-semibold">{title}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
           <div className="mt-6">{children}</div>

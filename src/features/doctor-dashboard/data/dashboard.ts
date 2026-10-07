@@ -3,8 +3,9 @@ import {
   MessageSquareIcon,
   StarIcon,
   UsersIcon,
-  type LucideIcon,
 } from "lucide-react";
+
+import type { Stat } from "@/components/shared/stat-card";
 
 export type PatientAppointment = {
   id: string;
@@ -17,12 +18,20 @@ export type PatientAppointment = {
   lastVisit: string;
 };
 
-export type PatientMessage = {
+export type ChatMessage = {
   id: string;
-  sender: string;
-  message: string;
+  from: "patient" | "doctor";
+  text: string;
+  time: string;
+};
+
+export type MessageThread = {
+  id: string;
+  patientName: string;
+  preview: string;
   time: string;
   unread: boolean;
+  messages: ChatMessage[];
 };
 
 export type DoctorProfile = {
@@ -37,13 +46,6 @@ export type DoctorProfile = {
   licenseNumber: string;
   memberSince: string;
   photo: string;
-};
-
-export type DashboardStat = {
-  label: string;
-  value: string;
-  hint: string;
-  icon: LucideIcon;
 };
 
 export const patientAppointments: PatientAppointment[] = [
@@ -79,20 +81,69 @@ export const patientAppointments: PatientAppointment[] = [
   },
 ];
 
-export const patientMessages: PatientMessage[] = [
+export const messageThreads: MessageThread[] = [
   {
-    id: "msg-1",
-    sender: "Shabna Firdos",
-    message: "Hi Doctor, I have a question about my prescription.",
+    id: "thread-1",
+    patientName: "Shabna Firdos",
+    preview: "Hi Doctor, I have a question about my prescription.",
     time: "10:15 AM",
     unread: true,
+    messages: [
+      {
+        id: "m1",
+        from: "doctor",
+        text: "Your blood pressure readings look much better this week.",
+        time: "Yesterday, 4:20 PM",
+      },
+      {
+        id: "m2",
+        from: "patient",
+        text: "Thank you! I've been taking the medicine every morning.",
+        time: "Yesterday, 4:35 PM",
+      },
+      {
+        id: "m3",
+        from: "patient",
+        text: "Hi Doctor, I have a question about my prescription. Can I take it with food?",
+        time: "10:15 AM",
+      },
+    ],
   },
   {
-    id: "msg-2",
-    sender: "Ali Khan",
-    message: "Can we reschedule my appointment?",
-    time: "11:30 AM",
+    id: "thread-2",
+    patientName: "Ali Khan",
+    preview: "Can we reschedule my appointment?",
+    time: "9:30 AM",
     unread: false,
+    messages: [
+      {
+        id: "m1",
+        from: "patient",
+        text: "Can we reschedule my appointment to next week?",
+        time: "9:30 AM",
+      },
+    ],
+  },
+  {
+    id: "thread-3",
+    patientName: "Sadia Bano",
+    preview: "The stomach pain has eased since yesterday.",
+    time: "Mon",
+    unread: false,
+    messages: [
+      {
+        id: "m1",
+        from: "patient",
+        text: "The stomach pain has eased since yesterday.",
+        time: "Mon, 6:10 PM",
+      },
+      {
+        id: "m2",
+        from: "doctor",
+        text: "Good to hear. Keep up the fluids and light meals for a few days.",
+        time: "Mon, 6:45 PM",
+      },
+    ],
   },
 ];
 
@@ -110,7 +161,7 @@ export const doctorProfile: DoctorProfile = {
   photo: "/images/doctor-avatar.png",
 };
 
-export const dashboardStats: DashboardStat[] = [
+export const doctorStats: Stat[] = [
   {
     label: "Today's appointments",
     value: "3",
@@ -126,7 +177,7 @@ export const dashboardStats: DashboardStat[] = [
   {
     label: "Unread messages",
     value: "1",
-    hint: "2 conversations",
+    hint: "3 conversations",
     icon: MessageSquareIcon,
   },
   {

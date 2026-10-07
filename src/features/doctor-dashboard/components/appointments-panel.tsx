@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
-import { PanelCard } from "@/features/doctor-dashboard/components/panel-card";
+import { PanelCard } from "@/components/shared/panel-card";
 import { PatientDetailsCard } from "@/features/doctor-dashboard/components/patient-details-card";
 import type { PatientAppointment } from "@/features/doctor-dashboard/data/dashboard";
 import { cn } from "@/lib/utils";
