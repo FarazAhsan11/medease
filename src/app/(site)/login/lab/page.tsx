@@ -7,7 +7,11 @@ export const metadata: Metadata = {
   title: "Lab log in",
 };
 
-export default function LabLoginPage() {
+export default async function LabLoginPage({
+  searchParams,
+}: PageProps<"/login/lab">) {
+  const { next } = await searchParams;
+
   return (
     <AuthShell
       role="lab"
@@ -15,7 +19,10 @@ export default function LabLoginPage() {
       title="Laboratory portal"
       description="Log in to manage bookings, sample collections, and reports."
     >
-      <LoginForm registerHref="/register/lab" dashboardHref="/lab" />
+      <LoginForm
+        registerHref="/register/lab"
+        next={typeof next === "string" ? next : undefined}
+      />
     </AuthShell>
   );
 }

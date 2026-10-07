@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { patientRoutes } from "@/config/routes";
 import { CountBadge } from "@/features/appointments/components/count-badge";
 import { PastAppointmentCard } from "@/features/appointments/components/past-appointment-card";
 import { UpcomingAppointmentCard } from "@/features/appointments/components/upcoming-appointment-card";
@@ -42,7 +43,10 @@ export function AppointmentTabs({ upcoming, past }: AppointmentTabsProps) {
             title="No upcoming appointments"
             description="When you book a consultation it will show up here."
             action={
-              <Link href="/find-doctor" className={buttonVariants()}>
+              <Link
+                href={patientRoutes.findDoctor}
+                className={buttonVariants()}
+              >
                 Find a doctor
               </Link>
             }

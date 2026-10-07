@@ -4,6 +4,7 @@ import Link from "next/link";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { doctorRoutes } from "@/config/routes";
 import type { MessageThread } from "@/features/doctor-dashboard/data/dashboard";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ export function ConversationView({ thread }: ConversationViewProps) {
           </div>
         </div>
         <Link
-          href="/video-call"
+          href={doctorRoutes.consultation}
           className={buttonVariants({
             variant: "outline",
             size: "sm",

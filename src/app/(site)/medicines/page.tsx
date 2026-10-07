@@ -4,10 +4,7 @@ import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { FeatureStrip } from "@/components/shared/feature-strip";
 import { PageHeader } from "@/components/shared/page-header";
-import { CartSummary } from "@/features/medicines/components/cart-summary";
-import { MedicineCatalog } from "@/features/medicines/components/medicine-catalog";
-import { PrescriptionUploadCard } from "@/features/medicines/components/prescription-upload-card";
-import { medicines, sampleCart } from "@/features/medicines/data/medicines";
+import { MedicineStore } from "@/features/medicines/components/medicine-store";
 
 export const metadata: Metadata = {
   title: "Order Medicines",
@@ -41,13 +38,7 @@ export default function MedicinesPage() {
       />
       <Container className="space-y-8 py-8">
         <FeatureStrip items={benefits} />
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <MedicineCatalog medicines={medicines} />
-          <aside className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
-            <PrescriptionUploadCard />
-            <CartSummary items={sampleCart} />
-          </aside>
-        </div>
+        <MedicineStore />
       </Container>
     </>
   );

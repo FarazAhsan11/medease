@@ -1,12 +1,20 @@
-import Link from "next/link";
-
 import { Container } from "@/components/layout/container";
+import {
+  HeaderAccountActions,
+  type HeaderAccount,
+} from "@/components/layout/header-account";
 import { Logo } from "@/components/layout/logo";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NavLinks } from "@/components/layout/nav-links";
-import { buttonVariants } from "@/components/ui/button";
+import { dashboards } from "@/config/dashboards";
+import { getSessionUser } from "@/lib/auth/session";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const user = await getSessionUser();
+  const account: HeaderAccount | null = user
+    ? { name: user.name, dashboardHref: dashboards[user.role].home }
+    : null;
+
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
       <Container className="flex h-16 items-center justify-between gap-6">
@@ -16,17 +24,12 @@ export function SiteHeader() {
           <NavLinks />
         </nav>
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <Link href="/login" className={buttonVariants({ variant: "ghost" })}>
-            Log in
-          </Link>
-          <Link href="/register" className={buttonVariants()}>
-            Get started
-          </Link>
+        <div className="hidden lg:block">
+          <HeaderAccountActions account={account} />
         </div>
 
         <div className="lg:hidden">
-          <MobileNav />
+          <MobileNav account={account} />
         </div>
       </Container>
     </header>

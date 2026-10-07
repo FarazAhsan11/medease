@@ -8,15 +8,16 @@ import { QuickActions } from "@/features/patient-dashboard/components/quick-acti
 import { UpcomingVisitsCard } from "@/features/patient-dashboard/components/upcoming-visits-card";
 import { patientStats } from "@/features/patient-dashboard/data/overview";
 import { prescriptions } from "@/features/prescriptions/data/prescriptions";
-import { patientProfile } from "@/features/settings/data/patient-profile";
+import { requireRole } from "@/lib/auth/session";
 
-export default function PatientOverviewPage() {
+export default async function PatientOverviewPage() {
+  const user = await requireRole("patient");
   const [nextAppointment] = upcomingAppointments;
 
   return (
     <>
       <NextAppointmentBanner
-        patientName={`${patientProfile.firstName} ${patientProfile.lastName}`}
+        patientName={user.name}
         appointment={nextAppointment}
       />
       <QuickActions />

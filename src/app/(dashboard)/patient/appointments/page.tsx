@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import { AppointmentTabs } from "@/features/appointments/components/appointment-tabs";
 import {
   pastAppointments,
@@ -22,7 +23,7 @@ export default function PatientAppointmentsPage() {
         description="Manage upcoming consultations and review past visits."
         actions={
           <Link
-            href="/find-doctor"
+            href={patientRoutes.findDoctor}
             className={buttonVariants({ className: "h-9 gap-1.5 px-4" })}
           >
             <PlusIcon aria-hidden />

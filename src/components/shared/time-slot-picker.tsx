@@ -17,7 +17,7 @@ export function TimeSlotPicker({
   hint,
 }: TimeSlotPickerProps) {
   return (
-    <fieldset disabled={disabled}>
+    <fieldset disabled={disabled} className="min-w-0">
       <legend className="text-sm font-medium">Select time</legend>
       <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
         {slots.map((slot) => (

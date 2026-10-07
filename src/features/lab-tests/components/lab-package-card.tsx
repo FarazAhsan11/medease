@@ -2,6 +2,7 @@ import { CheckIcon } from "lucide-react";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import type { LabPackage } from "@/features/lab-tests/data/lab-tests";
 import { formatFee } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -69,7 +70,7 @@ export function LabPackageCard({
           <p className="text-lg font-semibold">{formatFee(labPackage.price)}</p>
         </div>
         <Link
-          href={`/lab-tests/${labPackage.id}`}
+          href={patientRoutes.bookLabTest(labPackage.id)}
           className={buttonVariants({
             variant: featured ? "secondary" : "default",
             className: "h-9 px-4",

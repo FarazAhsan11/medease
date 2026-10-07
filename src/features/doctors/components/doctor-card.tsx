@@ -5,6 +5,7 @@ import { RatingBadge } from "@/components/shared/rating-badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import type { Doctor } from "@/features/doctors/data/doctors";
 import { formatFee } from "@/lib/format";
 
@@ -54,7 +55,7 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
           </p>
         </div>
         <Link
-          href={`/find-doctor/${doctor.id}`}
+          href={patientRoutes.bookDoctor(doctor.id)}
           className={buttonVariants({ size: "sm", className: "h-8 px-3" })}
         >
           Book appointment

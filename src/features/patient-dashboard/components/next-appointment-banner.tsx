@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import type { Appointment } from "@/features/appointments/data/appointments";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +53,7 @@ export function NextAppointmentBanner({
             </div>
           </div>
           <Link
-            href="/video-call"
+            href={patientRoutes.consultation}
             className={cn(
               buttonVariants({ variant: "secondary" }),
               "h-9 gap-1.5 px-4",

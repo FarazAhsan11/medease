@@ -9,15 +9,16 @@ import { PipelineCard } from "@/features/lab-dashboard/components/pipeline-card"
 import { PopularTestsCard } from "@/features/lab-dashboard/components/popular-tests-card";
 import {
   labBookings,
-  labProfile,
   labStats,
 } from "@/features/lab-dashboard/data/lab-dashboard";
+import { requireRole } from "@/lib/auth/session";
 
-export default function LabOverviewPage() {
+export default async function LabOverviewPage() {
+  const user = await requireRole("lab");
   return (
     <>
       <DashboardPageHeader
-        title={labProfile.name}
+        title={user.name}
         description="Today's collections, test queue, and reports at a glance."
         actions={
           <Link

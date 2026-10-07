@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import { PrescriptionCard } from "@/features/prescriptions/components/prescription-card";
 import { prescriptions } from "@/features/prescriptions/data/prescriptions";
 
@@ -19,7 +20,7 @@ export default function PatientPrescriptionsPage() {
         description="Your active medicines, dosing schedule, and refills."
         actions={
           <Link
-            href="/medicines"
+            href={patientRoutes.medicines}
             className={buttonVariants({
               variant: "outline",
               className: "h-9 gap-1.5 px-4",

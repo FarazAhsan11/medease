@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import type { Stat } from "@/components/shared/stat-card";
+import { patientRoutes } from "@/config/routes";
 
 export type QuickAction = {
   title: string;
@@ -49,25 +50,25 @@ export const quickActions: QuickAction[] = [
   {
     title: "Book a doctor",
     description: "Find a specialist",
-    href: "/find-doctor",
+    href: patientRoutes.findDoctor,
     icon: StethoscopeIcon,
   },
   {
     title: "Book a lab test",
     description: "Home collection",
-    href: "/lab-tests",
+    href: patientRoutes.bookLabTests,
     icon: FlaskConicalIcon,
   },
   {
     title: "Order medicines",
     description: "Delivered in 24h",
-    href: "/medicines",
+    href: patientRoutes.medicines,
     icon: ShoppingBagIcon,
   },
   {
     title: "Talk to AI",
     description: "Check symptoms",
-    href: "/talk-to-ai",
+    href: patientRoutes.talkToAi,
     icon: BotIcon,
   },
 ];

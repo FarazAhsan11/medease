@@ -1,4 +1,5 @@
 import {
+  BotIcon,
   CalendarClockIcon,
   CalendarDaysIcon,
   ClipboardListIcon,
@@ -9,6 +10,8 @@ import {
   MessageSquareIcon,
   PillIcon,
   SettingsIcon,
+  ShoppingBagIcon,
+  StethoscopeIcon,
   TestTubesIcon,
   UserRoundIcon,
   UsersIcon,
@@ -34,7 +37,6 @@ export type DashboardConfig = {
   label: string;
   home: string;
   loginHref: string;
-  user: { name: string; subtitle: string; avatar?: string };
   nav: DashboardNavItem[];
   notifications: DashboardNotification[];
 };
@@ -44,9 +46,13 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     label: "Patient",
     home: "/patient",
     loginHref: "/login",
-    user: { name: "Ali Raza", subtitle: "Patient" },
     nav: [
       { title: "Overview", href: "/patient", icon: LayoutDashboardIcon },
+      {
+        title: "Find a doctor",
+        href: "/patient/find-doctor",
+        icon: StethoscopeIcon,
+      },
       {
         title: "Appointments",
         href: "/patient/appointments",
@@ -63,10 +69,16 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
         icon: PillIcon,
       },
       {
+        title: "Medicines",
+        href: "/patient/medicines",
+        icon: ShoppingBagIcon,
+      },
+      {
         title: "Health records",
         href: "/patient/records",
         icon: FileHeartIcon,
       },
+      { title: "Talk to AI", href: "/patient/talk-to-ai", icon: BotIcon },
       { title: "Settings", href: "/patient/settings", icon: SettingsIcon },
     ],
     notifications: [
@@ -94,11 +106,6 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     label: "Doctor",
     home: "/doctor",
     loginHref: "/login/doctor",
-    user: {
-      name: "Dr. Nida Ali",
-      subtitle: "General Practitioner",
-      avatar: "/images/doctor-avatar.png",
-    },
     nav: [
       { title: "Overview", href: "/doctor", icon: LayoutDashboardIcon },
       {
@@ -134,7 +141,6 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     label: "Laboratory",
     home: "/lab",
     loginHref: "/login/lab",
-    user: { name: "CityCare Diagnostics", subtitle: "Laboratory" },
     nav: [
       { title: "Overview", href: "/lab", icon: LayoutDashboardIcon },
       { title: "Bookings", href: "/lab/bookings", icon: ClipboardListIcon },

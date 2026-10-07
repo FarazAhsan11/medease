@@ -17,7 +17,7 @@ export function BookingForm({ dates, timeSlots }: BookingFormProps) {
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
 
   return (
-    <section className="space-y-6 rounded-2xl border bg-card p-6">
+    <section className="min-w-0 space-y-6 rounded-2xl border bg-card p-6">
       <div>
         <h2 className="text-lg font-semibold">Book an appointment</h2>
         <p className="mt-1 text-sm text-muted-foreground">

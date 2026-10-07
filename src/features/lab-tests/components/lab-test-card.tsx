@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import type { LabTest } from "@/features/lab-tests/data/lab-tests";
 import { formatFee } from "@/lib/format";
 
@@ -31,7 +32,7 @@ export function LabTestCard({ test }: LabTestCardProps) {
       <div className="mt-5 flex items-center justify-between border-t pt-4">
         <p className="text-sm font-semibold">{formatFee(test.price)}</p>
         <Link
-          href={`/lab-tests/${test.id}`}
+          href={patientRoutes.bookLabTest(test.id)}
           className={buttonVariants({ size: "sm", className: "h-8 px-3" })}
         >
           Book test

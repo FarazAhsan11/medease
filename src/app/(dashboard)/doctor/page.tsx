@@ -6,18 +6,19 @@ import { StatGrid } from "@/components/shared/stat-grid";
 import { buttonVariants } from "@/components/ui/button";
 import { AppointmentsPanel } from "@/features/doctor-dashboard/components/appointments-panel";
 import { RecentMessagesCard } from "@/features/doctor-dashboard/components/recent-messages-card";
+import { requireRole } from "@/lib/auth/session";
 import {
-  doctorProfile,
   doctorStats,
   messageThreads,
   patientAppointments,
 } from "@/features/doctor-dashboard/data/dashboard";
 
-export default function DoctorOverviewPage() {
+export default async function DoctorOverviewPage() {
+  const user = await requireRole("doctor");
   return (
     <>
       <DashboardPageHeader
-        title={`Good morning, Dr. ${doctorProfile.firstName}`}
+        title={`Good morning, ${user.name}`}
         description="Here's what's happening with your practice today."
         actions={
           <Link

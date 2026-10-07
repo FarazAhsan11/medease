@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { doctorRoutes } from "@/config/routes";
 import type {
   ScheduledVisit,
   ScheduleStatus,
@@ -78,7 +79,7 @@ export function VisitsTable({ visits }: VisitsTableProps) {
                 <TableCell className="pr-5 text-right">
                   {visit.status === "Upcoming" && visit.type === "Video" ? (
                     <Link
-                      href="/video-call"
+                      href={doctorRoutes.consultation}
                       className={buttonVariants({ size: "sm" })}
                     >
                       Start call

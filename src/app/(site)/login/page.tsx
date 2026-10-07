@@ -7,7 +7,9 @@ export const metadata: Metadata = {
   title: "Log in",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const { next } = await searchParams;
+
   return (
     <AuthShell
       role="patient"
@@ -15,7 +17,10 @@ export default function LoginPage() {
       title="Welcome back"
       description="Log in to manage your appointments and health records."
     >
-      <LoginForm registerHref="/register" dashboardHref="/patient" />
+      <LoginForm
+        registerHref="/register"
+        next={typeof next === "string" ? next : undefined}
+      />
     </AuthShell>
   );
 }

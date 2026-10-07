@@ -10,17 +10,19 @@ import { cn } from "@/lib/utils";
 
 type DoctorSearchBarProps = {
   specialties: string[];
+  action?: string;
   className?: string;
 };
 
 export function DoctorSearchBar({
   specialties,
+  action = "/find-doctor",
   className,
 }: DoctorSearchBarProps) {
   return (
     <form
       role="search"
-      action="/find-doctor"
+      action={action}
       className={cn(
         "flex flex-col gap-2 rounded-2xl border bg-card p-2 shadow-soft sm:flex-row sm:items-center",
         className,

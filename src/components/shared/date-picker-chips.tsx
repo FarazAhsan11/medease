@@ -13,7 +13,7 @@ export function DatePickerChips({
   onChange,
 }: DatePickerChipsProps) {
   return (
-    <fieldset>
+    <fieldset className="min-w-0">
       <legend className="text-sm font-medium">Select date</legend>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
         {dates.map((date) => (

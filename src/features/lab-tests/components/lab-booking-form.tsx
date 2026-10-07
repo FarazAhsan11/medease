@@ -39,7 +39,7 @@ export function LabBookingForm({ dates, timeSlots }: LabBookingFormProps) {
   const [time, setTime] = useState<string | null>(null);
 
   return (
-    <section className="space-y-6 rounded-2xl border bg-card p-6">
+    <section className="min-w-0 space-y-6 rounded-2xl border bg-card p-6">
       <div>
         <h2 className="text-lg font-semibold">Schedule your test</h2>
         <p className="mt-1 text-sm text-muted-foreground">

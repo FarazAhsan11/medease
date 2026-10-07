@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import { LabOrderCard } from "@/features/lab-tests/components/lab-order-card";
 import { labOrders } from "@/features/lab-tests/data/lab-orders";
 
@@ -19,7 +20,7 @@ export default function PatientLabTestsPage() {
         description="Track your bookings and download reports when they're ready."
         actions={
           <Link
-            href="/lab-tests"
+            href={patientRoutes.bookLabTests}
             className={buttonVariants({ className: "h-9 gap-1.5 px-4" })}
           >
             <PlusIcon aria-hidden />
