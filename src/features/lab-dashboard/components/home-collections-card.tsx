@@ -28,7 +28,7 @@ export function HomeCollectionsCard({ bookings }: HomeCollectionsCardProps) {
             key={booking.id}
             className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center"
           >
-            <div className="w-16 shrink-0 text-sm font-semibold">
+            <div className="w-20 shrink-0 text-sm font-semibold whitespace-nowrap">
               {booking.slot}
             </div>
             <div className="min-w-0 flex-1">

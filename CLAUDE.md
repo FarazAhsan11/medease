@@ -12,10 +12,12 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 ## Structure
 
 - `src/app/` routes only; pages compose feature components and stay thin
+  - `(site)/` public pages with the marketing header and footer
+  - `(dashboard)/patient|doctor|lab/` role dashboards inside `DashboardShell`; each role's nav lives in `src/config/dashboards.ts`
 - `src/features/<name>/` all code for one feature (`components/`, `actions/`, `schemas/`, `data/`)
 - `src/components/ui/` shadcn primitives, added via `npx shadcn@latest add <name>`, don't hand-edit
 - `src/components/shared/` components used by 2+ features
-- `src/components/layout/` app shell (header, mobile nav, footer)
+- `src/components/layout/` app shells: site header/footer and dashboard sidebar/topbar
 - Static mock data lives in each feature's `data/` folder until the backend is connected
 
 ## Rules
