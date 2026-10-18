@@ -21,8 +21,10 @@ export function LoginForm({ registerHref, next }: LoginFormProps) {
     signIn,
     initialFormState,
   );
-  // A wrong password has no field error, but both fields are suspect.
-  const credentialsInvalid = state.status === "error" && !state.fieldErrors;
+  // Only a wrong email/password points at the fields; outages and rate
+  // limits are shown as a toast without blaming what the user typed.
+  const credentialsInvalid =
+    state.status === "error" && state.code === "invalid_credentials";
   const emailError = fieldError("email");
   const passwordError = fieldError("password");
 

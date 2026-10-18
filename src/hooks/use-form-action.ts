@@ -1,5 +1,6 @@
 "use client";
 
+import { unstable_rethrow } from "next/navigation";
 import {
   startTransition,
   useActionState,
@@ -8,6 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { NETWORK_ERROR_MESSAGE } from "@/lib/errors";
 import type { FormState } from "@/lib/form-state";
 
 // Runs a Server Action from a form and toasts its result. Submitting through
@@ -16,7 +18,27 @@ export function useFormAction<State extends FormState>(
   action: (state: Awaited<State>, formData: FormData) => Promise<State>,
   initialState: Awaited<State>,
 ) {
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const [state, formAction, pending] = useActionState(
+    async (previous: Awaited<State>, formData: FormData) => {
+      try {
+        return await action(previous, formData);
+      } catch (error) {
+        // Lets redirect() from the action through to the router.
+        unstable_rethrow(error);
+        // The request never reached the server (offline, server down).
+        return {
+          ...previous,
+          status: "error",
+          code: "network_error",
+          message: navigator.onLine
+            ? NETWORK_ERROR_MESSAGE
+            : "You're offline. Reconnect to the internet and try again.",
+          fieldErrors: undefined,
+        };
+      }
+    },
+    initialState,
+  );
 
   useEffect(() => {
     if (!state.message) return;

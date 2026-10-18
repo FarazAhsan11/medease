@@ -44,12 +44,22 @@ export async function updateSession(
 
   // Keep this call directly after creating the client. It validates the JWT
   // and triggers the cookie refresh above when the session is expiring.
-  const { data } = await supabase.auth.getClaims();
+  try {
+    const { data } = await supabase.auth.getClaims();
 
-  return {
-    response,
-    role: getRoleFromAppMetadata(data?.claims.app_metadata),
-  };
+    return {
+      response,
+      role: getRoleFromAppMetadata(data?.claims.app_metadata),
+    };
+  } catch (error) {
+    // If Supabase is unreachable, treat the request as signed out rather than
+    // failing every page; layouts still enforce access with requireRole().
+    console.error(
+      "Session refresh failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return { response, role: null };
+  }
 }
 
 const cacheHeaders = ["cache-control", "expires", "pragma"];

@@ -3,9 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { DashboardRole } from "@/config/dashboards";
-import { getAuthErrorMessage } from "@/features/auth/lib/auth-error-message";
+import { authFormError } from "@/features/auth/lib/auth-error";
 import { getAuthRedirectUrl } from "@/features/auth/lib/auth-redirect-url";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
+import { getUnexpectedErrorMessage, isNetworkError } from "@/lib/errors";
+import { formError, type FormState } from "@/lib/form-state";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,7 +24,7 @@ type NewAccount = {
 type CreateAccountResult =
   | { status: "signed-in" }
   | { status: "confirm-email" }
-  | { status: "error"; message: string };
+  | { status: "error"; error: FormState };
 
 const EXISTING_ACCOUNT =
   "An account with this email already exists. Log in instead.";
@@ -46,21 +48,27 @@ export async function createAccount({
     },
   });
 
-  if (error) return { status: "error", message: getAuthErrorMessage(error) };
+  if (error) return { status: "error", error: authFormError(error) };
 
   const { user, session } = data;
 
   // With email confirmation on, Supabase returns a user with no identities
   // for an address that is already registered instead of an error.
   if (!user || user.identities?.length === 0) {
-    return { status: "error", message: EXISTING_ACCOUNT };
+    return {
+      status: "error",
+      error: formError(EXISTING_ACCOUNT, "email_exists"),
+    };
   }
 
   // An unconfirmed account that signs up again keeps the role it started with,
   // so nobody can flip someone else's pending account to another role.
   const existingRole = getRoleFromAppMetadata(user.app_metadata);
   if (existingRole && existingRole !== role) {
-    return { status: "error", message: EXISTING_ACCOUNT };
+    return {
+      status: "error",
+      error: formError(EXISTING_ACCOUNT, "email_exists"),
+    };
   }
 
   const admin = createAdminClient();
@@ -84,7 +92,12 @@ export async function createAccount({
 
     return {
       status: "error",
-      message: "We couldn't create your account. Please try again.",
+      error: isNetworkError(cause)
+        ? formError(getUnexpectedErrorMessage(cause), "network_error")
+        : formError(
+            "We couldn't finish setting up your account. Please try again in a moment.",
+            "profile_setup_failed",
+          ),
     };
   }
 

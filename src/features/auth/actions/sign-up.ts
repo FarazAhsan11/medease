@@ -13,7 +13,8 @@ import {
 } from "@/features/auth/schemas/sign-up";
 import { getPostLoginPath } from "@/lib/auth/redirects";
 import { setFlash } from "@/lib/flash.server";
-import { formError, validationError } from "@/lib/form-state";
+import { withFormErrors } from "@/lib/form-action.server";
+import { validationError } from "@/lib/form-state";
 
 const DOCUMENTS_BUCKET = "doctor-documents";
 
@@ -47,7 +48,7 @@ async function finish(
   result: Awaited<ReturnType<typeof createAccount>>,
   next?: string | null,
 ): Promise<SignUpState> {
-  if (result.status === "error") return formError(result.message);
+  if (result.status === "error") return result.error;
 
   if (result.status === "confirm-email") {
     return {
@@ -61,110 +62,113 @@ async function finish(
   redirect(next ? getPostLoginPath(role, next) : dashboards[role].home);
 }
 
-export async function signUpPatient(
-  _previousState: SignUpState,
-  formData: FormData,
-): Promise<SignUpState> {
-  const parsed = patientSignUpSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return validationError(parsed.error);
+export const signUpPatient = withFormErrors(
+  async (_previousState: SignUpState, formData: FormData) => {
+    const parsed = patientSignUpSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return validationError(parsed.error);
 
-  const { firstName, lastName, email, phone, password } = parsed.data;
-  const next = formData.get("next");
-  const nextPath = typeof next === "string" ? next : null;
+    const { firstName, lastName, email, phone, password } = parsed.data;
+    const next = formData.get("next");
+    const nextPath = typeof next === "string" ? next : null;
 
-  const result = await createAccount({
-    role: "patient",
-    email,
-    password,
-    fullName: `${firstName} ${lastName}`,
-    next: nextPath,
-    saveProfile: (admin, id) =>
-      insertProfile(admin, "patient_profiles", {
-        id,
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-      }),
-  });
+    const result = await createAccount({
+      role: "patient",
+      email,
+      password,
+      fullName: `${firstName} ${lastName}`,
+      next: nextPath,
+      saveProfile: (admin, id) =>
+        insertProfile(admin, "patient_profiles", {
+          id,
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+        }),
+    });
 
-  return finish("patient", email, result, nextPath);
-}
+    return finish("patient", email, result, nextPath);
+  },
+);
 
-export async function signUpDoctor(
-  _previousState: SignUpState,
-  formData: FormData,
-): Promise<SignUpState> {
-  const parsed = doctorSignUpSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return validationError(parsed.error);
+export const signUpDoctor = withFormErrors(
+  async (_previousState: SignUpState, formData: FormData) => {
+    const parsed = doctorSignUpSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return validationError(parsed.error);
 
-  const { firstName, lastName, email, password, profilePhoto, degreeDocument } =
-    parsed.data;
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      profilePhoto,
+      degreeDocument,
+    } = parsed.data;
 
-  const result = await createAccount({
-    role: "doctor",
-    email,
-    password,
-    fullName: `Dr. ${firstName} ${lastName}`,
-    saveProfile: async (admin, id) => {
-      // Files live in a private bucket under the doctor's own folder.
-      const photoPath = profilePhoto
-        ? await uploadDocument(
-            admin,
-            `${id}/photo.${imageExtensions[profilePhoto.type]}`,
-            profilePhoto,
-          )
-        : null;
-      const degreePath = degreeDocument
-        ? await uploadDocument(admin, `${id}/degree.pdf`, degreeDocument)
-        : null;
+    const result = await createAccount({
+      role: "doctor",
+      email,
+      password,
+      fullName: `Dr. ${firstName} ${lastName}`,
+      saveProfile: async (admin, id) => {
+        // Files live in a private bucket under the doctor's own folder.
+        const photoPath = profilePhoto
+          ? await uploadDocument(
+              admin,
+              `${id}/photo.${imageExtensions[profilePhoto.type]}`,
+              profilePhoto,
+            )
+          : null;
+        const degreePath = degreeDocument
+          ? await uploadDocument(admin, `${id}/degree.pdf`, degreeDocument)
+          : null;
 
-      await insertProfile(admin, "doctor_profiles", {
-        id,
-        first_name: firstName,
-        last_name: lastName,
-        phone: parsed.data.phone,
-        age: parsed.data.age,
-        gender: parsed.data.gender,
-        specialization: parsed.data.specialization,
-        license_number: parsed.data.licenseNumber,
-        clinic_address: parsed.data.address,
-        photo_path: photoPath,
-        degree_path: degreePath,
-      });
-    },
-  });
+        await insertProfile(admin, "doctor_profiles", {
+          id,
+          first_name: firstName,
+          last_name: lastName,
+          phone: parsed.data.phone,
+          age: parsed.data.age,
+          gender: parsed.data.gender,
+          specialization: parsed.data.specialization,
+          license_number: parsed.data.licenseNumber,
+          clinic_address: parsed.data.address,
+          photo_path: photoPath,
+          degree_path: degreePath,
+        });
+      },
+    });
 
-  return finish("doctor", email, result);
-}
+    return finish("doctor", email, result);
+  },
+);
 
-export async function signUpLab(
-  _previousState: SignUpState,
-  formData: FormData,
-): Promise<SignUpState> {
-  const parsed = labSignUpSchema.safeParse({
-    ...Object.fromEntries(formData),
-    services: formData.getAll("services"),
-  });
-  if (!parsed.success) return validationError(parsed.error);
+export const signUpLab = withFormErrors(
+  async (_previousState: SignUpState, formData: FormData) => {
+    const parsed = labSignUpSchema.safeParse({
+      ...Object.fromEntries(formData),
+      services: formData.getAll("services"),
+    });
+    if (!parsed.success) return validationError(parsed.error);
 
-  const { labName, email, password } = parsed.data;
+    const { labName, email, password } = parsed.data;
 
-  const result = await createAccount({
-    role: "lab",
-    email,
-    password,
-    fullName: labName,
-    saveProfile: (admin, id) =>
-      insertProfile(admin, "lab_profiles", {
-        id,
-        lab_name: labName,
-        registration_number: parsed.data.registrationNumber,
-        contact_person: parsed.data.contactPerson,
-        phone: parsed.data.phone,
-        address: parsed.data.address,
-        services: parsed.data.services,
-      }),
-  });
+    const result = await createAccount({
+      role: "lab",
+      email,
+      password,
+      fullName: labName,
+      saveProfile: (admin, id) =>
+        insertProfile(admin, "lab_profiles", {
+          id,
+          lab_name: labName,
+          registration_number: parsed.data.registrationNumber,
+          contact_person: parsed.data.contactPerson,
+          phone: parsed.data.phone,
+          address: parsed.data.address,
+          services: parsed.data.services,
+        }),
+    });
 
-  return finish("lab", email, result);
-}
+    return finish("lab", email, result);
+  },
+);

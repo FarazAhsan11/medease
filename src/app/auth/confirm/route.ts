@@ -1,7 +1,8 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
+import type { AuthError, EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 
+import { getAuthErrorMessage } from "@/features/auth/lib/auth-error";
 import { getPostLoginPath } from "@/lib/auth/redirects";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
 import { setFlash } from "@/lib/flash.server";
@@ -20,21 +21,25 @@ export async function GET(request: NextRequest) {
   const isRecovery = type === "recovery" || next === RESET_PASSWORD_PATH;
 
   const supabase = await createClient();
-  let verified = false;
+  let error: AuthError | null = null;
 
   if (tokenHash && type) {
-    const { error } = await supabase.auth.verifyOtp({
+    ({ error } = await supabase.auth.verifyOtp({
       type,
       token_hash: tokenHash,
-    });
-    verified = !error;
+    }));
   } else if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    verified = !error;
+    ({ error } = await supabase.auth.exchangeCodeForSession(code));
+  } else {
+    await setFlash(
+      "error",
+      "That link is incomplete. Please use the full link from your email.",
+    );
+    redirect("/login");
   }
 
-  if (!verified) {
-    await setFlash("error", "That link is invalid or has expired.");
+  if (error) {
+    await setFlash("error", getAuthErrorMessage(error));
     redirect(isRecovery ? "/forgot-password" : "/login");
   }
 
