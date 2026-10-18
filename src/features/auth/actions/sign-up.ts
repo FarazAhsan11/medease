@@ -1,9 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { redirect } from "next/navigation";
 
-import { dashboards, type DashboardRole } from "@/config/dashboards";
 import { createAccount } from "@/features/auth/lib/create-account";
 import {
   doctorSignUpSchema,
@@ -11,8 +9,6 @@ import {
   patientSignUpSchema,
   type SignUpState,
 } from "@/features/auth/schemas/sign-up";
-import { getPostLoginPath } from "@/lib/auth/redirects";
-import { setFlash } from "@/lib/flash.server";
 import { withFormErrors } from "@/lib/form-action.server";
 import { validationError } from "@/lib/form-state";
 
@@ -42,24 +38,18 @@ async function uploadDocument(admin: SupabaseClient, path: string, file: File) {
   return path;
 }
 
-async function finish(
-  role: DashboardRole,
+// Every new account confirms its email before it can log in.
+function finish(
   email: string,
   result: Awaited<ReturnType<typeof createAccount>>,
-  next?: string | null,
-): Promise<SignUpState> {
+): SignUpState {
   if (result.status === "error") return result.error;
 
-  if (result.status === "confirm-email") {
-    return {
-      status: "success",
-      message: "Check your email to confirm your account.",
-      confirmEmail: email,
-    };
-  }
-
-  await setFlash("success", "Your account is ready. Welcome to MedEase!");
-  redirect(next ? getPostLoginPath(role, next) : dashboards[role].home);
+  return {
+    status: "success",
+    message: "Check your email to confirm your account.",
+    confirmEmail: email,
+  };
 }
 
 export const signUpPatient = withFormErrors(
@@ -86,7 +76,7 @@ export const signUpPatient = withFormErrors(
         }),
     });
 
-    return finish("patient", email, result, nextPath);
+    return finish(email, result);
   },
 );
 
@@ -138,7 +128,7 @@ export const signUpDoctor = withFormErrors(
       },
     });
 
-    return finish("doctor", email, result);
+    return finish(email, result);
   },
 );
 
@@ -169,6 +159,6 @@ export const signUpLab = withFormErrors(
         }),
     });
 
-    return finish("lab", email, result);
+    return finish(email, result);
   },
 );

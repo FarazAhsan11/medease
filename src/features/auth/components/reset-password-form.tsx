@@ -7,7 +7,11 @@ import { PasswordInput } from "@/features/auth/components/password-input";
 import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
 
-export function ResetPasswordForm() {
+type ResetPasswordFormProps = {
+  token: string;
+};
+
+export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const { pending, onSubmit, fieldError } = useFormAction(
     resetPassword,
     initialFormState,
@@ -15,6 +19,7 @@ export function ResetPasswordForm() {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <input type="hidden" name="token" value={token} />
       <FormField
         id="new-password"
         label="New password"

@@ -4,17 +4,23 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { ResetPasswordForm } from "@/features/auth/components/reset-password-form";
-import { getSessionUser } from "@/lib/auth/session";
+import { findValidAuthToken } from "@/features/auth/lib/auth-tokens";
 
 export const metadata: Metadata = {
   title: "Set a new password",
 };
 
-// The reset email link signs the user in, then lands here.
-export default async function ResetPasswordPage() {
-  const user = await getSessionUser();
+// Opened from the reset email. The token is only checked here; it's used up
+// when the new password is saved.
+export default async function ResetPasswordPage({
+  searchParams,
+}: PageProps<"/reset-password">) {
+  const { token } = await searchParams;
+  const valid =
+    typeof token === "string" &&
+    (await findValidAuthToken(token, "password_reset")) !== null;
 
-  if (!user) {
+  if (!valid) {
     return (
       <AuthShell
         role="patient"
@@ -33,11 +39,11 @@ export default async function ResetPasswordPage() {
 
   return (
     <AuthShell
-      role={user.role}
+      role="patient"
       title="Set a new password"
       description="Choose a strong password you don't use on other sites."
     >
-      <ResetPasswordForm />
+      <ResetPasswordForm token={token} />
     </AuthShell>
   );
 }

@@ -30,6 +30,7 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 - A user's role (`patient` | `doctor` | `lab`) lives in Supabase `app_metadata.role`, which only the secret key can write. Never trust `user_metadata` for roles.
 - Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic.
 - `npm run db:seed` creates/updates the demo accounts (password from `SEED_USER_PASSWORD` in `.env.local`).
+- Auth emails are ours, not Supabase's: accounts are created with the admin API, and confirmation/reset tokens are generated, hashed into `auth_tokens`, and checked in `src/features/auth/lib/auth-tokens.ts`. Emails go out through Nodemailer (`SMTP_*` vars); templates live in `src/features/auth/emails/`.
 
 ## Rules
 

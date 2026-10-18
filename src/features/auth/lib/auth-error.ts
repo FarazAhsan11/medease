@@ -40,8 +40,9 @@ const messages: Record<string, string> = {
   flow_state_expired: LINK_EXPIRED,
   flow_state_not_found: LINK_EXPIRED,
   bad_code_verifier: LINK_EXPIRED,
+  // Supabase's email limit is usually project-wide, not per address.
   over_email_send_rate_limit:
-    "We've sent too many emails to this address. Please wait a few minutes and try again.",
+    "We've hit our email sending limit for now. Please wait a little while and try again.",
   over_request_rate_limit:
     "Too many attempts. Please wait a minute and try again.",
   request_timeout: "The request timed out. Please try again.",

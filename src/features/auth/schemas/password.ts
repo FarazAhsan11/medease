@@ -12,6 +12,7 @@ export const forgotPasswordSchema = z.object({ email: emailSchema });
 
 export const resetPasswordSchema = z
   .object({
+    token: z.string().min(1, "This reset link is incomplete."),
     password: newPasswordSchema,
     confirmPassword: z.string(),
   })

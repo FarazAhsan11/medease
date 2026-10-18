@@ -1,36 +1,20 @@
-import type { AuthError, EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 
-import { getAuthErrorMessage } from "@/features/auth/lib/auth-error";
-import { getPostLoginPath } from "@/lib/auth/redirects";
+import { dashboards } from "@/config/dashboards";
+import { consumeAuthToken } from "@/features/auth/lib/auth-tokens";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
 import { setFlash } from "@/lib/flash.server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-const RESET_PASSWORD_PATH = "/reset-password";
-
-// Landing route for links in confirmation and password-reset emails. Handles
-// both the token-hash links (custom email templates) and PKCE `code` links.
+// Landing route for the link in our confirmation email. The token is the
+// permission check: it's single use and expires after 24 hours.
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
-  const code = searchParams.get("code");
+  const token = searchParams.get("token");
   const next = searchParams.get("next");
-  const isRecovery = type === "recovery" || next === RESET_PASSWORD_PATH;
 
-  const supabase = await createClient();
-  let error: AuthError | null = null;
-
-  if (tokenHash && type) {
-    ({ error } = await supabase.auth.verifyOtp({
-      type,
-      token_hash: tokenHash,
-    }));
-  } else if (code) {
-    ({ error } = await supabase.auth.exchangeCodeForSession(code));
-  } else {
+  if (!token) {
     await setFlash(
       "error",
       "That link is incomplete. Please use the full link from your email.",
@@ -38,25 +22,37 @@ export async function GET(request: NextRequest) {
     redirect("/login");
   }
 
-  if (error) {
-    await setFlash("error", getAuthErrorMessage(error));
-    redirect(isRecovery ? "/forgot-password" : "/login");
-  }
-
-  if (isRecovery) redirect(RESET_PASSWORD_PATH);
-
-  const { data } = await supabase.auth.getClaims();
-  const role = getRoleFromAppMetadata(data?.claims.app_metadata);
-
-  if (!role) {
-    await supabase.auth.signOut();
+  const userId = await consumeAuthToken(token, "email_confirmation");
+  if (!userId) {
     await setFlash(
       "error",
-      "Your account isn't set up yet. Please contact support.",
+      "That link has expired or was already used. Log in and we'll send you a new one.",
     );
     redirect("/login");
   }
 
-  await setFlash("success", "Your email is confirmed. Welcome to MedEase!");
-  redirect(getPostLoginPath(role, next));
+  const { data, error } = await createAdminClient().auth.admin.updateUserById(
+    userId,
+    { email_confirm: true },
+  );
+  if (error) {
+    console.error("Email confirmation failed:", error.code ?? error.message);
+    await setFlash(
+      "error",
+      "We couldn't confirm your email right now. Please try the link again.",
+    );
+    redirect("/login");
+  }
+
+  // There's no session yet (we never saw their password here), so send them
+  // to their login page, keeping where they were headed.
+  const role = getRoleFromAppMetadata(data.user.app_metadata);
+  const loginHref = role ? dashboards[role].loginHref : "/login";
+  const safeNext =
+    next?.startsWith("/") && !next.startsWith("//") ? next : null;
+
+  await setFlash("success", "Your email is confirmed. Log in to get started.");
+  redirect(
+    safeNext ? `${loginHref}?next=${encodeURIComponent(safeNext)}` : loginHref,
+  );
 }

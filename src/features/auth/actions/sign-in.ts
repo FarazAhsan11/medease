@@ -2,8 +2,9 @@
 
 import { redirect } from "next/navigation";
 
+import { sendConfirmationEmail } from "@/features/auth/lib/auth-emails";
 import { authFormError } from "@/features/auth/lib/auth-error";
-import { getAuthRedirectUrl } from "@/features/auth/lib/auth-redirect-url";
+import { findAuthUserByEmail } from "@/features/auth/lib/auth-users";
 import { signInSchema } from "@/features/auth/schemas/sign-in";
 import { getPostLoginPath } from "@/lib/auth/redirects";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
@@ -25,22 +26,15 @@ export const signIn = withFormErrors(
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
-    if (error?.code === "email_not_confirmed") {
-      const { error: resendError } = await supabase.auth.resend({
-        type: "signup",
-        email: parsed.data.email,
-        options: { emailRedirectTo: await getAuthRedirectUrl() },
-      });
+    // We confirm emails ourselves, so check it here whatever Supabase's
+    // "Confirm email" setting is.
+    const unconfirmed =
+      error?.code === "email_not_confirmed" ||
+      (!error && !data.user.email_confirmed_at);
 
-      return resendError
-        ? formError(
-            "Please confirm your email before logging in. Use the link we sent when you signed up.",
-            error.code,
-          )
-        : formError(
-            "Please confirm your email before logging in. We've sent a new link to your inbox.",
-            error.code,
-          );
+    if (unconfirmed) {
+      if (!error) await supabase.auth.signOut();
+      return resendConfirmation(parsed.data.email);
     }
 
     if (error) return authFormError(error);
@@ -59,3 +53,22 @@ export const signIn = withFormErrors(
     redirect(getPostLoginPath(role, typeof next === "string" ? next : null));
   },
 );
+
+async function resendConfirmation(email: string): Promise<FormState> {
+  const user = await findAuthUserByEmail(email);
+  const status =
+    user && !user.email_confirmed_at
+      ? await sendConfirmationEmail({
+          userId: user.id,
+          email: user.email,
+          name: user.full_name,
+        })
+      : "sent";
+
+  return formError(
+    status === "sent"
+      ? "Please confirm your email before logging in. We've sent a new link to your inbox."
+      : "Please confirm your email before logging in. Use the link we sent you a moment ago.",
+    "email_not_confirmed",
+  );
+}

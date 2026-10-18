@@ -1,11 +1,10 @@
 "use server";
 
-import { authFormError } from "@/features/auth/lib/auth-error";
-import { getAuthRedirectUrl } from "@/features/auth/lib/auth-redirect-url";
+import { sendPasswordResetEmail } from "@/features/auth/lib/auth-emails";
+import { findAuthUserByEmail } from "@/features/auth/lib/auth-users";
 import { forgotPasswordSchema } from "@/features/auth/schemas/password";
 import { withFormErrors } from "@/lib/form-action.server";
 import { validationError, type FormState } from "@/lib/form-state";
-import { createClient } from "@/lib/supabase/server";
 
 export const requestPasswordReset = withFormErrors(
   async (_previousState: FormState, formData: FormData) => {
@@ -14,14 +13,16 @@ export const requestPasswordReset = withFormErrors(
     });
     if (!parsed.success) return validationError(parsed.error);
 
-    const supabase = await createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      parsed.data.email,
-      { redirectTo: await getAuthRedirectUrl("/reset-password") },
-    );
-
-    // Unknown emails succeed too, so this can't be used to find accounts.
-    if (error) return authFormError(error);
+    // Same answer whether or not the account exists (or is rate limited), so
+    // this can't be used to find out who has an account.
+    const user = await findAuthUserByEmail(parsed.data.email);
+    if (user) {
+      await sendPasswordResetEmail({
+        userId: user.id,
+        email: user.email,
+        name: user.full_name,
+      });
+    }
 
     return {
       status: "success",
