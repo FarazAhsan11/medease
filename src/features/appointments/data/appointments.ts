@@ -7,7 +7,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 export const APPOINTMENT_COLUMNS =
-  "id, doctor_id, patient_id, starts_at, ends_at, status, reason, doctor_name, doctor_specialization, consultation_fee, timezone, patient_name, patient_email, patient_phone, cancelled_by, cancellation_reason, created_at";
+  "id, doctor_id, patient_id, starts_at, ends_at, status, reason, doctor_name, doctor_specialization, consultation_fee, timezone, patient_name, patient_email, patient_phone, cancelled_by, cancellation_reason, call_started_at, call_ended_at, created_at";
 
 // Row level security already limits rows to the signed-in user; the explicit
 // filters keep queries on the right index.

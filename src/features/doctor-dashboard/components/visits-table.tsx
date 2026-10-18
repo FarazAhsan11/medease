@@ -8,7 +8,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
-import type { Appointment } from "@/features/appointments/lib/appointments";
+import { doctorRoutes } from "@/config/routes";
+import {
+  isActive,
+  type Appointment,
+} from "@/features/appointments/lib/appointments";
+import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
 import { formatDate, formatTime } from "@/lib/datetime";
 
@@ -62,11 +67,19 @@ export function VisitsTable({
                 <AppointmentStatusBadge appointment={visit} viewer="doctor" />
               </TableCell>
               <TableCell className="pr-5 text-right">
-                <AppointmentDetailsSheet
-                  appointment={visit}
-                  notes={notes[visit.id] ?? ""}
-                  previousVisits={previousVisits[visit.id] ?? 0}
-                />
+                <div className="flex justify-end gap-2">
+                  {isActive(visit) && (
+                    <JoinCallButton
+                      startsAt={visit.startsAt}
+                      href={doctorRoutes.consultation(visit.id)}
+                    />
+                  )}
+                  <AppointmentDetailsSheet
+                    appointment={visit}
+                    notes={notes[visit.id] ?? ""}
+                    previousVisits={previousVisits[visit.id] ?? 0}
+                  />
+                </div>
               </TableCell>
             </TableRow>
           ))}

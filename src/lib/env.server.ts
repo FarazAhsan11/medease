@@ -51,3 +51,21 @@ export function getEmailEnv(): EmailEnv {
 
   return result.data;
 }
+
+// Optional TURN relay for video calls on networks that block direct
+// connections. Without it calls use free public STUN servers only.
+const turnEnvSchema = z.object({
+  TURN_URLS: z.string().min(1),
+  TURN_USERNAME: z.string().min(1),
+  TURN_CREDENTIAL: z.string().min(1),
+});
+
+export function getTurnEnv() {
+  const result = turnEnvSchema.safeParse({
+    TURN_URLS: process.env.TURN_URLS,
+    TURN_USERNAME: process.env.TURN_USERNAME,
+    TURN_CREDENTIAL: process.env.TURN_CREDENTIAL,
+  });
+
+  return result.success ? result.data : null;
+}

@@ -31,6 +31,7 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 - Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic.
 - `npm run db:seed` creates/updates the demo accounts, profiles and doctor hours (password from `SEED_USER_PASSWORD` in `.env.local`).
 - Appointments: patients book slots generated from doctors' weekly hours by `get_doctor_slots`. Booking, cancelling, outcomes and schedule saves go through SECURITY DEFINER functions (`supabase/migrations/*_appointments.sql`) that check the caller; a partial unique index prevents double-booking. Times display in the doctor's timezone via `src/lib/datetime.ts`.
+- Video calls: WebRTC peer to peer; Supabase Realtime private channel `call:<appointment id>` carries signaling, guarded by `can_join_call` policies on `realtime.messages` (participants only, 5 min before start to 30 min after). Engine in `src/features/video-call/lib/call-connection.ts`. Optional TURN via `TURN_*` env vars.
 - Auth emails are ours, not Supabase's: accounts are created with the admin API, and confirmation/reset tokens are generated, hashed into `auth_tokens`, and checked in `src/features/auth/lib/auth-tokens.ts`. Emails go out through Nodemailer (`SMTP_*` vars); templates live in `src/features/auth/emails/`.
 
 ## Rules

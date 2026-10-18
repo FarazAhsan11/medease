@@ -11,7 +11,8 @@ export const patientRoutes = {
   medicines: "/patient/medicines",
   prescriptions: "/patient/prescriptions",
   talkToAi: "/patient/talk-to-ai",
-  consultation: "/patient/consultation",
+  consultation: (appointmentId: string) =>
+    `/patient/consultation/${appointmentId}`,
 } as const;
 
 // Public browse pages and the patient page with the full feature. The proxy
@@ -34,5 +35,6 @@ export const doctorRoutes = {
   availability: "/doctor/availability",
   profile: "/doctor/profile",
   messages: "/doctor/messages",
-  consultation: "/doctor/consultation",
+  consultation: (appointmentId: string) =>
+    `/doctor/consultation/${appointmentId}`,
 } as const;

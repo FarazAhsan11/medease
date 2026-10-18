@@ -2,7 +2,12 @@ import { AddToCalendarButton } from "@/features/appointments/components/add-to-c
 import { AppointmentCard } from "@/features/appointments/components/appointment-card";
 import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
 import { CancelAppointmentDialog } from "@/features/appointments/components/cancel-appointment-dialog";
-import type { Appointment } from "@/features/appointments/lib/appointments";
+import {
+  isUpcoming,
+  type Appointment,
+} from "@/features/appointments/lib/appointments";
+import { patientRoutes } from "@/config/routes";
+import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { formatDateTime } from "@/lib/datetime";
 
 type UpcomingAppointmentCardProps = {
@@ -20,12 +25,18 @@ export function UpcomingAppointmentCard({
       }
       actions={
         <>
-          <AddToCalendarButton appointment={appointment} />
-          <CancelAppointmentDialog
-            appointmentId={appointment.id}
-            summary={`${appointment.doctorName} on ${formatDateTime(appointment.startsAt, appointment.timezone)}`}
-            notify="doctor"
+          <JoinCallButton
+            startsAt={appointment.startsAt}
+            href={patientRoutes.consultation(appointment.id)}
           />
+          <AddToCalendarButton appointment={appointment} />
+          {isUpcoming(appointment) && (
+            <CancelAppointmentDialog
+              appointmentId={appointment.id}
+              summary={`${appointment.doctorName} on ${formatDateTime(appointment.startsAt, appointment.timezone)}`}
+              notify="doctor"
+            />
+          )}
         </>
       }
     />

@@ -1,6 +1,6 @@
 import {
+  isActive,
   isUpcoming,
-  needsOutcome,
   type Appointment,
 } from "@/features/appointments/lib/appointments";
 import { toDateKey } from "@/lib/datetime";
@@ -45,9 +45,11 @@ export function groupDoctorAppointments(appointments: Appointment[]) {
     b.startsAt.localeCompare(a.startsAt);
 
   return {
-    upcoming: appointments.filter((a) => isUpcoming(a, now)).sort(byStartAsc),
+    // In-progress appointments stay under Upcoming until the call window
+    // closes, so the Join button is easy to find.
+    upcoming: appointments.filter((a) => isActive(a, now)).sort(byStartAsc),
     needsOutcome: appointments
-      .filter((a) => needsOutcome(a, now))
+      .filter((a) => a.status === "booked" && !isActive(a, now))
       .sort(byStartDesc),
     past: appointments
       .filter((a) => a.status === "completed" || a.status === "no_show")

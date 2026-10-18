@@ -1,5 +1,6 @@
 import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import {
+  isInProgress,
   needsOutcome,
   type Appointment,
 } from "@/features/appointments/lib/appointments";
@@ -35,6 +36,7 @@ function describe(
           : `Cancelled by ${appointment.cancelledBy === "doctor" ? "doctor" : "patient"}`,
       ];
     default:
+      if (isInProgress(appointment)) return ["success", "Happening now"];
       return needsOutcome(appointment)
         ? ["muted", viewer === "doctor" ? "Needs outcome" : "Awaiting update"]
         : ["info", "Confirmed"];

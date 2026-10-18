@@ -7,6 +7,7 @@ import { patientRoutes } from "@/config/routes";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { formatDate, formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 
 type NextAppointmentBannerProps = {
   patientName: string;
@@ -61,6 +62,14 @@ export function NextAppointmentBanner({
               <p className="text-xs text-white/70">Next appointment</p>
               <p className="text-sm font-semibold">Nothing booked yet</p>
             </div>
+          )}
+          {appointment && (
+            <JoinCallButton
+              startsAt={appointment.startsAt}
+              href={patientRoutes.consultation(appointment.id)}
+              variant="secondary"
+              className="h-9 px-4"
+            />
           )}
           <Link
             href={

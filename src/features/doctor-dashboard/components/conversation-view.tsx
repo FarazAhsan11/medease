@@ -24,7 +24,7 @@ export function ConversationView({ thread }: ConversationViewProps) {
           </div>
         </div>
         <Link
-          href={doctorRoutes.consultation}
+          href={doctorRoutes.appointments}
           className={buttonVariants({
             variant: "outline",
             size: "sm",

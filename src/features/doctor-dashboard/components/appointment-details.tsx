@@ -1,17 +1,37 @@
 import { MailIcon, PhoneIcon } from "lucide-react";
 
 import { DetailList } from "@/components/shared/detail-list";
+import { doctorRoutes } from "@/config/routes";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
 import { CancelAppointmentDialog } from "@/features/appointments/components/cancel-appointment-dialog";
 import {
+  isActive,
   isUpcoming,
   needsOutcome,
   type Appointment,
 } from "@/features/appointments/lib/appointments";
 import { AppointmentNotesForm } from "@/features/doctor-dashboard/components/appointment-notes-form";
 import { AppointmentOutcomeButtons } from "@/features/doctor-dashboard/components/appointment-outcome-buttons";
+import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
+
+// "10:02 AM – 10:24 AM (22 min)" once a call has happened.
+function describeCall(appointment: Appointment) {
+  if (!appointment.callStartedAt) return null;
+  const start = formatTime(appointment.callStartedAt, appointment.timezone);
+  if (!appointment.callEndedAt) return `Started ${start}`;
+
+  const minutes = Math.max(
+    1,
+    Math.round(
+      (Date.parse(appointment.callEndedAt) -
+        Date.parse(appointment.callStartedAt)) /
+        60_000,
+    ),
+  );
+  return `${start} – ${formatTime(appointment.callEndedAt, appointment.timezone)} (${minutes} min)`;
+}
 
 type AppointmentDetailsProps = {
   appointment: Appointment;
@@ -26,6 +46,7 @@ export function AppointmentDetails({
   previousVisits,
 }: AppointmentDetailsProps) {
   const { timezone } = appointment;
+  const call = describeCall(appointment);
 
   return (
     <div className="space-y-5">
@@ -71,8 +92,17 @@ export function AppointmentDetails({
             label: "Booked",
             value: formatDateTime(appointment.createdAt, timezone),
           },
+          ...(call ? [{ label: "Video call", value: call }] : []),
         ]}
       />
+
+      {isActive(appointment) && (
+        <JoinCallButton
+          startsAt={appointment.startsAt}
+          href={doctorRoutes.consultation(appointment.id)}
+          className="h-9 w-full"
+        />
+      )}
 
       <div className="rounded-xl bg-muted p-3 text-sm">
         <p className="text-xs font-medium text-muted-foreground">
