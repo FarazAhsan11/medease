@@ -9,14 +9,16 @@ import {
 import { cn } from "@/lib/utils";
 
 type DoctorSearchBarProps = {
-  specialties: string[];
+  specialties: readonly string[];
   action?: string;
+  defaultValues?: { q?: string; specialty?: string };
   className?: string;
 };
 
 export function DoctorSearchBar({
   specialties,
   action = "/find-doctor",
+  defaultValues,
   className,
 }: DoctorSearchBarProps) {
   return (
@@ -31,6 +33,7 @@ export function DoctorSearchBar({
       <NativeSelect
         name="specialty"
         aria-label="Specialty"
+        defaultValue={defaultValues?.specialty}
         className="w-full sm:w-48 [&_select]:h-10 [&_select]:border-0 [&_select]:bg-muted"
       >
         <NativeSelectOption value="">All specialties</NativeSelectOption>
@@ -48,7 +51,8 @@ export function DoctorSearchBar({
         <Input
           name="q"
           aria-label="Search doctors"
-          placeholder="Search by doctor name or condition"
+          defaultValue={defaultValues?.q}
+          placeholder="Search by doctor name, specialty or city"
           className="h-10 border-0 pl-9 shadow-none focus-visible:ring-0"
         />
       </div>

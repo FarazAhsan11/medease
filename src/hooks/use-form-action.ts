@@ -12,16 +12,24 @@ import { toast } from "sonner";
 import { NETWORK_ERROR_MESSAGE } from "@/lib/errors";
 import type { FormState } from "@/lib/form-state";
 
+type Options<State> = {
+  // Runs when the action succeeds, e.g. to close a dialog or reset a form.
+  onSuccess?: (state: State) => void;
+};
+
 // Runs a Server Action from a form and toasts its result. Submitting through
 // onSubmit (not the `action` prop) keeps what the user typed when it fails.
 export function useFormAction<State extends FormState>(
   action: (state: Awaited<State>, formData: FormData) => Promise<State>,
   initialState: Awaited<State>,
+  { onSuccess }: Options<State> = {},
 ) {
   const [state, formAction, pending] = useActionState(
     async (previous: Awaited<State>, formData: FormData) => {
       try {
-        return await action(previous, formData);
+        const next = await action(previous, formData);
+        if (next.status === "success") onSuccess?.(next);
+        return next;
       } catch (error) {
         // Lets redirect() from the action through to the router.
         unstable_rethrow(error);

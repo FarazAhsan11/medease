@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 import { FormField, fieldErrorProps } from "@/components/shared/form-field";
 import { PanelCard } from "@/components/shared/panel-card";
@@ -13,14 +13,11 @@ import { initialFormState } from "@/lib/form-state";
 
 export function ChangePasswordCard() {
   const formRef = useRef<HTMLFormElement>(null);
-  const { state, pending, onSubmit, fieldError } = useFormAction(
+  const { pending, onSubmit, fieldError } = useFormAction(
     changePassword,
     initialFormState,
+    { onSuccess: () => formRef.current?.reset() },
   );
-
-  useEffect(() => {
-    if (state.status === "success") formRef.current?.reset();
-  }, [state]);
 
   return (
     <PanelCard title="Password" description="Use at least 8 characters.">

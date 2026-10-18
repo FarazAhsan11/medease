@@ -4,13 +4,13 @@ import {
   confirmSignUpEmail,
   resetPasswordEmail,
 } from "@/features/auth/emails/auth-email-templates";
-import type { EmailContent } from "@/features/auth/emails/render-email";
 import {
   deleteAuthToken,
   issueAuthToken,
   type TokenPurpose,
 } from "@/features/auth/lib/auth-tokens";
 import { sendMail } from "@/lib/mailer.server";
+import type { EmailContent } from "@/lib/render-email";
 import { getSiteUrl } from "@/lib/site-url.server";
 
 type Recipient = {

@@ -25,7 +25,9 @@ export function DatePickerChips({
           >
             <span className="text-xs opacity-70">{date.weekday}</span>
             <span className="text-base font-semibold">{date.day}</span>
-            <span className="text-xs opacity-70">{date.month}</span>
+            <span className="text-xs opacity-70">
+              {date.note ?? date.month}
+            </span>
           </SelectableChip>
         ))}
       </div>

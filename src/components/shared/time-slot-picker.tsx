@@ -25,9 +25,13 @@ export function TimeSlotPicker({
             key={slot.value}
             active={value === slot.value}
             onSelect={() => onChange(slot)}
-            className="py-2"
+            disabled={slot.disabled}
+            className="flex flex-col items-center py-2"
           >
-            {slot.label}
+            <span className={slot.disabled ? "line-through" : undefined}>
+              {slot.label}
+            </span>
+            {slot.note && <span className="text-xs">{slot.note}</span>}
           </SelectableChip>
         ))}
       </div>

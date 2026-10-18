@@ -30,6 +30,9 @@ export function getPatientRouteFor(publicPath: string): string | undefined {
 export const doctorRoutes = {
   home: "/doctor",
   appointments: "/doctor/appointments",
+  patients: "/doctor/patients",
+  availability: "/doctor/availability",
+  profile: "/doctor/profile",
   messages: "/doctor/messages",
   consultation: "/doctor/consultation",
 } as const;

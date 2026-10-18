@@ -1,21 +1,56 @@
-import { CalendarXIcon, HistoryIcon } from "lucide-react";
+import { CalendarXIcon, HistoryIcon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { patientRoutes } from "@/config/routes";
+import { AppointmentCard } from "@/features/appointments/components/appointment-card";
+import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
 import { CountBadge } from "@/features/appointments/components/count-badge";
-import { PastAppointmentCard } from "@/features/appointments/components/past-appointment-card";
 import { UpcomingAppointmentCard } from "@/features/appointments/components/upcoming-appointment-card";
-import type { Appointment } from "@/features/appointments/data/appointments";
+import type { Appointment } from "@/features/appointments/lib/appointments";
 
 type AppointmentTabsProps = {
   upcoming: Appointment[];
   past: Appointment[];
+  cancelled: Appointment[];
 };
 
-export function AppointmentTabs({ upcoming, past }: AppointmentTabsProps) {
+function BookAgainLink({ doctorId }: { doctorId: string }) {
+  return (
+    <Link
+      href={patientRoutes.bookDoctor(doctorId)}
+      className={buttonVariants({
+        variant: "outline",
+        size: "sm",
+        className: "gap-1.5",
+      })}
+    >
+      <RotateCcwIcon aria-hidden />
+      Book again
+    </Link>
+  );
+}
+
+function HistoryList({ appointments }: { appointments: Appointment[] }) {
+  return appointments.map((appointment) => (
+    <AppointmentCard
+      key={appointment.id}
+      appointment={appointment}
+      status={
+        <AppointmentStatusBadge appointment={appointment} viewer="patient" />
+      }
+      actions={<BookAgainLink doctorId={appointment.doctorId} />}
+    />
+  ));
+}
+
+export function AppointmentTabs({
+  upcoming,
+  past,
+  cancelled,
+}: AppointmentTabsProps) {
   return (
     <Tabs defaultValue="upcoming" className="gap-6">
       <TabsList className="h-9">
@@ -26,6 +61,10 @@ export function AppointmentTabs({ upcoming, past }: AppointmentTabsProps) {
         <TabsTrigger value="past" className="gap-2 px-3">
           Past
           <CountBadge count={past.length} />
+        </TabsTrigger>
+        <TabsTrigger value="cancelled" className="gap-2 px-3">
+          Cancelled
+          <CountBadge count={cancelled.length} />
         </TabsTrigger>
       </TabsList>
 
@@ -56,17 +95,24 @@ export function AppointmentTabs({ upcoming, past }: AppointmentTabsProps) {
 
       <TabsContent value="past" className="grid gap-3">
         {past.length > 0 ? (
-          past.map((appointment) => (
-            <PastAppointmentCard
-              key={appointment.id}
-              appointment={appointment}
-            />
-          ))
+          <HistoryList appointments={past} />
         ) : (
           <EmptyState
             icon={HistoryIcon}
             title="No past appointments"
             description="Your completed consultations will appear here."
+          />
+        )}
+      </TabsContent>
+
+      <TabsContent value="cancelled" className="grid gap-3">
+        {cancelled.length > 0 ? (
+          <HistoryList appointments={cancelled} />
+        ) : (
+          <EmptyState
+            icon={CalendarXIcon}
+            title="No cancelled appointments"
+            description="Appointments you or your doctor cancel will appear here."
           />
         )}
       </TabsContent>

@@ -1,4 +1,4 @@
-import { renderEmail } from "@/features/auth/emails/render-email";
+import { renderEmail } from "@/lib/render-email";
 
 const greeting = (name: string | null) => (name ? `Hi ${name},` : "Hi there,");
 

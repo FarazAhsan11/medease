@@ -6,16 +6,18 @@ import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { patientRoutes } from "@/config/routes";
 import { AppointmentTabs } from "@/features/appointments/components/appointment-tabs";
-import {
-  pastAppointments,
-  upcomingAppointments,
-} from "@/features/appointments/data/appointments";
+import { listPatientAppointments } from "@/features/appointments/data/appointments";
+import { groupAppointments } from "@/features/appointments/lib/appointments";
+import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Appointments",
 };
 
-export default function PatientAppointmentsPage() {
+export default async function PatientAppointmentsPage() {
+  const user = await requireRole("patient");
+  const appointments = await listPatientAppointments(user.id);
+
   return (
     <>
       <DashboardPageHeader
@@ -31,10 +33,7 @@ export default function PatientAppointmentsPage() {
           </Link>
         }
       />
-      <AppointmentTabs
-        upcoming={upcomingAppointments}
-        past={pastAppointments}
-      />
+      <AppointmentTabs {...groupAppointments(appointments)} />
     </>
   );
 }

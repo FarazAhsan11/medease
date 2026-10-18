@@ -5,13 +5,14 @@ import { useState } from "react";
 import { ProfileDetails } from "@/features/doctor-dashboard/components/profile-details";
 import { ProfileEditForm } from "@/features/doctor-dashboard/components/profile-edit-form";
 import { ProfileSummaryCard } from "@/features/doctor-dashboard/components/profile-summary-card";
-import type { DoctorProfile } from "@/features/doctor-dashboard/data/dashboard";
+import type { DoctorProfile } from "@/features/doctor-dashboard/data/doctor-profile";
 
 type ProfilePanelProps = {
   profile: DoctorProfile;
+  email: string;
 };
 
-export function ProfilePanel({ profile }: ProfilePanelProps) {
+export function ProfilePanel({ profile, email }: ProfilePanelProps) {
   const [editing, setEditing] = useState(false);
 
   return (
@@ -22,9 +23,9 @@ export function ProfilePanel({ profile }: ProfilePanelProps) {
         onEdit={() => setEditing(true)}
       />
       {editing ? (
-        <ProfileEditForm profile={profile} onCancel={() => setEditing(false)} />
+        <ProfileEditForm profile={profile} onDone={() => setEditing(false)} />
       ) : (
-        <ProfileDetails profile={profile} />
+        <ProfileDetails profile={profile} email={email} />
       )}
     </div>
   );

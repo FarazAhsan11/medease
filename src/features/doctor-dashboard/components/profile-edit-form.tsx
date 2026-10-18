@@ -1,4 +1,10 @@
-import { FormField } from "@/components/shared/form-field";
+"use client";
+
+import { Loader2Icon } from "lucide-react";
+import type { ComponentProps } from "react";
+
+import { FormField, fieldErrorProps } from "@/components/shared/form-field";
+import { PanelCard } from "@/components/shared/panel-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -6,53 +12,72 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { PanelCard } from "@/components/shared/panel-card";
-import type { DoctorProfile } from "@/features/doctor-dashboard/data/dashboard";
+import {
+  genders,
+  specializations,
+} from "@/features/auth/data/registration-options";
+import { updateDoctorProfile } from "@/features/doctor-dashboard/actions/update-profile";
+import type { DoctorProfile } from "@/features/doctor-dashboard/data/doctor-profile";
+import { useFormAction } from "@/hooks/use-form-action";
+import { initialFormState } from "@/lib/form-state";
 
 type ProfileEditFormProps = {
   profile: DoctorProfile;
-  onCancel: () => void;
+  onDone: () => void;
 };
 
-const textFields = [
-  { id: "firstName", label: "First name", type: "text" },
-  { id: "lastName", label: "Last name", type: "text" },
-  { id: "email", label: "Email", type: "email" },
-  { id: "phone", label: "Phone", type: "tel" },
-  { id: "specialization", label: "Specialization", type: "text" },
-  { id: "licenseNumber", label: "License number", type: "text" },
-] as const;
+export function ProfileEditForm({ profile, onDone }: ProfileEditFormProps) {
+  const { pending, onSubmit, fieldError } = useFormAction(
+    updateDoctorProfile,
+    initialFormState,
+    { onSuccess: onDone },
+  );
 
-export function ProfileEditForm({ profile, onCancel }: ProfileEditFormProps) {
+  const field = (
+    name: keyof typeof profile & string,
+    label: string,
+    props: ComponentProps<typeof Input> = {},
+  ) => {
+    const id = `profile-${name}`;
+    return (
+      <FormField id={id} label={label} error={fieldError(name)}>
+        <Input
+          id={id}
+          name={name}
+          defaultValue={String(profile[name] ?? "")}
+          {...fieldErrorProps(id, fieldError(name))}
+          {...props}
+        />
+      </FormField>
+    );
+  };
+
   return (
     <PanelCard
       title="Edit profile"
-      description="Keep your details up to date for patients."
+      description="Patients see your name, specialty, city, experience, clinic and bio."
     >
-      <form className="grid gap-4 p-5 sm:grid-cols-2">
-        {textFields.map((field) => (
-          <FormField
-            key={field.id}
-            id={`profile-${field.id}`}
-            label={field.label}
-          >
-            <Input
-              id={`profile-${field.id}`}
-              type={field.type}
-              defaultValue={profile[field.id]}
-            />
-          </FormField>
-        ))}
-        <FormField id="profile-age" label="Age">
-          <Input id="profile-age" type="number" defaultValue={profile.age} />
-        </FormField>
-        <FormField id="profile-gender" label="Gender">
+      <form
+        onSubmit={onSubmit}
+        className="grid gap-4 p-5 sm:grid-cols-2"
+        noValidate
+      >
+        {field("firstName", "First name", { autoComplete: "given-name" })}
+        {field("lastName", "Last name", { autoComplete: "family-name" })}
+        {field("phone", "Phone", { type: "tel", autoComplete: "tel" })}
+        {field("age", "Age", { type: "number", min: 21, max: 100 })}
+        <FormField
+          id="profile-gender"
+          label="Gender"
+          error={fieldError("gender")}
+        >
           <NativeSelect
             id="profile-gender"
+            name="gender"
             defaultValue={profile.gender}
             className="w-full"
           >
-            {["Male", "Female", "Other"].map((gender) => (
+            {genders.map((gender) => (
               <NativeSelectOption key={gender} value={gender}>
                 {gender}
               </NativeSelectOption>
@@ -60,27 +85,79 @@ export function ProfileEditForm({ profile, onCancel }: ProfileEditFormProps) {
           </NativeSelect>
         </FormField>
         <FormField
-          id="profile-address"
-          label="Address"
+          id="profile-specialization"
+          label="Specialization"
+          error={fieldError("specialization")}
+        >
+          <NativeSelect
+            id="profile-specialization"
+            name="specialization"
+            defaultValue={profile.specialization}
+            className="w-full"
+          >
+            {specializations.map((specialization) => (
+              <NativeSelectOption key={specialization} value={specialization}>
+                {specialization}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </FormField>
+        {field("experienceYears", "Years of experience", {
+          type: "number",
+          min: 0,
+          max: 70,
+        })}
+        {field("city", "City", { autoComplete: "address-level2" })}
+        <FormField
+          id="profile-clinicAddress"
+          label="Clinic address"
+          error={fieldError("clinicAddress")}
           className="sm:col-span-2"
         >
           <Textarea
-            id="profile-address"
+            id="profile-clinicAddress"
+            name="clinicAddress"
             rows={2}
-            defaultValue={profile.address}
+            defaultValue={profile.clinicAddress}
+            {...fieldErrorProps(
+              "profile-clinicAddress",
+              fieldError("clinicAddress"),
+            )}
           />
         </FormField>
-        <FormField id="profile-photo" label="Profile photo">
-          <Input id="profile-photo" type="file" accept="image/*" />
+        <FormField
+          id="profile-bio"
+          label="Bio"
+          hint="A few lines about your experience and approach."
+          error={fieldError("bio")}
+          className="sm:col-span-2"
+        >
+          <Textarea
+            id="profile-bio"
+            name="bio"
+            rows={4}
+            maxLength={1000}
+            defaultValue={profile.bio ?? ""}
+            {...fieldErrorProps("profile-bio", fieldError("bio"))}
+          />
         </FormField>
-        <FormField id="profile-degree" label="Degree document">
-          <Input id="profile-degree" type="file" accept=".pdf,.doc,.docx" />
-        </FormField>
+        <p className="text-xs text-muted-foreground sm:col-span-2">
+          License number and documents are verified by our team. Contact support
+          to change them.
+        </p>
         <div className="flex gap-2 border-t pt-4 sm:col-span-2 sm:justify-end">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onDone}
+            disabled={pending}
+          >
             Cancel
           </Button>
-          <Button type="button">Save changes</Button>
+          <Button type="submit" disabled={pending} className="gap-2">
+            {pending && <Loader2Icon className="animate-spin" aria-hidden />}
+            {pending ? "Saving…" : "Save changes"}
+          </Button>
         </div>
       </form>
     </PanelCard>

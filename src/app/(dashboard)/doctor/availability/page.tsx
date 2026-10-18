@@ -1,25 +1,39 @@
 import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
-import { ConsultationSettingsCard } from "@/features/doctor-dashboard/components/consultation-settings-card";
-import { WeeklyAvailabilityCard } from "@/features/doctor-dashboard/components/weekly-availability-card";
-import { weeklyAvailability } from "@/features/doctor-dashboard/data/availability";
+import { MissingProfileNotice } from "@/features/doctor-dashboard/components/missing-profile-notice";
+import { ScheduleForm } from "@/features/doctor-dashboard/components/schedule-form";
+import { getDoctorProfile } from "@/features/doctor-dashboard/data/doctor-profile";
+import { getWeeklyHours } from "@/features/doctors/data/doctor-directory";
+import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Availability",
 };
 
-export default function DoctorAvailabilityPage() {
+export default async function DoctorAvailabilityPage() {
+  const user = await requireRole("doctor");
+  const [profile, hours] = await Promise.all([
+    getDoctorProfile(user.id),
+    getWeeklyHours(user.id),
+  ]);
+
   return (
     <>
       <DashboardPageHeader
         title="Availability"
-        description="Set the hours and consultation types patients can book."
+        description="Set the hours patients can book and how long each appointment lasts."
       />
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <WeeklyAvailabilityCard days={weeklyAvailability} />
-        <ConsultationSettingsCard />
-      </div>
+      {profile ? (
+        <ScheduleForm
+          hours={hours}
+          slotMinutes={profile.slotMinutes}
+          accepting={profile.acceptingAppointments}
+          fee={profile.consultationFee}
+        />
+      ) : (
+        <MissingProfileNotice />
+      )}
     </>
   );
 }

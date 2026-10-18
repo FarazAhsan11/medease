@@ -1,14 +1,9 @@
-import { CalendarPlusIcon, VideoIcon } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { AddToCalendarButton } from "@/features/appointments/components/add-to-calendar-button";
 import { AppointmentCard } from "@/features/appointments/components/appointment-card";
-import type { Appointment } from "@/features/appointments/data/appointments";
+import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
+import { CancelAppointmentDialog } from "@/features/appointments/components/cancel-appointment-dialog";
+import type { Appointment } from "@/features/appointments/lib/appointments";
+import { formatDateTime } from "@/lib/datetime";
 
 type UpcomingAppointmentCardProps = {
   appointment: Appointment;
@@ -20,31 +15,17 @@ export function UpcomingAppointmentCard({
   return (
     <AppointmentCard
       appointment={appointment}
-      status={<Badge className="bg-success-soft text-success">Confirmed</Badge>}
+      status={
+        <AppointmentStatusBadge appointment={appointment} viewer="patient" />
+      }
       actions={
         <>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <CalendarPlusIcon aria-hidden />
-            Add to calendar
-          </Button>
-          <Tooltip>
-            <TooltipTrigger render={<span tabIndex={0} />}>
-              <Button size="sm" disabled className="gap-1.5">
-                <VideoIcon aria-hidden />
-                Join call
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Available 5 minutes before the appointment
-            </TooltipContent>
-          </Tooltip>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          >
-            Cancel
-          </Button>
+          <AddToCalendarButton appointment={appointment} />
+          <CancelAppointmentDialog
+            appointmentId={appointment.id}
+            summary={`${appointment.doctorName} on ${formatDateTime(appointment.startsAt, appointment.timezone)}`}
+            notify="doctor"
+          />
         </>
       }
     />

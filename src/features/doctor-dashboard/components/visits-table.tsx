@@ -1,9 +1,4 @@
-import { MonitorIcon, StethoscopeIcon } from "lucide-react";
-import Link from "next/link";
-
-import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
-import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -12,23 +7,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { doctorRoutes } from "@/config/routes";
-import type {
-  ScheduledVisit,
-  ScheduleStatus,
-} from "@/features/doctor-dashboard/data/schedule";
-
-const statusTones: Record<ScheduleStatus, StatusTone> = {
-  Upcoming: "info",
-  Completed: "success",
-  Cancelled: "danger",
-};
+import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
+import type { Appointment } from "@/features/appointments/lib/appointments";
+import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
+import { formatDate, formatTime } from "@/lib/datetime";
 
 type VisitsTableProps = {
-  visits: ScheduledVisit[];
+  visits: Appointment[];
+  notes: Record<string, string>;
+  previousVisits: Record<string, number>;
 };
 
-export function VisitsTable({ visits }: VisitsTableProps) {
+export function VisitsTable({
+  visits,
+  notes,
+  previousVisits,
+}: VisitsTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border bg-card">
       <Table>
@@ -36,63 +30,46 @@ export function VisitsTable({ visits }: VisitsTableProps) {
           <TableRow>
             <TableHead className="pl-5">Patient</TableHead>
             <TableHead>Date & time</TableHead>
-            <TableHead className="hidden md:table-cell">Type</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="hidden md:table-cell">Status</TableHead>
             <TableHead className="pr-5 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {visits.map((visit) => {
-            const TypeIcon =
-              visit.type === "Video" ? MonitorIcon : StethoscopeIcon;
-
-            return (
-              <TableRow key={visit.id}>
-                <TableCell className="pl-5">
-                  <div className="flex items-center gap-3">
-                    <UserAvatar name={visit.patientName} className="size-8" />
-                    <div>
-                      <p className="font-medium">{visit.patientName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {visit.reason}
-                      </p>
-                    </div>
+          {visits.map((visit) => (
+            <TableRow key={visit.id}>
+              <TableCell className="pl-5">
+                <div className="flex items-center gap-3">
+                  <UserAvatar name={visit.patientName} className="size-8" />
+                  <div className="min-w-0">
+                    <p className="font-medium">{visit.patientName}</p>
+                    <p className="max-w-56 truncate text-xs text-muted-foreground">
+                      {visit.reason ?? "No reason given"}
+                    </p>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <p className="font-medium">{visit.time}</p>
-                  <p className="text-xs text-muted-foreground">{visit.date}</p>
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <TypeIcon className="size-3.5" aria-hidden />
-                    {visit.type}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge tone={statusTones[visit.status]}>
-                    {visit.status}
-                  </StatusBadge>
-                </TableCell>
-                <TableCell className="pr-5 text-right">
-                  {visit.status === "Upcoming" && visit.type === "Video" ? (
-                    <Link
-                      href={doctorRoutes.consultation}
-                      className={buttonVariants({ size: "sm" })}
-                    >
-                      Start call
-                    </Link>
-                  ) : (
-                    <Button size="sm" variant="ghost">
-                      View
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
+                </div>
+              </TableCell>
+              <TableCell>
+                <p className="font-medium">
+                  {formatTime(visit.startsAt, visit.timezone)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDate(visit.startsAt, visit.timezone)}
+                </p>
+              </TableCell>
+              <TableCell className="hidden md:table-cell">
+                <AppointmentStatusBadge appointment={visit} viewer="doctor" />
+              </TableCell>
+              <TableCell className="pr-5 text-right">
+                <AppointmentDetailsSheet
+                  appointment={visit}
+                  notes={notes[visit.id] ?? ""}
+                  previousVisits={previousVisits[visit.id] ?? 0}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
     </div>

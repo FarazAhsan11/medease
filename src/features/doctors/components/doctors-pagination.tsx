@@ -1,51 +1,84 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import Link from "next/link";
+import type { ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import type { DoctorSearch } from "@/features/doctors/data/doctor-directory";
+import { cn } from "@/lib/utils";
 
 type DoctorsPaginationProps = {
+  basePath: string;
+  search: DoctorSearch;
   totalPages: number;
-  currentPage: number;
 };
 
+function pageHref(basePath: string, search: DoctorSearch, page: number) {
+  const params = new URLSearchParams();
+  for (const key of ["q", "specialty", "gender", "city"] as const) {
+    if (search[key]) params.set(key, search[key]);
+  }
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
+}
+
 export function DoctorsPagination({
+  basePath,
+  search,
   totalPages,
-  currentPage,
 }: DoctorsPaginationProps) {
+  if (totalPages <= 1) return null;
+
+  const current = Math.min(search.page, totalPages);
   const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+  const edge = (page: number, label: string, icon: ReactNode) =>
+    page < 1 || page > totalPages ? (
+      <span
+        aria-disabled
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "pointer-events-none gap-1 opacity-50",
+        )}
+      >
+        {label === "Next" ? null : icon}
+        {label}
+        {label === "Next" ? icon : null}
+      </span>
+    ) : (
+      <Link
+        href={pageHref(basePath, search, page)}
+        className={buttonVariants({
+          variant: "ghost",
+          size: "sm",
+          className: "gap-1",
+        })}
+      >
+        {label === "Next" ? null : icon}
+        {label}
+        {label === "Next" ? icon : null}
+      </Link>
+    );
 
   return (
     <nav
       aria-label="Pagination"
       className="mt-8 flex items-center justify-center gap-1"
     >
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={currentPage === 1}
-        className="gap-1"
-      >
-        <ChevronLeftIcon aria-hidden />
-        Previous
-      </Button>
+      {edge(current - 1, "Previous", <ChevronLeftIcon aria-hidden />)}
       {pages.map((page) => (
-        <Button
+        <Link
           key={page}
-          size="icon-sm"
-          variant={page === currentPage ? "default" : "ghost"}
-          aria-current={page === currentPage ? "page" : undefined}
+          href={pageHref(basePath, search, page)}
+          aria-current={page === current ? "page" : undefined}
+          className={buttonVariants({
+            size: "icon-sm",
+            variant: page === current ? "default" : "ghost",
+          })}
         >
           {page}
-        </Button>
+        </Link>
       ))}
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={currentPage === totalPages}
-        className="gap-1"
-      >
-        Next
-        <ChevronRightIcon aria-hidden />
-      </Button>
+      {edge(current + 1, "Next", <ChevronRightIcon aria-hidden />)}
     </nav>
   );
 }

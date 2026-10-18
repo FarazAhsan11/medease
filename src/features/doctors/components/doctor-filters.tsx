@@ -1,24 +1,27 @@
 import { SlidersHorizontalIcon } from "lucide-react";
+import Link from "next/link";
 
 import { FormField } from "@/components/shared/form-field";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import { specialties } from "@/features/doctors/data/doctors";
+import {
+  genders,
+  specializations,
+} from "@/features/auth/data/registration-options";
+import type { DoctorSearch } from "@/features/doctors/data/doctor-directory";
 
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+type DoctorFiltersProps = {
+  action: string;
+  search: DoctorSearch;
+};
 
-const selectFilters = [
-  { id: "filter-type", label: "Specialty", options: specialties },
-  { id: "filter-gender", label: "Gender", options: ["Male", "Female"] },
-  { id: "filter-rating", label: "Rating", options: ["4.5 & up", "4.0 & up"] },
-];
-
-export function DoctorFilters() {
+// A plain GET form: filters live in the URL, so results are shareable and
+// work without JavaScript.
+export function DoctorFilters({ action, search }: DoctorFiltersProps) {
   return (
     <aside className="h-fit rounded-2xl border bg-card p-5 lg:sticky lg:top-20">
       <div className="flex items-center gap-2">
@@ -26,44 +29,55 @@ export function DoctorFilters() {
         <h2 className="text-sm font-semibold">Filters</h2>
       </div>
 
-      <form className="mt-5 grid gap-4">
-        {selectFilters.map((filter) => (
-          <FormField key={filter.id} id={filter.id} label={filter.label}>
-            <NativeSelect id={filter.id} className="w-full">
-              <NativeSelectOption value="">Any</NativeSelectOption>
-              {filter.options.map((option) => (
-                <NativeSelectOption key={option} value={option}>
-                  {option}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </FormField>
-        ))}
-
-        <FormField id="filter-location" label="Location">
-          <Input id="filter-location" placeholder="City or area" />
+      <form action={action} className="mt-5 grid gap-4">
+        {search.q && <input type="hidden" name="q" value={search.q} />}
+        <FormField id="filter-specialty" label="Specialty">
+          <NativeSelect
+            id="filter-specialty"
+            name="specialty"
+            defaultValue={search.specialty}
+            className="w-full"
+          >
+            <NativeSelectOption value="">Any</NativeSelectOption>
+            {specializations.map((option) => (
+              <NativeSelectOption key={option} value={option}>
+                {option}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </FormField>
+        <FormField id="filter-gender" label="Gender">
+          <NativeSelect
+            id="filter-gender"
+            name="gender"
+            defaultValue={search.gender}
+            className="w-full"
+          >
+            <NativeSelectOption value="">Any</NativeSelectOption>
+            {genders.map((option) => (
+              <NativeSelectOption key={option} value={option}>
+                {option}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </FormField>
+        <FormField id="filter-city" label="City">
+          <Input
+            id="filter-city"
+            name="city"
+            defaultValue={search.city}
+            placeholder="e.g. Lahore"
+          />
         </FormField>
 
-        <fieldset>
-          <legend className="text-sm font-medium">Availability</legend>
-          <div className="mt-2 grid grid-cols-4 gap-2 lg:grid-cols-3">
-            {weekDays.map((day) => (
-              <label
-                key={day}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground"
-              >
-                <Checkbox name="days" value={day} />
-                {day}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
         <div className="mt-1 grid grid-cols-2 gap-2">
-          <Button type="reset" variant="outline">
+          <Link
+            href={action}
+            className={buttonVariants({ variant: "outline" })}
+          >
             Reset
-          </Button>
-          <Button type="button">Apply</Button>
+          </Link>
+          <Button type="submit">Apply</Button>
         </div>
       </form>
     </aside>

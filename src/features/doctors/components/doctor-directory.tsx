@@ -1,31 +1,44 @@
 import { DoctorSearchBar } from "@/components/shared/doctor-search-bar";
+import { specializations } from "@/features/auth/data/registration-options";
 import { DoctorFilters } from "@/features/doctors/components/doctor-filters";
 import { DoctorList } from "@/features/doctors/components/doctor-list";
 import { DoctorsPagination } from "@/features/doctors/components/doctors-pagination";
 import {
-  DOCTORS_PER_PAGE,
-  doctors,
-  specialties,
-} from "@/features/doctors/data/doctors";
+  searchDoctors,
+  type DoctorSearch,
+} from "@/features/doctors/data/doctor-directory";
 
 type DoctorDirectoryProps = {
   searchAction: string;
+  search: DoctorSearch;
 };
 
-export function DoctorDirectory({ searchAction }: DoctorDirectoryProps) {
-  const totalPages = Math.ceil(doctors.length / DOCTORS_PER_PAGE);
+export async function DoctorDirectory({
+  searchAction,
+  search,
+}: DoctorDirectoryProps) {
+  const { doctors, total, totalPages } = await searchDoctors(search);
 
   return (
     <div className="space-y-8">
-      <DoctorSearchBar specialties={specialties} action={searchAction} />
+      <DoctorSearchBar
+        specialties={specializations}
+        action={searchAction}
+        defaultValues={{ q: search.q, specialty: search.specialty }}
+      />
       <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-        <DoctorFilters />
+        <DoctorFilters action={searchAction} search={search} />
         <div>
           <DoctorList
-            doctors={doctors.slice(0, DOCTORS_PER_PAGE)}
-            total={doctors.length}
+            doctors={doctors}
+            total={total}
+            resetHref={searchAction}
           />
-          <DoctorsPagination totalPages={totalPages} currentPage={1} />
+          <DoctorsPagination
+            basePath={searchAction}
+            search={search}
+            totalPages={totalPages}
+          />
         </div>
       </div>
     </div>

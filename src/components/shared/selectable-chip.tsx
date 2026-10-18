@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 type SelectableChipProps = {
   active: boolean;
   onSelect: () => void;
+  disabled?: boolean;
   className?: string;
   children: ReactNode;
 };
@@ -12,6 +13,7 @@ type SelectableChipProps = {
 export function SelectableChip({
   active,
   onSelect,
+  disabled = false,
   className,
   children,
 }: SelectableChipProps) {
@@ -19,6 +21,7 @@ export function SelectableChip({
     <button
       type="button"
       aria-pressed={active}
+      disabled={disabled}
       onClick={onSelect}
       className={cn(
         "group rounded-xl border text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
