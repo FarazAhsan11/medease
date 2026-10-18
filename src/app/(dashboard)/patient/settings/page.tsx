@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { ToggleListCard } from "@/components/shared/toggle-list-card";
+import { ChangePasswordCard } from "@/features/auth/components/change-password-card";
 import { PersonalInfoForm } from "@/features/settings/components/personal-info-form";
-import { ChangePasswordCard } from "@/components/shared/change-password-card";
 import {
   patientNotificationPreferences,
   patientProfile,

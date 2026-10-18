@@ -5,14 +5,15 @@ import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 
 type LogoProps = {
+  href?: string;
   inverted?: boolean;
   className?: string;
 };
 
-export function Logo({ inverted = false, className }: LogoProps) {
+export function Logo({ href = "/", inverted = false, className }: LogoProps) {
   return (
     <Link
-      href="/"
+      href={href}
       className={cn("flex items-center gap-2 font-semibold", className)}
     >
       <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">

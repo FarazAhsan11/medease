@@ -1,17 +1,39 @@
+import {
+  BotIcon,
+  FlaskConicalIcon,
+  HouseIcon,
+  InfoIcon,
+  MailIcon,
+  ShoppingBagIcon,
+  StethoscopeIcon,
+  type LucideIcon,
+} from "lucide-react";
+
+import { dashboards, type DashboardRole } from "@/config/dashboards";
+
 export type NavItem = {
   title: string;
   href: string;
+  icon?: LucideIcon;
 };
 
 export const mainNav: NavItem[] = [
-  { title: "Home", href: "/" },
-  { title: "Find a Doctor", href: "/find-doctor" },
-  { title: "Lab Tests", href: "/lab-tests" },
-  { title: "Medicines", href: "/medicines" },
-  { title: "Talk to AI", href: "/talk-to-ai" },
-  { title: "About", href: "/about" },
-  { title: "Contact", href: "/contact" },
+  { title: "Home", href: "/", icon: HouseIcon },
+  { title: "Find a Doctor", href: "/find-doctor", icon: StethoscopeIcon },
+  { title: "Lab Tests", href: "/lab-tests", icon: FlaskConicalIcon },
+  { title: "Medicines", href: "/medicines", icon: ShoppingBagIcon },
+  { title: "Talk to AI", href: "/talk-to-ai", icon: BotIcon },
+  { title: "About", href: "/about", icon: InfoIcon },
+  { title: "Contact", href: "/contact", icon: MailIcon },
 ];
+
+// Header links for the signed-in role, or the public links for guests.
+export function getHeaderNav(role: DashboardRole | null) {
+  if (!role) return { links: mainNav, more: [] };
+
+  const { nav, moreNav } = dashboards[role];
+  return { links: nav, more: moreNav };
+}
 
 export const footerNav: { title: string; links: NavItem[] }[] = [
   {
@@ -41,4 +63,11 @@ export const footerNav: { title: string; links: NavItem[] }[] = [
       { title: "Privacy Policy", href: "#" },
     ],
   },
+];
+
+// Signed-in users get a slim footer without the marketing links.
+export const compactFooterNav: NavItem[] = [
+  { title: "About", href: "/about" },
+  { title: "Contact", href: "/contact" },
+  { title: "Privacy Policy", href: "#" },
 ];

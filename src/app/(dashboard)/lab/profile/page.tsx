@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
-import { ChangePasswordCard } from "@/components/shared/change-password-card";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { ToggleListCard } from "@/components/shared/toggle-list-card";
+import { ChangePasswordCard } from "@/features/auth/components/change-password-card";
 import { LabProfileForm } from "@/features/lab-dashboard/components/lab-profile-form";
 import {
   labProfile,

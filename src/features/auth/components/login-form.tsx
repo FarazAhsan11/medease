@@ -1,52 +1,45 @@
 "use client";
 
-import { CircleAlertIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState } from "react";
 
-import { FormField } from "@/components/shared/form-field";
-import { Button } from "@/components/ui/button";
+import { FormField, fieldErrorProps } from "@/components/shared/form-field";
 import { Input } from "@/components/ui/input";
 import { signIn } from "@/features/auth/actions/sign-in";
 import { AuthFooterLink } from "@/features/auth/components/auth-footer-link";
+import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
 import { PasswordInput } from "@/features/auth/components/password-input";
-import type { SignInState } from "@/features/auth/schemas/sign-in";
+import { useFormAction } from "@/hooks/use-form-action";
+import { initialFormState } from "@/lib/form-state";
 
 type LoginFormProps = {
   registerHref: string;
   next?: string;
 };
 
-const initialState: SignInState = {};
-
 export function LoginForm({ registerHref, next }: LoginFormProps) {
-  const [state, formAction, pending] = useActionState(signIn, initialState);
-  const [email, setEmail] = useState("");
+  const { state, pending, onSubmit, fieldError } = useFormAction(
+    signIn,
+    initialFormState,
+  );
+  // A wrong password has no field error, but both fields are suspect.
+  const credentialsInvalid = state.status === "error" && !state.fieldErrors;
+  const emailError = fieldError("email");
+  const passwordError = fieldError("password");
 
   return (
     <>
-      <form action={formAction} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
-        {state.error && (
-          <p
-            role="alert"
-            className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-          >
-            <CircleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-            {state.error}
-          </p>
-        )}
-        <FormField id="login-email" label="Email">
+        <FormField id="login-email" label="Email" error={emailError}>
           <Input
             id="login-email"
             name="email"
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            aria-invalid={Boolean(state.error)}
             required
+            {...fieldErrorProps("login-email", emailError)}
+            aria-invalid={Boolean(emailError) || credentialsInvalid}
           />
         </FormField>
         <div className="grid gap-1.5">
@@ -66,22 +59,27 @@ export function LoginForm({ registerHref, next }: LoginFormProps) {
             name="password"
             autoComplete="current-password"
             placeholder="Enter your password"
-            aria-invalid={Boolean(state.error)}
             required
+            {...fieldErrorProps("login-password", passwordError)}
+            aria-invalid={Boolean(passwordError) || credentialsInvalid}
           />
+          {passwordError && (
+            <p id="login-password-error" className="text-xs text-destructive">
+              {passwordError}
+            </p>
+          )}
         </div>
-        <Button
-          type="submit"
-          disabled={pending}
-          className="mt-2 h-9 w-full gap-2"
-        >
-          {pending && <Loader2Icon className="animate-spin" aria-hidden />}
-          {pending ? "Logging in…" : "Log in"}
-        </Button>
+        <AuthSubmitButton pending={pending} pendingLabel="Logging in…">
+          Log in
+        </AuthSubmitButton>
       </form>
       <AuthFooterLink
         prompt="Don't have an account?"
-        href={registerHref}
+        href={
+          next
+            ? `${registerHref}?next=${encodeURIComponent(next)}`
+            : registerHref
+        }
         label="Create one"
       />
     </>

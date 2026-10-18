@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -9,11 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function LabLayout({ children }: { children: ReactNode }) {
-  const user = await requireRole("lab");
+  await requireRole("lab");
 
-  return (
-    <DashboardShell role="lab" user={user}>
-      {children}
-    </DashboardShell>
-  );
+  return children;
 }

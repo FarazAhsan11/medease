@@ -38,7 +38,7 @@ export default function MedicinesPage() {
       />
       <Container className="space-y-8 py-8">
         <FeatureStrip items={benefits} />
-        <MedicineStore />
+        <MedicineStore guest />
       </Container>
     </>
   );

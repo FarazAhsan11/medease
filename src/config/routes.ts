@@ -14,6 +14,19 @@ export const patientRoutes = {
   consultation: "/patient/consultation",
 } as const;
 
+// Public browse pages and the patient page with the full feature. The proxy
+// sends signed-in patients straight to theirs so they never see the guest one.
+const patientRoutesByPublicPath: Record<string, string> = {
+  "/find-doctor": patientRoutes.findDoctor,
+  "/lab-tests": patientRoutes.bookLabTests,
+  "/medicines": patientRoutes.medicines,
+  "/talk-to-ai": patientRoutes.talkToAi,
+};
+
+export function getPatientRouteFor(publicPath: string): string | undefined {
+  return patientRoutesByPublicPath[publicPath];
+}
+
 export const doctorRoutes = {
   home: "/doctor",
   appointments: "/doctor/appointments",

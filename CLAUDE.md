@@ -12,13 +12,14 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 ## Structure
 
 - `src/app/` routes only; pages compose feature components and stay thin
-  - `(site)/` public pages with the marketing header and footer
-  - `(dashboard)/patient|doctor|lab/` role dashboards inside `DashboardShell`; each role's nav lives in `src/config/dashboards.ts`
-  - Signed-in tasks (booking, calls, AI chat, ordering) live inside the role's dashboard so the UI never switches layouts; link to them via `src/config/routes.ts`. Public pages only browse.
+  - Every page renders inside one `AppShell` (root layout): the same top header and footer for guests and signed-in users. Guests get the public links; signed-in users get their role's links from `src/config/dashboards.ts`.
+  - `(site)/` public pages. Guests can only browse; actions (booking, AI chat, ordering) send them to log in.
+  - `(dashboard)/patient|doctor|lab/` signed-in role areas, guarded by `requireRole()` in each layout.
+  - Signed-in tasks (booking, calls, AI chat, ordering) live in the role's area; link to them via `src/config/routes.ts`. The proxy sends signed-in users from `/` to their dashboard and patients from public feature pages to their own version.
 - `src/features/<name>/` all code for one feature (`components/`, `actions/`, `schemas/`, `data/`)
 - `src/components/ui/` shadcn primitives, added via `npx shadcn@latest add <name>`, don't hand-edit
 - `src/components/shared/` components used by 2+ features
-- `src/components/layout/` app shells: site header/footer and dashboard sidebar/topbar
+- `src/components/layout/` the app shell: header, nav, user menu, footer
 - Static mock data lives in each feature's `data/` folder until the backend is connected
 
 ## Supabase

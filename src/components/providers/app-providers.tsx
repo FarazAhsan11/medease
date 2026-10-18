@@ -11,7 +11,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <TooltipProvider>
       {children}
-      <Toaster />
+      <Toaster position="top-center" closeButton />
     </TooltipProvider>
   );
 }

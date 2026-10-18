@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { dashboards } from "@/config/dashboards";
+import { getPatientRouteFor } from "@/config/routes";
 import { getPostLoginPath } from "@/lib/auth/redirects";
 import { getRoleForPath } from "@/lib/auth/roles";
 import { hasPublicEnv } from "@/lib/env";
@@ -35,6 +36,20 @@ export async function proxy(request: NextRequest) {
 
   if (role && portal && portal !== role) {
     return redirectWithSession(request, response, dashboards[role].home);
+  }
+
+  // Signed-in users start on their own dashboard instead of the marketing home.
+  if (role && pathname === "/") {
+    return redirectWithSession(request, response, dashboards[role].home);
+  }
+
+  const patientRoute = role === "patient" && getPatientRouteFor(pathname);
+  if (patientRoute) {
+    return redirectWithSession(
+      request,
+      response,
+      patientRoute + request.nextUrl.search,
+    );
   }
 
   if (role && isAuthPage(pathname)) {

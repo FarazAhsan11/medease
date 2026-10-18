@@ -7,7 +7,11 @@ export const metadata: Metadata = {
   title: "Create an account",
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: PageProps<"/register">) {
+  const { next } = await searchParams;
+
   return (
     <AuthShell
       role="patient"
@@ -15,7 +19,7 @@ export default function RegisterPage() {
       title="Create your account"
       description="Book doctors, order lab tests, and keep your records in one place."
     >
-      <RegisterForm />
+      <RegisterForm next={typeof next === "string" ? next : undefined} />
     </AuthShell>
   );
 }

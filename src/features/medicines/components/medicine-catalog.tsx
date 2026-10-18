@@ -10,9 +10,13 @@ import {
 
 type MedicineCatalogProps = {
   medicines: Medicine[];
+  guest?: boolean;
 };
 
-export function MedicineCatalog({ medicines }: MedicineCatalogProps) {
+export function MedicineCatalog({
+  medicines,
+  guest = false,
+}: MedicineCatalogProps) {
   return (
     <section className="min-w-0">
       <div className="relative">
@@ -36,7 +40,7 @@ export function MedicineCatalog({ medicines }: MedicineCatalogProps) {
       </div>
       <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
         {medicines.map((medicine) => (
-          <MedicineCard key={medicine.id} medicine={medicine} />
+          <MedicineCard key={medicine.id} medicine={medicine} guest={guest} />
         ))}
       </div>
     </section>

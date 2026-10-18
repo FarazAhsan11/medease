@@ -24,15 +24,14 @@ type UserMenuProps = {
 };
 
 export function UserMenu({ role, name, email }: UserMenuProps) {
-  const { label, nav } = dashboards[role];
-  const settings = nav[nav.length - 1];
+  const { label, account } = dashboards[role];
   const [signingOut, startSignOut] = useTransition();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg p-1 pr-2 transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
         <UserAvatar name={name} className="size-8" />
-        <span className="hidden text-left sm:block">
+        <span className="hidden text-left xl:block">
           <span className="block text-sm leading-tight font-medium">
             {name}
           </span>
@@ -48,9 +47,9 @@ export function UserMenu({ role, name, email }: UserMenuProps) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href={settings.href} />}>
-          <settings.icon />
-          {settings.title}
+        <DropdownMenuItem render={<Link href={account.href} />}>
+          <account.icon />
+          {account.title}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

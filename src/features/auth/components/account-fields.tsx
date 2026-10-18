@@ -1,57 +1,89 @@
-import { FormField } from "@/components/shared/form-field";
+import { FormField, fieldErrorProps } from "@/components/shared/form-field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/features/auth/components/password-input";
 
 type AccountFieldsProps = {
   idPrefix: string;
+  fieldError: (name: string) => string | undefined;
 };
 
-export function AccountFields({ idPrefix }: AccountFieldsProps) {
+export function AccountFields({ idPrefix, fieldError }: AccountFieldsProps) {
+  const ids = {
+    firstName: `${idPrefix}-first-name`,
+    lastName: `${idPrefix}-last-name`,
+    email: `${idPrefix}-email`,
+    phone: `${idPrefix}-phone`,
+    password: `${idPrefix}-password`,
+  };
+
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <FormField id={`${idPrefix}-first-name`} label="First name">
+        <FormField
+          id={ids.firstName}
+          label="First name"
+          error={fieldError("firstName")}
+        >
           <Input
-            id={`${idPrefix}-first-name`}
+            id={ids.firstName}
             name="firstName"
             autoComplete="given-name"
+            required
+            {...fieldErrorProps(ids.firstName, fieldError("firstName"))}
           />
         </FormField>
-        <FormField id={`${idPrefix}-last-name`} label="Last name">
+        <FormField
+          id={ids.lastName}
+          label="Last name"
+          error={fieldError("lastName")}
+        >
           <Input
-            id={`${idPrefix}-last-name`}
+            id={ids.lastName}
             name="lastName"
             autoComplete="family-name"
+            required
+            {...fieldErrorProps(ids.lastName, fieldError("lastName"))}
           />
         </FormField>
       </div>
-      <FormField id={`${idPrefix}-email`} label="Email">
+      <FormField id={ids.email} label="Email" error={fieldError("email")}>
         <Input
-          id={`${idPrefix}-email`}
+          id={ids.email}
           name="email"
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
+          required
+          {...fieldErrorProps(ids.email, fieldError("email"))}
         />
       </FormField>
-      <FormField id={`${idPrefix}-phone`} label="Phone number">
+      <FormField
+        id={ids.phone}
+        label="Phone number"
+        error={fieldError("phone")}
+      >
         <Input
-          id={`${idPrefix}-phone`}
+          id={ids.phone}
           name="phone"
           type="tel"
           autoComplete="tel"
           placeholder="+92 300 0000000"
+          required
+          {...fieldErrorProps(ids.phone, fieldError("phone"))}
         />
       </FormField>
       <FormField
-        id={`${idPrefix}-password`}
+        id={ids.password}
         label="Password"
         hint="At least 8 characters."
+        error={fieldError("password")}
       >
         <PasswordInput
-          id={`${idPrefix}-password`}
+          id={ids.password}
           name="password"
           autoComplete="new-password"
+          required
+          {...fieldErrorProps(ids.password, fieldError("password"))}
         />
       </FormField>
     </>

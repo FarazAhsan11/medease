@@ -18,13 +18,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { NavItem } from "@/config/navigation";
+
 export type DashboardRole = "patient" | "doctor" | "lab";
 
-export type DashboardNavItem = {
-  title: string;
-  href: string;
-  icon: LucideIcon;
-};
+type DashboardNavItem = NavItem & { icon: LucideIcon };
 
 export type DashboardNotification = {
   id: string;
@@ -37,7 +35,11 @@ export type DashboardConfig = {
   label: string;
   home: string;
   loginHref: string;
+  // Links in the header; `moreNav` overflows into a "More" menu and
+  // `account` sits in the user menu.
   nav: DashboardNavItem[];
+  moreNav: DashboardNavItem[];
+  account: DashboardNavItem;
   notifications: DashboardNotification[];
 };
 
@@ -63,24 +65,30 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
         href: "/patient/lab-tests",
         icon: FlaskConicalIcon,
       },
-      {
-        title: "Prescriptions",
-        href: "/patient/prescriptions",
-        icon: PillIcon,
-      },
+      { title: "Talk to AI", href: "/patient/talk-to-ai", icon: BotIcon },
+    ],
+    moreNav: [
       {
         title: "Medicines",
         href: "/patient/medicines",
         icon: ShoppingBagIcon,
       },
       {
+        title: "Prescriptions",
+        href: "/patient/prescriptions",
+        icon: PillIcon,
+      },
+      {
         title: "Health records",
         href: "/patient/records",
         icon: FileHeartIcon,
       },
-      { title: "Talk to AI", href: "/patient/talk-to-ai", icon: BotIcon },
-      { title: "Settings", href: "/patient/settings", icon: SettingsIcon },
     ],
+    account: {
+      title: "Settings",
+      href: "/patient/settings",
+      icon: SettingsIcon,
+    },
     notifications: [
       {
         id: "n1",
@@ -120,8 +128,9 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
         href: "/doctor/availability",
         icon: CalendarClockIcon,
       },
-      { title: "Profile", href: "/doctor/profile", icon: UserRoundIcon },
     ],
+    moreNav: [],
+    account: { title: "Profile", href: "/doctor/profile", icon: UserRoundIcon },
     notifications: [
       {
         id: "n1",
@@ -146,8 +155,13 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
       { title: "Bookings", href: "/lab/bookings", icon: ClipboardListIcon },
       { title: "Test catalog", href: "/lab/tests", icon: TestTubesIcon },
       { title: "Reports", href: "/lab/reports", icon: FileTextIcon },
-      { title: "Lab profile", href: "/lab/profile", icon: SettingsIcon },
     ],
+    moreNav: [],
+    account: {
+      title: "Lab profile",
+      href: "/lab/profile",
+      icon: SettingsIcon,
+    },
     notifications: [
       {
         id: "n1",

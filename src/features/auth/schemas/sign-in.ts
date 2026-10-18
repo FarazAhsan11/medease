@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email("Enter a valid email address."));
+
 export const signInSchema = z.object({
-  email: z.email("Enter a valid email address."),
+  email: emailSchema,
   password: z.string().min(1, "Enter your password."),
 });
-
-export type SignInState = {
-  error?: string;
-};

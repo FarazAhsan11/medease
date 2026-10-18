@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function TalkToAiPage() {
   return (
     <Container className="max-w-4xl py-6">
-      <ChatPanel className="h-[calc(100dvh-7rem)]" />
+      <ChatPanel locked className="h-[calc(100dvh-7rem)]" />
     </Container>
   );
 }

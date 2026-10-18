@@ -1,15 +1,19 @@
 import { PillIcon, PlusIcon } from "lucide-react";
+import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import type { Medicine } from "@/features/medicines/data/medicines";
 import { formatFee } from "@/lib/format";
 
 type MedicineCardProps = {
   medicine: Medicine;
+  // Guests are sent to log in before anything goes in a cart.
+  guest?: boolean;
 };
 
-export function MedicineCard({ medicine }: MedicineCardProps) {
+export function MedicineCard({ medicine, guest = false }: MedicineCardProps) {
   return (
     <article className="flex flex-col rounded-2xl border bg-card p-4 transition-shadow hover:shadow-soft">
       <div className="relative flex aspect-[4/3] items-center justify-center rounded-xl bg-secondary">
@@ -29,15 +33,30 @@ export function MedicineCard({ medicine }: MedicineCardProps) {
       </p>
       <div className="mt-4 flex items-center justify-between">
         <p className="text-sm font-semibold">{formatFee(medicine.price)}</p>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1"
-          aria-label={`Add ${medicine.name} to cart`}
-        >
-          <PlusIcon aria-hidden />
-          Add
-        </Button>
+        {guest ? (
+          <Link
+            href={patientRoutes.medicines}
+            className={buttonVariants({
+              size: "sm",
+              variant: "outline",
+              className: "gap-1",
+            })}
+            aria-label={`Log in to add ${medicine.name} to cart`}
+          >
+            <PlusIcon aria-hidden />
+            Add
+          </Link>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            aria-label={`Add ${medicine.name} to cart`}
+          >
+            <PlusIcon aria-hidden />
+            Add
+          </Button>
+        )}
       </div>
     </article>
   );

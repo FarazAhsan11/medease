@@ -7,7 +7,7 @@ import {
 } from "@/components/icons/social-icons";
 import { Container } from "@/components/layout/container";
 import { Logo } from "@/components/layout/logo";
-import { footerNav } from "@/config/navigation";
+import { compactFooterNav, footerNav } from "@/config/navigation";
 import { siteConfig } from "@/config/site";
 
 const socialLinks = [
@@ -16,7 +16,36 @@ const socialLinks = [
   { label: "Instagram", icon: InstagramIcon },
 ];
 
-export function SiteFooter() {
+type SiteFooterProps = {
+  compact?: boolean;
+};
+
+export function SiteFooter({ compact = false }: SiteFooterProps) {
+  if (compact) {
+    return (
+      <footer className="border-t">
+        <Container className="flex flex-col gap-3 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            &copy; 2024 {siteConfig.name}. Not a substitute for professional
+            medical advice.
+          </p>
+          <ul className="flex gap-4">
+            {compactFooterNav.map((link) => (
+              <li key={link.title}>
+                <Link
+                  href={link.href}
+                  className="transition-colors hover:text-foreground"
+                >
+                  {link.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </footer>
+    );
+  }
+
   return (
     <footer className="bg-ink text-ink-foreground">
       <Container className="grid gap-10 py-12 md:grid-cols-[1.5fr_repeat(3,1fr)]">
