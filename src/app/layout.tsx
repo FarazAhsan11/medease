@@ -22,7 +22,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={jakarta.variable}>
+    <html
+      lang="en"
+      className={jakarta.variable}
+      // Smooth scrolling for in-page links only, not page navigations.
+      data-scroll-behavior="smooth"
+    >
       <body>
         <AppProviders>
           <AppShell>{children}</AppShell>
