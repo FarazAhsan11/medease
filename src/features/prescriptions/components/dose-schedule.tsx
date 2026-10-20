@@ -1,15 +1,16 @@
 import { MoonIcon, SunIcon, SunMediumIcon } from "lucide-react";
 
 import {
-  doseTimes,
+  DOSE_TIMES,
+  doseTimeLabels,
   type DoseTime,
-} from "@/features/prescriptions/data/prescriptions";
+} from "@/features/prescriptions/lib/prescriptions";
 import { cn } from "@/lib/utils";
 
 const doseIcons = {
-  Morning: SunMediumIcon,
-  Afternoon: SunIcon,
-  Night: MoonIcon,
+  morning: SunMediumIcon,
+  afternoon: SunIcon,
+  night: MoonIcon,
 };
 
 type DoseScheduleProps = {
@@ -19,7 +20,7 @@ type DoseScheduleProps = {
 export function DoseSchedule({ doses }: DoseScheduleProps) {
   return (
     <ul className="grid grid-cols-3 gap-2">
-      {doseTimes.map((time) => {
+      {DOSE_TIMES.map((time) => {
         const Icon = doseIcons[time];
         const active = doses.includes(time);
 
@@ -34,7 +35,7 @@ export function DoseSchedule({ doses }: DoseScheduleProps) {
             )}
           >
             <Icon className="size-4" aria-hidden />
-            {time}
+            {doseTimeLabels[time]}
             <span className="sr-only">{active ? "dose" : "no dose"}</span>
           </li>
         );

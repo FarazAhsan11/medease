@@ -10,6 +10,8 @@ export const patientRoutes = {
   bookLabTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
   medicines: "/patient/medicines",
   prescriptions: "/patient/prescriptions",
+  prescription: (prescriptionId: string) =>
+    `/patient/prescriptions/${prescriptionId}`,
   talkToAi: "/patient/talk-to-ai",
   consultation: (appointmentId: string) =>
     `/patient/consultation/${appointmentId}`,
@@ -37,4 +39,6 @@ export const doctorRoutes = {
   messages: "/doctor/messages",
   consultation: (appointmentId: string) =>
     `/doctor/consultation/${appointmentId}`,
+  prescription: (appointmentId: string) =>
+    `/doctor/appointments/${appointmentId}/prescription`,
 } as const;

@@ -9,10 +9,12 @@ import { initialFormState } from "@/lib/form-state";
 
 type AppointmentOutcomeButtonsProps = {
   appointmentId: string;
+  allowNoShow?: boolean;
 };
 
 export function AppointmentOutcomeButtons({
   appointmentId,
+  allowNoShow = true,
 }: AppointmentOutcomeButtonsProps) {
   const { pending, onSubmit } = useFormAction(
     setAppointmentOutcome,
@@ -29,20 +31,22 @@ export function AppointmentOutcomeButtons({
           Mark completed
         </Button>
       </form>
-      <form onSubmit={onSubmit}>
-        <input type="hidden" name="appointmentId" value={appointmentId} />
-        <input type="hidden" name="outcome" value="no_show" />
-        <Button
-          type="submit"
-          size="sm"
-          variant="outline"
-          disabled={pending}
-          className="gap-1.5"
-        >
-          <UserXIcon aria-hidden />
-          No-show
-        </Button>
-      </form>
+      {allowNoShow && (
+        <form onSubmit={onSubmit}>
+          <input type="hidden" name="appointmentId" value={appointmentId} />
+          <input type="hidden" name="outcome" value="no_show" />
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            className="gap-1.5"
+          >
+            <UserXIcon aria-hidden />
+            No-show
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

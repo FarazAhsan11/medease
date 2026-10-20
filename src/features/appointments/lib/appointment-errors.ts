@@ -1,7 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 
-import { NETWORK_ERROR_MESSAGE, UNEXPECTED_ERROR_MESSAGE } from "@/lib/errors";
-import { formError, type FormState } from "@/lib/form-state";
+import { databaseErrorState } from "@/lib/database-errors";
+import type { FormState } from "@/lib/form-state";
 
 // The booking functions in the database raise these short codes.
 const messages: Record<string, string> = {
@@ -21,6 +21,8 @@ const messages: Record<string, string> = {
   not_open: "This appointment has already been updated.",
   not_started:
     "You can record the outcome once the appointment time has started.",
+  has_prescription:
+    "You prescribed for this appointment, so it can't be a no-show. Mark it completed, or cancel the prescription first.",
   not_doctor: "Only doctors can change a schedule.",
   overlapping_hours: "Some of your hours overlap. Adjust them and try again.",
   invalid_schedule:
@@ -28,13 +30,5 @@ const messages: Record<string, string> = {
 };
 
 export function appointmentErrorState(error: PostgrestError): FormState {
-  const known = messages[error.message];
-  if (known) return formError(known, error.message);
-
-  if (/fetch failed|network/i.test(error.message)) {
-    return formError(NETWORK_ERROR_MESSAGE, "network_error");
-  }
-
-  console.error("Appointment request failed:", error.code, error.message);
-  return formError(UNEXPECTED_ERROR_MESSAGE, "unexpected_error");
+  return databaseErrorState(error, messages, "Appointment request");
 }

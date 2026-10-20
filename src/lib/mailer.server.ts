@@ -1,8 +1,10 @@
 import "server-only";
 
+import { after } from "next/server";
 import { createTransport } from "nodemailer";
 
 import { getEmailEnv } from "@/lib/env.server";
+import type { EmailContent } from "@/lib/render-email";
 
 type Message = {
   to: string;
@@ -46,6 +48,21 @@ export async function sendMail({ to, subject, html, text }: Message) {
     logSendFailure(subject, error);
     throw error;
   }
+}
+
+type Mail = { to: string | null; content: EmailContent };
+
+// Sends after the response, so a slow SMTP server never delays the action
+// that triggered the email. A failed email is logged (by sendMail) and never
+// undoes that action. Mails without a recipient are skipped.
+export function sendMailAfterResponse(mails: Mail[]) {
+  after(async () => {
+    await Promise.allSettled(
+      mails
+        .filter((mail): mail is Mail & { to: string } => Boolean(mail.to))
+        .map((mail) => sendMail({ to: mail.to, ...mail.content })),
+    );
+  });
 }
 
 // Nodemailer messages can include recipient addresses, so log codes only.

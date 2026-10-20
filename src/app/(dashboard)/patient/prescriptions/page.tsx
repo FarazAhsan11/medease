@@ -5,19 +5,23 @@ import Link from "next/link";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { patientRoutes } from "@/config/routes";
-import { PrescriptionCard } from "@/features/prescriptions/components/prescription-card";
-import { prescriptions } from "@/features/prescriptions/data/prescriptions";
+import { PatientPrescriptions } from "@/features/prescriptions/components/patient-prescriptions";
+import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
+import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Prescriptions",
 };
 
-export default function PatientPrescriptionsPage() {
+export default async function PatientPrescriptionsPage() {
+  const user = await requireRole("patient");
+  const prescriptions = await listPatientPrescriptions(user.id);
+
   return (
     <>
       <DashboardPageHeader
         title="Prescriptions"
-        description="Your active medicines, dosing schedule, and refills."
+        description="Medicines from your doctors, how to take them, and for how long."
         actions={
           <Link
             href={patientRoutes.medicines}
@@ -31,11 +35,7 @@ export default function PatientPrescriptionsPage() {
           </Link>
         }
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {prescriptions.map((prescription) => (
-          <PrescriptionCard key={prescription.id} prescription={prescription} />
-        ))}
-      </div>
+      <PatientPrescriptions prescriptions={prescriptions} />
     </>
   );
 }

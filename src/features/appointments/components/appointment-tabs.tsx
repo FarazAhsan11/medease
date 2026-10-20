@@ -10,11 +10,14 @@ import { AppointmentStatusBadge } from "@/features/appointments/components/appoi
 import { CountBadge } from "@/features/appointments/components/count-badge";
 import { UpcomingAppointmentCard } from "@/features/appointments/components/upcoming-appointment-card";
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
 
 type AppointmentTabsProps = {
   upcoming: Appointment[];
   past: Appointment[];
   cancelled: Appointment[];
+  // Appointment id -> prescription id, for appointments that have one.
+  prescriptionIds: Record<string, string>;
 };
 
 function BookAgainLink({ doctorId }: { doctorId: string }) {
@@ -33,23 +36,43 @@ function BookAgainLink({ doctorId }: { doctorId: string }) {
   );
 }
 
-function HistoryList({ appointments }: { appointments: Appointment[] }) {
-  return appointments.map((appointment) => (
-    <AppointmentCard
-      key={appointment.id}
-      appointment={appointment}
-      status={
-        <AppointmentStatusBadge appointment={appointment} viewer="patient" />
-      }
-      actions={<BookAgainLink doctorId={appointment.doctorId} />}
-    />
-  ));
+function HistoryList({
+  appointments,
+  prescriptionIds,
+}: {
+  appointments: Appointment[];
+  prescriptionIds: Record<string, string>;
+}) {
+  return appointments.map((appointment) => {
+    const prescriptionId = prescriptionIds[appointment.id];
+
+    return (
+      <AppointmentCard
+        key={appointment.id}
+        appointment={appointment}
+        status={
+          <AppointmentStatusBadge appointment={appointment} viewer="patient" />
+        }
+        actions={
+          <>
+            {prescriptionId && (
+              <ViewPrescriptionLink
+                href={patientRoutes.prescription(prescriptionId)}
+              />
+            )}
+            <BookAgainLink doctorId={appointment.doctorId} />
+          </>
+        }
+      />
+    );
+  });
 }
 
 export function AppointmentTabs({
   upcoming,
   past,
   cancelled,
+  prescriptionIds,
 }: AppointmentTabsProps) {
   return (
     <Tabs defaultValue="upcoming" className="gap-6">
@@ -74,6 +97,7 @@ export function AppointmentTabs({
             <UpcomingAppointmentCard
               key={appointment.id}
               appointment={appointment}
+              prescriptionId={prescriptionIds[appointment.id]}
             />
           ))
         ) : (
@@ -95,7 +119,7 @@ export function AppointmentTabs({
 
       <TabsContent value="past" className="grid gap-3">
         {past.length > 0 ? (
-          <HistoryList appointments={past} />
+          <HistoryList appointments={past} prescriptionIds={prescriptionIds} />
         ) : (
           <EmptyState
             icon={HistoryIcon}
@@ -107,7 +131,10 @@ export function AppointmentTabs({
 
       <TabsContent value="cancelled" className="grid gap-3">
         {cancelled.length > 0 ? (
-          <HistoryList appointments={cancelled} />
+          <HistoryList
+            appointments={cancelled}
+            prescriptionIds={prescriptionIds}
+          />
         ) : (
           <EmptyState
             icon={CalendarXIcon}

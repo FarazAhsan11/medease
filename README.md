@@ -34,3 +34,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Project structure
 
 See [CLAUDE.md](./CLAUDE.md) for the folder layout and coding conventions.
+
+## Roadmap
+
+See [docs/roadmap.md](./docs/roadmap.md) for what's built and the next milestone, and [docs/chat.md](./docs/chat.md) for the planned chat features.

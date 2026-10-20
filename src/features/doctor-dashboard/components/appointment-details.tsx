@@ -13,6 +13,8 @@ import {
 } from "@/features/appointments/lib/appointments";
 import { AppointmentNotesForm } from "@/features/doctor-dashboard/components/appointment-notes-form";
 import { AppointmentOutcomeButtons } from "@/features/doctor-dashboard/components/appointment-outcome-buttons";
+import { AppointmentPrescription } from "@/features/doctor-dashboard/components/appointment-prescription";
+import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
@@ -38,12 +40,14 @@ type AppointmentDetailsProps = {
   notes: string;
   // Completed visits with this patient, this one excluded.
   previousVisits: number;
+  prescription: PrescriptionSummary | null;
 };
 
 export function AppointmentDetails({
   appointment,
   notes,
   previousVisits,
+  prescription,
 }: AppointmentDetailsProps) {
   const { timezone } = appointment;
   const call = describeCall(appointment);
@@ -123,12 +127,21 @@ export function AppointmentDetails({
         </div>
       )}
 
+      <AppointmentPrescription
+        appointment={appointment}
+        prescription={prescription}
+      />
+
       {needsOutcome(appointment) && (
         <div className="grid gap-2 border-t pt-5">
           <p className="text-xs text-muted-foreground">
             How did this appointment go?
           </p>
-          <AppointmentOutcomeButtons appointmentId={appointment.id} />
+          <AppointmentOutcomeButtons
+            appointmentId={appointment.id}
+            // Someone who was prescribed for attended.
+            allowNoShow={prescription?.status !== "active"}
+          />
         </div>
       )}
 

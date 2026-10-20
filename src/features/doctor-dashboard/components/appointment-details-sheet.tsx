@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/sheet";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetails } from "@/features/doctor-dashboard/components/appointment-details";
+import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import { formatDateTime } from "@/lib/datetime";
 
 type AppointmentDetailsSheetProps = {
   appointment: Appointment;
   notes: string;
   previousVisits: number;
+  prescription: PrescriptionSummary | null;
 };
 
 export function AppointmentDetailsSheet(props: AppointmentDetailsSheetProps) {

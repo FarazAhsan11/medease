@@ -59,6 +59,34 @@ export function toDateKey(value: DateInput, timeZone: string) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const dateKeyToUtc = (dateKey: string) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+
+// Whole days from one "YYYY-MM-DD" to another (negative if `to` is earlier).
+export function daysBetweenDateKeys(from: string, to: string) {
+  return Math.round((dateKeyToUtc(to) - dateKeyToUtc(from)) / DAY_MS);
+}
+
+// "2026-10-30" + 3 -> "2026-11-02"
+export function addDaysToDateKey(dateKey: string, days: number) {
+  return new Date(dateKeyToUtc(dateKey) + days * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+}
+
+// "Oct 30, 2026" for a "YYYY-MM-DD" calendar day.
+export function formatDateKey(dateKey: string) {
+  return formatter("UTC", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(dateKeyToUtc(dateKey)));
+}
+
 // Parts for a date chip: { weekday: "Mon", day: "19", month: "Oct" }.
 export function dateChipParts(dateKey: string, timeZone: string) {
   // Noon UTC keeps the calendar day stable across timezones.

@@ -8,6 +8,8 @@ import { patientRoutes } from "@/config/routes";
 import { AppointmentTabs } from "@/features/appointments/components/appointment-tabs";
 import { listPatientAppointments } from "@/features/appointments/data/appointments";
 import { groupAppointments } from "@/features/appointments/lib/appointments";
+import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
+import { prescriptionIdsByAppointment } from "@/features/prescriptions/lib/prescriptions";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -16,7 +18,10 @@ export const metadata: Metadata = {
 
 export default async function PatientAppointmentsPage() {
   const user = await requireRole("patient");
-  const appointments = await listPatientAppointments(user.id);
+  const [appointments, prescriptions] = await Promise.all([
+    listPatientAppointments(user.id),
+    listPatientPrescriptions(user.id),
+  ]);
 
   return (
     <>
@@ -33,7 +38,10 @@ export default async function PatientAppointmentsPage() {
           </Link>
         }
       />
-      <AppointmentTabs {...groupAppointments(appointments)} />
+      <AppointmentTabs
+        {...groupAppointments(appointments)}
+        prescriptionIds={prescriptionIdsByAppointment(prescriptions)}
+      />
     </>
   );
 }

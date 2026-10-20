@@ -1,5 +1,6 @@
 import { CalendarXIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/shared/back-link";
@@ -15,6 +16,8 @@ type ConsultationViewProps = {
   role: CallRole;
   userId: string;
   backHref: string;
+  // Extra actions next to the back link.
+  actions?: ReactNode;
 };
 
 export async function ConsultationView({
@@ -22,6 +25,7 @@ export async function ConsultationView({
   role,
   userId,
   backHref,
+  actions,
 }: ConsultationViewProps) {
   const appointment = await getCallAppointment(appointmentId);
   const ownId =
@@ -38,7 +42,10 @@ export async function ConsultationView({
 
   return (
     <>
-      <BackLink href={backHref}>Back to appointments</BackLink>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <BackLink href={backHref}>Back to appointments</BackLink>
+        {actions}
+      </div>
       {appointment.status === "booked" ? (
         <CallRoom
           appointmentId={appointment.id}

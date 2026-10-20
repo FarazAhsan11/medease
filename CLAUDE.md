@@ -4,6 +4,8 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 
 @AGENTS.md
 
+Planned work and milestones: `docs/roadmap.md`. Chat feature designs: `docs/chat.md`.
+
 ## Commands
 
 - `npm run dev` / `npm run build`
@@ -31,6 +33,7 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 - Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic.
 - `npm run db:seed` creates/updates the demo accounts, profiles and doctor hours (password from `SEED_USER_PASSWORD` in `.env.local`).
 - Appointments: patients book slots generated from doctors' weekly hours by `get_doctor_slots`. Booking, cancelling, outcomes and schedule saves go through SECURITY DEFINER functions (`supabase/migrations/*_appointments.sql`) that check the caller; a partial unique index prevents double-booking. Times display in the doctor's timezone via `src/lib/datetime.ts`.
+- Prescriptions: doctors issue them per appointment (from its start until 14 days after) through `issue_prescription` / `cancel_prescription` (`supabase/migrations/*_prescriptions.sql`); edits create a new version that replaces the active one, one active per appointment. Patients and doctors only read. Course and dosing rules live in `src/features/prescriptions/lib/prescriptions.ts`. Design: `docs/prescriptions.md`.
 - Video calls: WebRTC peer to peer; Supabase Realtime private channel `call:<appointment id>` carries signaling, guarded by `can_join_call` policies on `realtime.messages` (participants only, 5 min before start to 30 min after). Engine in `src/features/video-call/lib/call-connection.ts`. Optional TURN via `TURN_*` env vars.
 - Auth emails are ours, not Supabase's: accounts are created with the admin API, and confirmation/reset tokens are generated, hashed into `auth_tokens`, and checked in `src/features/auth/lib/auth-tokens.ts`. Emails go out through Nodemailer (`SMTP_*` vars); templates live in `src/features/auth/emails/`.
 

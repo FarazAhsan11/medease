@@ -25,12 +25,16 @@ import {
   startingWithin,
   summarizePatients,
 } from "@/features/doctor-dashboard/lib/practice";
+import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
 import { requireRole } from "@/lib/auth/session";
 import { formatTime } from "@/lib/datetime";
 
 export default async function DoctorOverviewPage() {
   const user = await requireRole("doctor");
-  const appointments = await listDoctorAppointments(user.id);
+  const [appointments, prescriptions] = await Promise.all([
+    listDoctorAppointments(user.id),
+    getDoctorPrescriptionSummaries(user.id),
+  ]);
   const { upcoming, needsOutcome } = groupDoctorAppointments(appointments);
 
   const today = appointments.filter((item) => isToday(item));
@@ -92,6 +96,7 @@ export default async function DoctorOverviewPage() {
         appointments={today}
         notes={notes}
         previousVisits={countPreviousVisits(appointments)}
+        prescriptions={prescriptions}
         nextAppointment={upcoming[0] ?? null}
       />
       <RecentMessagesCard threads={messageThreads} />

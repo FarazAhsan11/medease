@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+
 import {
   toAppointment,
   type AppointmentRow,
@@ -44,6 +46,21 @@ export async function listDoctorAppointments(
 
   if (error) throw new Error(`appointments: ${error.message}`);
   return data.map(toAppointment);
+}
+
+// One appointment, for its own patient or doctor only (row level security).
+export async function getAppointment(appointmentId: string) {
+  if (!z.uuid().safeParse(appointmentId).success) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(APPOINTMENT_COLUMNS)
+    .eq("id", appointmentId)
+    .maybeSingle<AppointmentRow>();
+
+  if (error) throw new Error(`appointments: ${error.message}`);
+  return data ? toAppointment(data) : null;
 }
 
 // Private notes for a doctor's appointments, keyed by appointment id.

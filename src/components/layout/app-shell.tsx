@@ -17,9 +17,13 @@ export async function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader user={user} />
+      <div className="contents print:hidden">
+        <SiteHeader user={user} />
+      </div>
       <main className="flex-1">{children}</main>
-      <SiteFooter compact={Boolean(user)} />
+      <div className="contents print:hidden">
+        <SiteFooter compact={Boolean(user)} />
+      </div>
       <FlashToaster flash={flash} />
     </div>
   );

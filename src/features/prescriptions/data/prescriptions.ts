@@ -1,55 +1,117 @@
-export type DoseTime = "Morning" | "Afternoon" | "Night";
+import "server-only";
 
-export type Prescription = {
+import { z } from "zod";
+
+import {
+  toPrescription,
+  type PrescriptionRow,
+  type PrescriptionSummary,
+} from "@/features/prescriptions/lib/prescriptions";
+import { createClient } from "@/lib/supabase/server";
+
+const PRESCRIPTION_COLUMNS =
+  "id, appointment_id, doctor_id, patient_id, status, diagnosis, advice, doctor_name, doctor_specialization, doctor_license, clinic_address, patient_name, timezone, replaces_id, issued_at, cancelled_at, cancellation_reason, prescription_items(id, sort_order, medicine, strength, form, dose, frequency, dose_times, meal, duration_days, instructions)";
+
+// Row level security already limits rows to the prescription's own patient
+// and doctor; the explicit filters keep queries on the right index.
+// Replaced versions are history only, so lists leave them out.
+
+export async function listPatientPrescriptions(patientId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select(PRESCRIPTION_COLUMNS)
+    .eq("patient_id", patientId)
+    .neq("status", "replaced")
+    .order("issued_at", { ascending: false })
+    .limit(200)
+    .returns<PrescriptionRow[]>();
+
+  if (error) throw new Error(`prescriptions: ${error.message}`);
+  return data.map(toPrescription);
+}
+
+// The active prescription and any cancelled ones for one appointment,
+// newest first.
+export async function listAppointmentPrescriptions(appointmentId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select(PRESCRIPTION_COLUMNS)
+    .eq("appointment_id", appointmentId)
+    .neq("status", "replaced")
+    .order("issued_at", { ascending: false })
+    .returns<PrescriptionRow[]>();
+
+  if (error) throw new Error(`prescriptions: ${error.message}`);
+  return data.map(toPrescription);
+}
+
+export async function getPrescription(prescriptionId: string) {
+  if (!z.uuid().safeParse(prescriptionId).success) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select(PRESCRIPTION_COLUMNS)
+    .eq("id", prescriptionId)
+    .maybeSingle<PrescriptionRow>();
+
+  if (error) throw new Error(`prescriptions: ${error.message}`);
+  return data ? toPrescription(data) : null;
+}
+
+// The version that replaced this one, for old links to an edited prescription.
+export async function getReplacementId(prescriptionId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select("id")
+    .eq("replaces_id", prescriptionId)
+    .maybeSingle<{ id: string }>();
+
+  if (error) throw new Error(`prescriptions: ${error.message}`);
+  return data?.id ?? null;
+}
+
+type SummaryRow = {
   id: string;
-  medicine: string;
-  strength: string;
-  instructions: string;
-  doses: DoseTime[];
-  prescribedBy: string;
-  startedOn: string;
-  refillsLeft: number;
-  totalRefills: number;
-  daysRemaining: number;
+  appointment_id: string;
+  status: PrescriptionSummary["status"];
+  issued_at: string;
+  prescription_items: { medicine: string; sort_order: number }[];
 };
 
-export const doseTimes: DoseTime[] = ["Morning", "Afternoon", "Night"];
+// For a doctor's appointment lists, keyed by appointment id: the active
+// prescription, or else the latest cancelled one.
+export async function getDoctorPrescriptionSummaries(doctorId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select(
+      "id, appointment_id, status, issued_at, prescription_items(medicine, sort_order)",
+    )
+    .eq("doctor_id", doctorId)
+    .neq("status", "replaced")
+    .order("issued_at", { ascending: false })
+    .limit(1000)
+    .returns<SummaryRow[]>();
 
-export const prescriptions: Prescription[] = [
-  {
-    id: "rx-1",
-    medicine: "Atorvastatin",
-    strength: "20 mg",
-    instructions: "1 tablet after dinner",
-    doses: ["Night"],
-    prescribedBy: "Dr. Ayesha Khan",
-    startedOn: "Aug 2, 2026",
-    refillsLeft: 1,
-    totalRefills: 3,
-    daysRemaining: 3,
-  },
-  {
-    id: "rx-2",
-    medicine: "Metformin",
-    strength: "500 mg",
-    instructions: "1 tablet with breakfast and dinner",
-    doses: ["Morning", "Night"],
-    prescribedBy: "Dr. Nida Ali",
-    startedOn: "Jun 18, 2026",
-    refillsLeft: 2,
-    totalRefills: 4,
-    daysRemaining: 17,
-  },
-  {
-    id: "rx-3",
-    medicine: "Vitamin D3",
-    strength: "50,000 IU",
-    instructions: "1 capsule once a week after lunch",
-    doses: ["Afternoon"],
-    prescribedBy: "Dr. Nida Ali",
-    startedOn: "Sep 20, 2026",
-    refillsLeft: 0,
-    totalRefills: 0,
-    daysRemaining: 24,
-  },
-];
+  if (error) throw new Error(`prescriptions: ${error.message}`);
+
+  const summaries: Record<string, PrescriptionSummary> = {};
+  for (const row of data) {
+    const existing = summaries[row.appointment_id];
+    if (existing && (existing.status === "active" || row.status !== "active")) {
+      continue;
+    }
+    summaries[row.appointment_id] = {
+      id: row.id,
+      status: row.status,
+      medicines: [...row.prescription_items]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((item) => item.medicine),
+    };
+  }
+  return summaries;
+}

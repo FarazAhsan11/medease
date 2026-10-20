@@ -9,10 +9,12 @@ import {
   countPreviousVisits,
   groupDoctorAppointments,
 } from "@/features/doctor-dashboard/lib/practice";
+import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 
 type VisitsTabsProps = {
   appointments: Appointment[];
   notes: Record<string, string>;
+  prescriptions: Record<string, PrescriptionSummary>;
 };
 
 const tabs = [
@@ -39,7 +41,11 @@ const tabs = [
   },
 ] as const;
 
-export function VisitsTabs({ appointments, notes }: VisitsTabsProps) {
+export function VisitsTabs({
+  appointments,
+  notes,
+  prescriptions,
+}: VisitsTabsProps) {
   const groups = groupDoctorAppointments(appointments);
   const previousVisits = countPreviousVisits(appointments);
 
@@ -60,6 +66,7 @@ export function VisitsTabs({ appointments, notes }: VisitsTabsProps) {
               visits={groups[tab.value]}
               notes={notes}
               previousVisits={previousVisits}
+              prescriptions={prescriptions}
             />
           ) : (
             <EmptyState

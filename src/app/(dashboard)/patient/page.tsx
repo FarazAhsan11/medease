@@ -8,29 +8,57 @@ import { NextAppointmentBanner } from "@/features/patient-dashboard/components/n
 import { QuickActions } from "@/features/patient-dashboard/components/quick-actions";
 import { UpcomingVisitsCard } from "@/features/patient-dashboard/components/upcoming-visits-card";
 import { patientStats } from "@/features/patient-dashboard/data/overview";
-import { prescriptions } from "@/features/prescriptions/data/prescriptions";
+import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
+import {
+  ENDING_SOON_DAYS,
+  getCurrentMedicines,
+} from "@/features/prescriptions/lib/prescriptions";
 import { requireRole } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/datetime";
 
+function describeMedicines(medicines: ReturnType<typeof getCurrentMedicines>) {
+  if (medicines.length === 0) return "None right now";
+  const endingSoon = medicines.filter(
+    ({ course }) =>
+      course.daysLeft !== null && course.daysLeft <= ENDING_SOON_DAYS,
+  ).length;
+  if (endingSoon > 0) {
+    return `${endingSoon} ending in ${ENDING_SOON_DAYS} days or less`;
+  }
+  const dueToday = medicines.filter(({ course }) => course.dueToday).length;
+  return `${dueToday} to take today`;
+}
+
 export default async function PatientOverviewPage() {
   const user = await requireRole("patient");
-  const { upcoming } = groupAppointments(
-    await listPatientAppointments(user.id),
-  );
+  const [appointments, prescriptions] = await Promise.all([
+    listPatientAppointments(user.id),
+    listPatientPrescriptions(user.id),
+  ]);
+  const { upcoming } = groupAppointments(appointments);
   const [next] = upcoming;
+  const medicines = getCurrentMedicines(prescriptions);
 
-  // Appointments are live; the other stats are still sample data.
-  const stats = patientStats.map((stat) =>
-    stat.label === "Upcoming visits"
-      ? {
-          ...stat,
-          value: String(upcoming.length),
-          hint: next
-            ? `Next: ${formatDateTime(next.startsAt, next.timezone)}`
-            : "Nothing booked",
-        }
-      : stat,
-  );
+  // Appointments and medicines are live; the other stats are still sample data.
+  const stats = patientStats.map((stat) => {
+    if (stat.label === "Upcoming visits") {
+      return {
+        ...stat,
+        value: String(upcoming.length),
+        hint: next
+          ? `Next: ${formatDateTime(next.startsAt, next.timezone)}`
+          : "Nothing booked",
+      };
+    }
+    if (stat.label === "Active medicines") {
+      return {
+        ...stat,
+        value: String(medicines.length),
+        hint: describeMedicines(medicines),
+      };
+    }
+    return stat;
+  });
 
   return (
     <>
@@ -45,7 +73,7 @@ export default async function PatientOverviewPage() {
           <UpcomingVisitsCard appointments={upcoming.slice(0, 3)} />
           <LabResultsCard orders={labOrders} />
         </div>
-        <MedicationRemindersCard prescriptions={prescriptions} />
+        <MedicationRemindersCard medicines={medicines} />
       </div>
     </>
   );

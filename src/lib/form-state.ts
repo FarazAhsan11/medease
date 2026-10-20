@@ -21,6 +21,23 @@ export function validationError(error: z.ZodError): FormState {
   };
 }
 
+// Like validationError, but keys each error by its full path
+// ("items.0.dose"), for forms with repeated rows.
+export function nestedValidationError(error: z.ZodError): FormState {
+  const fieldErrors: Record<string, string[]> = {};
+  for (const issue of error.issues) {
+    const key = issue.path.map(String).join(".");
+    (fieldErrors[key] ??= []).push(issue.message);
+  }
+
+  return {
+    status: "error",
+    code: "validation_failed",
+    message: "Please fix the highlighted fields.",
+    fieldErrors,
+  };
+}
+
 export function formError(message: string, code?: string): FormState {
   return { status: "error", message, code };
 }
