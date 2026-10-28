@@ -5,6 +5,7 @@ Healthcare app. Next.js App Router, TypeScript, Tailwind v4, shadcn/ui (Base UI)
 @AGENTS.md
 
 Planned work and milestones: `docs/roadmap.md`. Chat feature designs: `docs/chat.md`.
+Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requirement, update its status there, name its ID in the commit message, and run `npm run srs -- --write`.
 
 ## Commands
 
