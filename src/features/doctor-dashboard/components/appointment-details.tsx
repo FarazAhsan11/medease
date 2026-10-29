@@ -103,6 +103,7 @@ export function AppointmentDetails({
       {isActive(appointment) && (
         <JoinCallButton
           startsAt={appointment.startsAt}
+          endsAt={appointment.endsAt}
           href={doctorRoutes.consultation(appointment.id)}
           className="h-9 w-full"
         />

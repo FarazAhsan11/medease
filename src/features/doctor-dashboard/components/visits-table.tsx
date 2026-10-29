@@ -74,6 +74,7 @@ export function VisitsTable({
                   {isActive(visit) && (
                     <JoinCallButton
                       startsAt={visit.startsAt}
+                      endsAt={visit.endsAt}
                       href={doctorRoutes.consultation(visit.id)}
                     />
                   )}

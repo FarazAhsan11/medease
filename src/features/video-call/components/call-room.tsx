@@ -34,6 +34,7 @@ type CallRoomProps = {
   role: CallRole;
   other: { name: string; subtitle: string };
   startsAt: string;
+  endsAt: string;
   timezone: string;
   iceServers: IceServer[];
   backHref: string;
@@ -55,12 +56,13 @@ export function CallRoom({
   role,
   other,
   startsAt,
+  endsAt,
   timezone,
   iceServers,
   backHref,
 }: CallRoomProps) {
   const now = useNow();
-  const { opensAt, closesAt } = getCallWindow(startsAt);
+  const { opensAt, closesAt } = getCallWindow(startsAt, endsAt);
   const call = useCall({
     appointmentId,
     role,
@@ -128,7 +130,7 @@ export function CallRoom({
       time: {
         icon: TimerOffIcon,
         title: "The call time is over",
-        description: "Calls last up to 30 minutes from the appointment time.",
+        description: `The call for this appointment closed at ${formatTime(new Date(closesAt), timezone)}.`,
       },
       closed: {
         icon: CalendarClockIcon,

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 type JoinCallButtonProps = {
   startsAt: string;
+  endsAt: string;
   href: string;
   variant?: "default" | "secondary";
   className?: string;
@@ -18,16 +19,17 @@ type JoinCallButtonProps = {
 
 const HOUR_MS = 60 * 60_000;
 
-// Live from 5 minutes before the appointment until 30 minutes after it
-// starts; a countdown in the last hour before that; hidden once over.
+// Live from 5 minutes before the appointment until its call window closes
+// (CALL_WINDOW); a countdown in the last hour before that; hidden once over.
 export function JoinCallButton({
   startsAt,
+  endsAt,
   href,
   variant = "default",
   className,
 }: JoinCallButtonProps) {
   const now = useNow();
-  const { opensAt, closesAt } = getCallWindow(startsAt);
+  const { opensAt, closesAt } = getCallWindow(startsAt, endsAt);
 
   if (now !== 0 && now >= closesAt) return null;
 

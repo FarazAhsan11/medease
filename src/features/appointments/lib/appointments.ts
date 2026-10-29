@@ -72,16 +72,24 @@ export function toAppointment(row: AppointmentRow): Appointment {
   };
 }
 
-// Video calls open 5 minutes early and last at most 30 minutes from the
-// start. Keep in sync with can_join_call in the video calls migration.
-export const CALL_WINDOW = { earlyMinutes: 5, lengthMinutes: 30 } as const;
+// Video calls open 5 minutes early and close 15 minutes after the slot ends,
+// never sooner than 30 minutes after the start. Keep in sync with
+// call_closes_at in the booking fixes migration.
+export const CALL_WINDOW = {
+  earlyMinutes: 5,
+  afterEndMinutes: 15,
+  minLengthMinutes: 30,
+} as const;
 const MINUTE_MS = 60_000;
 
-export function getCallWindow(startsAt: string) {
+export function getCallWindow(startsAt: string, endsAt: string) {
   const start = Date.parse(startsAt);
   return {
     opensAt: start - CALL_WINDOW.earlyMinutes * MINUTE_MS,
-    closesAt: start + CALL_WINDOW.lengthMinutes * MINUTE_MS,
+    closesAt: Math.max(
+      Date.parse(endsAt) + CALL_WINDOW.afterEndMinutes * MINUTE_MS,
+      start + CALL_WINDOW.minLengthMinutes * MINUTE_MS,
+    ),
   };
 }
 
@@ -92,7 +100,7 @@ export const isUpcoming = (appointment: Appointment, now = Date.now()) =>
 // Not started, or started but the call window is still open.
 export const isActive = (appointment: Appointment, now = Date.now()) =>
   appointment.status === "booked" &&
-  now < getCallWindow(appointment.startsAt).closesAt;
+  now < getCallWindow(appointment.startsAt, appointment.endsAt).closesAt;
 
 // Started and the call window is open right now.
 export const isInProgress = (appointment: Appointment, now = Date.now()) =>

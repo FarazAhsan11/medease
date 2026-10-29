@@ -31,6 +31,7 @@ export function UpcomingAppointmentCard({
         <>
           <JoinCallButton
             startsAt={appointment.startsAt}
+            endsAt={appointment.endsAt}
             href={patientRoutes.consultation(appointment.id)}
           />
           {prescriptionId && (

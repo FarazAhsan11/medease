@@ -66,6 +66,7 @@ export function NextAppointmentBanner({
           {appointment && (
             <JoinCallButton
               startsAt={appointment.startsAt}
+              endsAt={appointment.endsAt}
               href={patientRoutes.consultation(appointment.id)}
               variant="secondary"
               className="h-9 px-4"

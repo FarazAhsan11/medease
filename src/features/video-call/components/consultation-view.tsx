@@ -52,6 +52,7 @@ export async function ConsultationView({
           role={role}
           other={other}
           startsAt={appointment.startsAt}
+          endsAt={appointment.endsAt}
           timezone={appointment.timezone}
           iceServers={getIceServers()}
           backHref={backHref}
