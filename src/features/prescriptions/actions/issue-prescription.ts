@@ -58,7 +58,7 @@ export const issuePrescription = withFormErrors(
       patient_email: string | null;
       replaced: boolean;
     };
-    await notifyPrescriptionIssued(
+    notifyPrescriptionIssued(
       toPrescription(row),
       row.patient_email,
       row.replaced,

@@ -39,7 +39,15 @@ export function UpcomingAppointmentCard({
               href={patientRoutes.prescription(prescriptionId)}
             />
           )}
-          <AddToCalendarButton appointment={appointment} />
+          <AddToCalendarButton
+            // Only what the file needs reaches the browser.
+            appointment={{
+              id: appointment.id,
+              startsAt: appointment.startsAt,
+              endsAt: appointment.endsAt,
+            }}
+            href={patientRoutes.appointments}
+          />
           {isUpcoming(appointment) && (
             <CancelAppointmentDialog
               appointmentId={appointment.id}

@@ -30,7 +30,7 @@ export const cancelAppointment = withFormErrors(
     if (error) return appointmentErrorState(error);
 
     const row = data as AppointmentRow & { doctor_email: string | null };
-    await notifyAppointmentCancelled(toAppointment(row), row.doctor_email);
+    notifyAppointmentCancelled(toAppointment(row), row.doctor_email);
 
     refresh();
     return { status: "success", message: "The appointment was cancelled." };

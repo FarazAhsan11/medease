@@ -11,7 +11,6 @@ import {
 } from "@/features/appointments/lib/appointments";
 import { bookAppointmentSchema } from "@/features/appointments/schemas/appointment";
 import { getSessionUser } from "@/lib/auth/session";
-import { formatDateTime } from "@/lib/datetime";
 import { setFlash } from "@/lib/flash.server";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, validationError, type FormState } from "@/lib/form-state";
@@ -43,13 +42,11 @@ export const bookAppointment = withFormErrors(
     if (error) return appointmentErrorState(error);
 
     const row = data as AppointmentRow & { doctor_email: string | null };
-    const appointment = toAppointment(row);
-    await notifyAppointmentBooked(appointment, row.doctor_email);
+    notifyAppointmentBooked(toAppointment(row), row.doctor_email);
 
-    await setFlash(
-      "success",
-      `Booked with ${appointment.doctorName} for ${formatDateTime(appointment.startsAt, appointment.timezone)}.`,
-    );
+    // Generic on purpose: the flash cookie is readable in the browser. The
+    // appointments page shows the details.
+    await setFlash("success", "Your appointment is booked.");
     redirect(patientRoutes.appointments);
   },
 );

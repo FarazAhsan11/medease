@@ -6,18 +6,17 @@ import {
   prescriptionIssuedEmail,
 } from "@/features/prescriptions/emails/prescription-email-templates";
 import type { Prescription } from "@/features/prescriptions/lib/prescriptions";
+import { getSiteUrl } from "@/lib/env.server";
 import { sendMailAfterResponse } from "@/lib/mailer.server";
-import { getSiteUrl } from "@/lib/site-url.server";
 
-async function prescriptionUrl(prescription: Prescription) {
-  const siteUrl = await getSiteUrl();
+function prescriptionUrl(prescription: Prescription) {
   return new URL(
     patientRoutes.prescription(prescription.id),
-    siteUrl,
+    getSiteUrl(),
   ).toString();
 }
 
-export async function notifyPrescriptionIssued(
+export function notifyPrescriptionIssued(
   prescription: Prescription,
   patientEmail: string | null,
   replaced: boolean,
@@ -28,13 +27,13 @@ export async function notifyPrescriptionIssued(
       content: prescriptionIssuedEmail(
         prescription,
         replaced,
-        await prescriptionUrl(prescription),
+        prescriptionUrl(prescription),
       ),
     },
   ]);
 }
 
-export async function notifyPrescriptionCancelled(
+export function notifyPrescriptionCancelled(
   prescription: Prescription,
   patientEmail: string | null,
 ) {
@@ -43,7 +42,7 @@ export async function notifyPrescriptionCancelled(
       to: patientEmail,
       content: prescriptionCancelledEmail(
         prescription,
-        await prescriptionUrl(prescription),
+        prescriptionUrl(prescription),
       ),
     },
   ]);

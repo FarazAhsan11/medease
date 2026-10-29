@@ -3,24 +3,32 @@
 import { CalendarPlusIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { buildAppointmentIcs } from "@/features/appointments/lib/calendar";
-import type { Appointment } from "@/features/appointments/lib/appointments";
+import {
+  buildAppointmentIcs,
+  type CalendarAppointment,
+} from "@/features/appointments/lib/calendar";
 
 type AddToCalendarButtonProps = {
-  appointment: Appointment;
+  appointment: CalendarAppointment;
+  // Page the calendar event links back to for the details.
+  href: string;
 };
 
 // Built in the browser, so no appointment details travel through a URL.
-export function AddToCalendarButton({ appointment }: AddToCalendarButtonProps) {
+export function AddToCalendarButton({
+  appointment,
+  href,
+}: AddToCalendarButtonProps) {
   function download() {
-    const blob = new Blob([buildAppointmentIcs(appointment)], {
+    const link = new URL(href, window.location.origin).toString();
+    const blob = new Blob([buildAppointmentIcs(appointment, link)], {
       type: "text/calendar;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "medease-appointment.ics";
-    link.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "medease-appointment.ics";
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 

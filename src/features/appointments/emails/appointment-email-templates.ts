@@ -3,6 +3,11 @@ import { formatDate, formatTime } from "@/lib/datetime";
 import { formatFee } from "@/lib/format";
 import { renderEmail } from "@/lib/render-email";
 
+// Inboxes are less private than the app, so emails never carry the doctor's
+// name or specialty, the reason for the visit or a cancellation reason; those
+// stay behind sign-in. Subjects and previews (shown on lock screens) name
+// no one.
+
 const when = (appointment: Appointment) =>
   `${formatDate(appointment.startsAt, appointment.timezone)} at ${formatTime(appointment.startsAt, appointment.timezone)}`;
 
@@ -11,12 +16,12 @@ export function bookingConfirmationEmail(
   url: string,
 ) {
   return renderEmail({
-    subject: `Appointment booked with ${appointment.doctorName}`,
+    subject: "Your appointment is booked",
     preview: `You're booked for ${when(appointment)}.`,
     heading: "Your appointment is booked",
     paragraphs: [
       `Hi ${appointment.patientName},`,
-      `You're booked with ${appointment.doctorName} (${appointment.doctorSpecialization}) on ${when(appointment)}.`,
+      `Your consultation is booked for ${when(appointment)}. Sign in to see the details.`,
       `Consultation fee: ${formatFee(appointment.consultationFee)}. If your plans change, please cancel from your appointments page so someone else can take the slot.`,
     ],
     action: { label: "View my appointments", url },
@@ -25,14 +30,12 @@ export function bookingConfirmationEmail(
 
 export function newBookingEmail(appointment: Appointment, url: string) {
   return renderEmail({
-    subject: `New appointment: ${appointment.patientName}, ${when(appointment)}`,
-    preview: `${appointment.patientName} booked ${when(appointment)}.`,
+    subject: `New appointment: ${when(appointment)}`,
+    preview: `A patient booked ${when(appointment)}.`,
     heading: "You have a new appointment",
     paragraphs: [
       `${appointment.patientName} booked a consultation with you on ${when(appointment)}.`,
-      appointment.reason
-        ? `Reason for visit: ${appointment.reason}`
-        : "No reason for the visit was given.",
+      "Open your schedule to see the details.",
     ],
     action: { label: "Open your schedule", url },
   });
@@ -45,22 +48,19 @@ export function cancellationEmail(
 ) {
   const byOther =
     recipient === "patient"
-      ? `${appointment.doctorName} cancelled your appointment on ${when(appointment)}.`
+      ? `Your doctor cancelled your appointment on ${when(appointment)}.`
       : `${appointment.patientName} cancelled their appointment on ${when(appointment)}.`;
 
   return renderEmail({
     subject: `Appointment cancelled: ${when(appointment)}`,
-    preview: byOther,
+    preview: `An appointment on ${when(appointment)} was cancelled.`,
     heading: "An appointment was cancelled",
     paragraphs: [
       recipient === "patient" ? `Hi ${appointment.patientName},` : "Hello,",
       byOther,
-      ...(appointment.cancellationReason
-        ? [`Reason: ${appointment.cancellationReason}`]
-        : []),
       recipient === "patient"
-        ? "We're sorry for the change. You can book another time that suits you."
-        : "The slot is open again for other patients.",
+        ? "We're sorry for the change. Sign in to see the details, or book another time that suits you."
+        : "The slot is open again for other patients. Sign in to see the details.",
     ],
     action: {
       label:

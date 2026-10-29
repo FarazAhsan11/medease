@@ -22,6 +22,38 @@ export function getServerEnv(): ServerEnv {
   return result.data;
 }
 
+// Base URL for links in emails. Always from config, never from request
+// headers, so a forged Host header can't point a reset link at another site.
+// https only, except localhost for development.
+const siteUrlSchema = z.url({ protocol: /^https?$/ }).refine(
+  (value) => {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" ||
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1"
+    );
+  },
+  { message: "Use https (http only for localhost)" },
+);
+
+const DEV_SITE_URL = "http://localhost:3000";
+
+// Required in production: instrumentation.ts checks it at startup.
+export function getSiteUrl(): string {
+  const value = process.env.SITE_URL;
+  if (!value && process.env.NODE_ENV !== "production") return DEV_SITE_URL;
+
+  const result = siteUrlSchema.safeParse(value);
+  if (!result.success) {
+    throw new Error(
+      `Missing or invalid SITE_URL, the public address used in email links (e.g. https://medease.pk).\n${z.prettifyError(result.error)}`,
+    );
+  }
+
+  return new URL(result.data).origin;
+}
+
 // Separate from getServerEnv so a missing SMTP setup only breaks email, not
 // every server feature.
 const emailEnvSchema = z.object({

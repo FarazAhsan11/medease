@@ -30,7 +30,7 @@ export const cancelPrescription = withFormErrors(
     if (error) return prescriptionErrorState(error);
 
     const row = data as PrescriptionRow & { patient_email: string | null };
-    await notifyPrescriptionCancelled(toPrescription(row), row.patient_email);
+    notifyPrescriptionCancelled(toPrescription(row), row.patient_email);
 
     refresh();
     return {

@@ -7,14 +7,14 @@ import {
   newBookingEmail,
 } from "@/features/appointments/emails/appointment-email-templates";
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import { getSiteUrl } from "@/lib/env.server";
 import { sendMailAfterResponse } from "@/lib/mailer.server";
-import { getSiteUrl } from "@/lib/site-url.server";
 
-export async function notifyAppointmentBooked(
+export function notifyAppointmentBooked(
   appointment: Appointment,
   doctorEmail: string | null,
 ) {
-  const siteUrl = await getSiteUrl();
+  const siteUrl = getSiteUrl();
   sendMailAfterResponse([
     {
       to: appointment.patientEmail,
@@ -33,11 +33,11 @@ export async function notifyAppointmentBooked(
   ]);
 }
 
-export async function notifyAppointmentCancelled(
+export function notifyAppointmentCancelled(
   appointment: Appointment,
   doctorEmail: string | null,
 ) {
-  const siteUrl = await getSiteUrl();
+  const siteUrl = getSiteUrl();
   // Tell whoever didn't cancel.
   sendMailAfterResponse([
     appointment.cancelledBy === "doctor"

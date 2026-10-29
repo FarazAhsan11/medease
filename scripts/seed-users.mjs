@@ -14,6 +14,30 @@ if (!url || !secretKey || !password) {
   process.exit(1);
 }
 
+// Demo accounts share one password, so they must never exist in production.
+// Seed only a local Supabase, or the project named in SEED_PROJECT_REF, which
+// confirms it's a dev/test project; swapping in production keys then fails.
+const { hostname } = new URL(url);
+const isLocal = ["localhost", "127.0.0.1"].includes(hostname);
+const projectRef = hostname.split(".")[0];
+const isProduction =
+  process.env.NODE_ENV === "production" ||
+  process.env.VERCEL_ENV === "production";
+
+if (isProduction) {
+  console.error(
+    "Refusing to seed: this looks like a production environment (NODE_ENV or VERCEL_ENV is production). Demo accounts must never be created there.",
+  );
+  process.exit(1);
+}
+
+if (!isLocal && process.env.SEED_PROJECT_REF !== projectRef) {
+  console.error(
+    `Refusing to seed project "${projectRef}". If it's a dev/test project (never production), add this line to .env.local:\nSEED_PROJECT_REF=${projectRef}`,
+  );
+  process.exit(1);
+}
+
 // Weekdays: 0 = Sunday … 6 = Saturday. Times are clinic time (Asia/Karachi).
 const weekdays = (days, start, end) =>
   days.map((weekday) => ({ weekday, start_time: start, end_time: end }));

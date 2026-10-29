@@ -9,9 +9,9 @@ import {
   issueAuthToken,
   type TokenPurpose,
 } from "@/features/auth/lib/auth-tokens";
+import { getSiteUrl } from "@/lib/env.server";
 import { sendMail } from "@/lib/mailer.server";
 import type { EmailContent } from "@/lib/render-email";
-import { getSiteUrl } from "@/lib/site-url.server";
 
 type Recipient = {
   userId: string;
@@ -33,7 +33,7 @@ async function sendTokenEmail(
   if (issued.status !== "issued") return issued.status;
 
   try {
-    const url = buildLink(issued.token, await getSiteUrl());
+    const url = buildLink(issued.token, getSiteUrl());
     await sendMail({ to: email, ...buildEmail(url) });
   } catch (error) {
     await deleteAuthToken(issued.id);
