@@ -1,6 +1,7 @@
 import { BriefcaseMedicalIcon, ClockIcon, MapPinIcon } from "lucide-react";
 
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { VerifiedBadge } from "@/components/shared/verified-badge";
 import { WeeklyHoursList } from "@/components/shared/weekly-hours-list";
 import type {
   DirectoryDoctor,
@@ -32,6 +33,9 @@ export function DoctorProfileCard({ doctor, hours }: DoctorProfileCardProps) {
           {doctor.specialization}
           {doctor.city && ` · ${doctor.city}`}
         </p>
+        <div className="mt-2">
+          <VerifiedBadge licenseNumber={doctor.licenseNumber} />
+        </div>
       </div>
 
       {doctor.bio && (

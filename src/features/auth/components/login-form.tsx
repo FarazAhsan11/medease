@@ -12,7 +12,8 @@ import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
 
 type LoginFormProps = {
-  registerHref: string;
+  // Left out for accounts nobody can sign up for themselves.
+  registerHref?: string;
   next?: string;
 };
 
@@ -75,15 +76,17 @@ export function LoginForm({ registerHref, next }: LoginFormProps) {
           Log in
         </AuthSubmitButton>
       </form>
-      <AuthFooterLink
-        prompt="Don't have an account?"
-        href={
-          next
-            ? `${registerHref}?next=${encodeURIComponent(next)}`
-            : registerHref
-        }
-        label="Create one"
-      />
+      {registerHref && (
+        <AuthFooterLink
+          prompt="Don't have an account?"
+          href={
+            next
+              ? `${registerHref}?next=${encodeURIComponent(next)}`
+              : registerHref
+          }
+          label="Create one"
+        />
+      )}
     </>
   );
 }

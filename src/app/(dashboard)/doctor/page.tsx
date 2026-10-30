@@ -25,15 +25,18 @@ import {
   startingWithin,
   summarizePatients,
 } from "@/features/doctor-dashboard/lib/practice";
+import { VerificationBanner } from "@/features/doctor-verification/components/verification-banner";
+import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
 import { requireRole } from "@/lib/auth/session";
 import { formatTime } from "@/lib/datetime";
 
 export default async function DoctorOverviewPage() {
   const user = await requireRole("doctor");
-  const [appointments, prescriptions] = await Promise.all([
+  const [appointments, prescriptions, verification] = await Promise.all([
     listDoctorAppointments(user.id),
     getDoctorPrescriptionSummaries(user.id),
+    getDoctorVerification(user.id),
   ]);
   const { upcoming, needsOutcome } = groupDoctorAppointments(appointments);
 
@@ -91,6 +94,7 @@ export default async function DoctorOverviewPage() {
           </Link>
         }
       />
+      {verification && <VerificationBanner verification={verification} />}
       <StatGrid stats={stats} />
       <AppointmentsPanel
         appointments={today}

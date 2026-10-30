@@ -9,8 +9,6 @@ import { newPasswordSchema } from "@/features/auth/schemas/password";
 import { emailSchema } from "@/features/auth/schemas/sign-in";
 import type { FormState } from "@/lib/form-state";
 
-const MB = 1024 * 1024;
-
 const requiredText = (message: string, max: number) =>
   z.string().trim().min(1, message).max(max, `Use ${max} characters or fewer.`);
 
@@ -18,18 +16,6 @@ const phoneSchema = z
   .string()
   .trim()
   .regex(/^\+?[\d\s-]{7,20}$/, "Enter a valid phone number.");
-
-// An empty file input still submits a nameless, zero-byte File.
-function optionalFile(maxMb: number, types: string[], label: string) {
-  return z.preprocess(
-    (value) => (value instanceof File && value.size > 0 ? value : undefined),
-    z
-      .file()
-      .max(maxMb * MB, `${label} must be ${maxMb} MB or smaller.`)
-      .mime(types, `${label} must be a ${types.join(", ")} file.`)
-      .optional(),
-  );
-}
 
 const accountSchema = z.object({
   firstName: requiredText("Enter your first name.", 60),
@@ -51,12 +37,6 @@ export const doctorSignUpSchema = accountSchema.extend({
   specialization: z.enum(specializations, "Select your specialization."),
   licenseNumber: requiredText("Enter your license number.", 40),
   address: requiredText("Enter your clinic address.", 300),
-  profilePhoto: optionalFile(
-    2,
-    ["image/jpeg", "image/png", "image/webp"],
-    "Profile photo",
-  ),
-  degreeDocument: optionalFile(5, ["application/pdf"], "Degree"),
 });
 
 export const labSignUpSchema = z.object({

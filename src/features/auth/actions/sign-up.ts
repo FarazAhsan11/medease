@@ -12,14 +12,6 @@ import {
 import { withFormErrors } from "@/lib/form-action.server";
 import { validationError } from "@/lib/form-state";
 
-const DOCUMENTS_BUCKET = "doctor-documents";
-
-const imageExtensions: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
 async function insertProfile(
   admin: SupabaseClient,
   table: string,
@@ -27,15 +19,6 @@ async function insertProfile(
 ) {
   const { error } = await admin.from(table).upsert(row);
   if (error) throw new Error(`${table}: ${error.message}`);
-}
-
-async function uploadDocument(admin: SupabaseClient, path: string, file: File) {
-  const { error } = await admin.storage
-    .from(DOCUMENTS_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
-  if (error) throw new Error(`${DOCUMENTS_BUCKET}: ${error.message}`);
-
-  return path;
 }
 
 // Every new account confirms its email before it can log in.
@@ -85,34 +68,16 @@ export const signUpDoctor = withFormErrors(
     const parsed = doctorSignUpSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return validationError(parsed.error);
 
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      profilePhoto,
-      degreeDocument,
-    } = parsed.data;
+    const { firstName, lastName, email, password } = parsed.data;
 
+    // Documents come later, from the verification page once they've signed in.
     const result = await createAccount({
       role: "doctor",
       email,
       password,
       fullName: `Dr. ${firstName} ${lastName}`,
-      saveProfile: async (admin, id) => {
-        // Files live in a private bucket under the doctor's own folder.
-        const photoPath = profilePhoto
-          ? await uploadDocument(
-              admin,
-              `${id}/photo.${imageExtensions[profilePhoto.type]}`,
-              profilePhoto,
-            )
-          : null;
-        const degreePath = degreeDocument
-          ? await uploadDocument(admin, `${id}/degree.pdf`, degreeDocument)
-          : null;
-
-        await insertProfile(admin, "doctor_profiles", {
+      saveProfile: (admin, id) =>
+        insertProfile(admin, "doctor_profiles", {
           id,
           first_name: firstName,
           last_name: lastName,
@@ -122,10 +87,7 @@ export const signUpDoctor = withFormErrors(
           specialization: parsed.data.specialization,
           license_number: parsed.data.licenseNumber,
           clinic_address: parsed.data.address,
-          photo_path: photoPath,
-          degree_path: degreePath,
-        });
-      },
+        }),
     });
 
     return finish(email, result);

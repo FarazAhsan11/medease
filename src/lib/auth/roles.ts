@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { DashboardRole } from "@/config/dashboards";
 
-export const userRoleSchema = z.enum(["patient", "doctor", "lab"]);
+export const userRoleSchema = z.enum(["patient", "doctor", "lab", "admin"]);
 
 // The role lives in Supabase `app_metadata`, which only the server (secret
 // key) can write. Never read it from `user_metadata`; users can edit that.

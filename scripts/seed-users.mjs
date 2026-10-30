@@ -118,7 +118,12 @@ const accounts = [
     role: "doctor",
     fullName: `Dr. ${doctor.profile.first_name} ${doctor.profile.last_name}`,
     table: "doctor_profiles",
-    profile: doctor.profile,
+    // Demo doctors skip the review queue so they appear in search right away.
+    profile: {
+      ...doctor.profile,
+      verification_status: "approved",
+      verified_at: new Date().toISOString(),
+    },
     hours: doctor.hours,
   })),
   {

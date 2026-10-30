@@ -21,6 +21,7 @@ export type DirectoryDoctor = {
   timezone: string;
   acceptingAppointments: boolean;
   hasSchedule: boolean;
+  licenseNumber: string;
 };
 
 export type WeeklyHours = { weekday: number; start: string; end: string };
@@ -47,10 +48,11 @@ type DoctorRow = {
   timezone: string;
   accepting_appointments: boolean;
   has_schedule: boolean;
+  license_number: string;
 };
 
 const COLUMNS =
-  "id, full_name, gender, specialization, city, clinic_address, bio, experience_years, consultation_fee, slot_minutes, timezone, accepting_appointments, has_schedule";
+  "id, full_name, gender, specialization, city, clinic_address, bio, experience_years, consultation_fee, slot_minutes, timezone, accepting_appointments, has_schedule, license_number";
 
 function toDoctor(row: DoctorRow): DirectoryDoctor {
   return {
@@ -67,6 +69,7 @@ function toDoctor(row: DoctorRow): DirectoryDoctor {
     timezone: row.timezone,
     acceptingAppointments: row.accepting_appointments,
     hasSchedule: row.has_schedule,
+    licenseNumber: row.license_number,
   };
 }
 

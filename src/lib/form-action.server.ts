@@ -8,12 +8,12 @@ import type { FormState } from "@/lib/form-state";
 // Safety net for form Server Actions. Expected failures are returned as
 // FormState by the action itself; anything that throws is logged and turned
 // into a message instead of crashing the page. redirect() still works.
-export function withFormErrors<State extends FormState>(
-  action: (state: State, formData: FormData) => Promise<State>,
+export function withFormErrors<State extends FormState, Input = FormData>(
+  action: (state: State, input: Input) => Promise<State>,
 ) {
-  return async (state: State, formData: FormData): Promise<State> => {
+  return async (state: State, input: Input): Promise<State> => {
     try {
-      return await action(state, formData);
+      return await action(state, input);
     } catch (error) {
       unstable_rethrow(error);
       // Log the message only; never the submitted form data.

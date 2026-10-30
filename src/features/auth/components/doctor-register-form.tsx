@@ -125,39 +125,11 @@ export function DoctorRegisterForm() {
           />
         </FormField>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FormField
-            id="doctor-photo"
-            label="Profile photo"
-            hint="Optional · JPG, PNG or WebP, up to 2 MB"
-            error={fieldError("profilePhoto")}
-          >
-            <Input
-              id="doctor-photo"
-              name="profilePhoto"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              {...fieldErrorProps("doctor-photo", fieldError("profilePhoto"))}
-            />
-          </FormField>
-          <FormField
-            id="doctor-degree"
-            label="Degree (PDF)"
-            hint="Optional · PDF, up to 5 MB"
-            error={fieldError("degreeDocument")}
-          >
-            <Input
-              id="doctor-degree"
-              name="degreeDocument"
-              type="file"
-              accept="application/pdf"
-              {...fieldErrorProps(
-                "doctor-degree",
-                fieldError("degreeDocument"),
-              )}
-            />
-          </FormField>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          After you confirm your email, you&apos;ll upload your PMDC license,
+          degree and photo from your dashboard. Patients can find you once our
+          team has verified them.
+        </p>
 
         <AuthSubmitButton pending={pending} pendingLabel="Creating account…">
           Create doctor account

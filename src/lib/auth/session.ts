@@ -5,6 +5,7 @@ import { cache } from "react";
 import { z } from "zod";
 
 import { dashboards, type DashboardRole } from "@/config/dashboards";
+import { adminRoutes } from "@/config/routes";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
 import { hasPublicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,8 @@ export type SessionUser = {
   email: string;
   name: string;
   role: DashboardRole;
+  // "aal2" once the session has passed a second factor.
+  assuranceLevel: string;
 };
 
 const userMetadataSchema = z.object({ full_name: z.string().min(1) });
@@ -39,6 +42,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     email,
     name: metadata.success ? metadata.data.full_name : email,
     role,
+    assuranceLevel: claims.aal ?? "aal1",
   };
 });
 
@@ -49,6 +53,16 @@ export async function requireRole(role: DashboardRole): Promise<SessionUser> {
 
   if (!user) redirect(dashboards[role].loginHref);
   if (user.role !== role) redirect(dashboards[user.role].home);
+
+  return user;
+}
+
+// Admin pages also need a second factor. The database checks the same claim
+// (private.is_admin), so this redirect is only the friendly half of the rule.
+export async function requireAdmin(): Promise<SessionUser> {
+  const user = await requireRole("admin");
+
+  if (user.assuranceLevel !== "aal2") redirect(adminRoutes.twoFactor);
 
   return user;
 }

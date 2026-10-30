@@ -6,10 +6,13 @@ import {
   FileHeartIcon,
   FileTextIcon,
   FlaskConicalIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   MessageSquareIcon,
   PillIcon,
+  ScrollTextIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   ShoppingBagIcon,
   StethoscopeIcon,
   TestTubesIcon,
@@ -20,7 +23,7 @@ import {
 
 import type { NavItem } from "@/config/navigation";
 
-export type DashboardRole = "patient" | "doctor" | "lab";
+export type DashboardRole = "patient" | "doctor" | "lab" | "admin";
 
 type DashboardNavItem = NavItem & { icon: LucideIcon };
 
@@ -176,5 +179,21 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
         unread: true,
       },
     ],
+  },
+  admin: {
+    label: "Admin",
+    home: "/admin",
+    loginHref: "/login/admin",
+    nav: [
+      { title: "Verification", href: "/admin", icon: ShieldCheckIcon },
+      { title: "Audit log", href: "/admin/audit-log", icon: ScrollTextIcon },
+    ],
+    moreNav: [],
+    account: {
+      title: "Two-factor",
+      href: "/admin/two-factor",
+      icon: KeyRoundIcon,
+    },
+    notifications: [],
   },
 };

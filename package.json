@@ -11,6 +11,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:seed": "node --env-file=.env.local scripts/seed-users.mjs",
+    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
+    "test:db": "node --env-file=.env.local scripts/test-db.mjs",
     "srs": "node scripts/srs.mjs"
   },
   "dependencies": {

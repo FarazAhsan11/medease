@@ -11,6 +11,7 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 
 - `npm run dev` / `npm run build`
 - `npm run lint` and `npm run typecheck` must pass before committing
+- `npm run test:db` tests the database rules on the project in `.env.local` with temporary accounts, no local database needed
 
 ## Structure
 
@@ -30,8 +31,9 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 - Env vars are documented in `.env.example`; real values go in `.env.local` (gitignored). Read them only through `src/lib/env.ts` (public) and `src/lib/env.server.ts` (secrets).
 - Use `@/lib/supabase/server` in Server Components and Actions, `@/lib/supabase/client` in Client Components. `@/lib/supabase/admin` bypasses RLS: server-only, and only after an explicit permission check.
 - `src/proxy.ts` refreshes the auth session. Protect data with RLS policies, not just UI checks.
-- A user's role (`patient` | `doctor` | `lab`) lives in Supabase `app_metadata.role`, which only the secret key can write. Never trust `user_metadata` for roles.
-- Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic.
+- A user's role (`patient` | `doctor` | `lab` | `admin`) lives in Supabase `app_metadata.role`, which only the secret key can write. Never trust `user_metadata` for roles.
+- Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic. Admin pages use `requireAdmin()`, which also needs a second factor.
+- Doctor verification: doctors start `pending` and stay out of `doctor_directory` until an admin approves them. Admins come only from `npm run admin:create`; `private.is_admin()` needs the role and an `aal2` session, and admin pages use the admin's own session, not the secret key. Sensitive actions go in the append-only `audit_log` through `private.write_audit`, ids only. Large files go straight from the browser to Storage on signed upload links, never through a Server Action (Vercel's 4.5 MB limit). Design: `docs/verification.md`.
 - `npm run db:seed` creates/updates the demo accounts, profiles and doctor hours (password from `SEED_USER_PASSWORD` in `.env.local`).
 - Appointments: patients book slots generated from doctors' weekly hours by `get_doctor_slots`. Booking, cancelling, outcomes and schedule saves go through SECURITY DEFINER functions (`supabase/migrations/*_appointments.sql`, latest `get_doctor_slots` / `book_appointment` in `*_booking_fixes.sql`) that check the caller; exclusion constraints stop overlapping bookings for a doctor or a patient. Only doctors in `doctor_directory` (today: email confirmed) are listed or bookable; slots and booking read through it. Times display in the doctor's timezone via `src/lib/datetime.ts`.
 - Prescriptions: doctors issue them per appointment (from its start until 14 days after) through `issue_prescription` / `cancel_prescription` (`supabase/migrations/*_prescriptions.sql`); edits create a new version that replaces the active one, one active per appointment. Patients and doctors only read. Course and dosing rules live in `src/features/prescriptions/lib/prescriptions.ts`. Design: `docs/prescriptions.md`.

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { VerifiedBadge } from "@/components/shared/verified-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { patientRoutes } from "@/config/routes";
 import type { DirectoryDoctor } from "@/features/doctors/data/doctor-directory";
@@ -40,7 +41,8 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
         </li>
       </ul>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap gap-2">
+        <VerifiedBadge licenseNumber={doctor.licenseNumber} />
         {bookable ? (
           <StatusBadge tone="success" dot>
             Accepting appointments

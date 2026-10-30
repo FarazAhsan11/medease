@@ -36,6 +36,11 @@ const visuals: Record<
       "Home collections, test queues, and report delivery finally live in one place.",
     author: "CityCare Diagnostics",
   },
+  admin: {
+    quote:
+      "Every doctor is checked against the PMDC register before patients can book them.",
+    author: "MedEase verification team",
+  },
 };
 
 export function AuthShell({

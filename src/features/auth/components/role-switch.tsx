@@ -5,7 +5,10 @@ import { cn } from "@/lib/utils";
 
 export type AuthMode = "login" | "register";
 
-const routes: Record<AuthMode, Record<DashboardRole, string>> = {
+// Admins aren't offered here: their accounts come from a script, not sign-up.
+const roles = ["patient", "doctor", "lab"] as const;
+
+const routes: Record<AuthMode, Record<(typeof roles)[number], string>> = {
   login: { patient: "/login", doctor: "/login/doctor", lab: "/login/lab" },
   register: {
     patient: "/register",
@@ -13,8 +16,6 @@ const routes: Record<AuthMode, Record<DashboardRole, string>> = {
     lab: "/register/lab",
   },
 };
-
-const roles = Object.keys(dashboards) as DashboardRole[];
 
 type RoleSwitchProps = {
   role: DashboardRole;

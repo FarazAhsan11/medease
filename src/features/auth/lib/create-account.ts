@@ -10,7 +10,7 @@ import { formError, type FormState } from "@/lib/form-state";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type NewAccount = {
-  role: DashboardRole;
+  role: Exclude<DashboardRole, "admin">;
   email: string;
   password: string;
   fullName: string;
