@@ -14,6 +14,14 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 - `npm run test:sql` applies every migration to a throwaway in-memory Postgres and tests each database rule; no Docker, network or Supabase project needed. Add tests here for every new function: it fails on any `raise exception` without a test
 - `npm run test:db` tests what needs real Supabase services (Auth, two-factor, Storage) on the project in `.env.local`, with temporary accounts
 
+## Keeping sessions small
+
+- `docs/srs.md` is about 60k tokens. Never read it whole or @-mention it: use `npm run srs -- --phase 0` and search for an ID. `scripts/test-sql.mjs` is about 20k: search it and read only the section needed.
+- Filter command output to what matters (`npm run test:sql` prints every pass; keep only failures and the total).
+- In browser tests, read the page with a script, and take a screenshot only to check how something looks.
+- Write a file once, with small edits after. Don't draft large content in a scratch file and then write it again.
+- One feature per session. Start the next with `/clear`; `docs/roadmap.md` and memory carry the state.
+
 ## Structure
 
 - `src/app/` routes only; pages compose feature components and stay thin
