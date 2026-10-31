@@ -10,7 +10,17 @@ import {
   type SignUpState,
 } from "@/features/auth/schemas/sign-up";
 import { withFormErrors } from "@/lib/form-action.server";
-import { validationError } from "@/lib/form-state";
+import { formError, validationError } from "@/lib/form-state";
+import {
+  isIpRateLimited,
+  RATE_LIMITED_MESSAGE,
+  rateLimits,
+} from "@/lib/rate-limit.server";
+
+const signUpBlocked = async () =>
+  (await isIpRateLimited(rateLimits.signUpIp))
+    ? formError(RATE_LIMITED_MESSAGE, "rate_limited")
+    : null;
 
 async function insertProfile(
   admin: SupabaseClient,
@@ -40,6 +50,9 @@ export const signUpPatient = withFormErrors(
     const parsed = patientSignUpSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return validationError(parsed.error);
 
+    const blocked = await signUpBlocked();
+    if (blocked) return blocked;
+
     const { firstName, lastName, email, phone, password } = parsed.data;
     const next = formData.get("next");
     const nextPath = typeof next === "string" ? next : null;
@@ -67,6 +80,9 @@ export const signUpDoctor = withFormErrors(
   async (_previousState: SignUpState, formData: FormData) => {
     const parsed = doctorSignUpSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return validationError(parsed.error);
+
+    const blocked = await signUpBlocked();
+    if (blocked) return blocked;
 
     const { firstName, lastName, email, password } = parsed.data;
 
@@ -101,6 +117,9 @@ export const signUpLab = withFormErrors(
       services: formData.getAll("services"),
     });
     if (!parsed.success) return validationError(parsed.error);
+
+    const blocked = await signUpBlocked();
+    if (blocked) return blocked;
 
     const { labName, email, password } = parsed.data;
 

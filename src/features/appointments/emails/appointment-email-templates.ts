@@ -28,6 +28,33 @@ export function bookingConfirmationEmail(
   });
 }
 
+type ReminderDetails = {
+  kind: "24h" | "1h";
+  patient_name: string;
+  starts_at: string;
+  timezone: string;
+};
+
+export function appointmentReminderEmail(
+  reminder: ReminderDetails,
+  url: string,
+) {
+  const at = `${formatDate(reminder.starts_at, reminder.timezone)} at ${formatTime(reminder.starts_at, reminder.timezone)}`;
+  const soon = reminder.kind === "1h" ? "in about an hour" : "tomorrow";
+
+  return renderEmail({
+    subject: `Your appointment is ${soon}`,
+    preview: `Your appointment is on ${at}.`,
+    heading: `Your appointment is ${soon}`,
+    paragraphs: [
+      `Hi ${reminder.patient_name},`,
+      `Your consultation is on ${at}. Sign in to see the details, and to join when it's time.`,
+      "If your plans have changed, please cancel from your appointments page so someone else can take the slot.",
+    ],
+    action: { label: "View my appointments", url },
+  });
+}
+
 export function newBookingEmail(appointment: Appointment, url: string) {
   return renderEmail({
     subject: `New appointment: ${when(appointment)}`,

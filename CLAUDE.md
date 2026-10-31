@@ -11,7 +11,8 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 
 - `npm run dev` / `npm run build`
 - `npm run lint` and `npm run typecheck` must pass before committing
-- `npm run test:db` tests the database rules on the project in `.env.local` with temporary accounts, no local database needed
+- `npm run test:sql` applies every migration to a throwaway in-memory Postgres and tests each database rule; no Docker, network or Supabase project needed. Add tests here for every new function: it fails on any `raise exception` without a test
+- `npm run test:db` tests what needs real Supabase services (Auth, two-factor, Storage) on the project in `.env.local`, with temporary accounts
 
 ## Structure
 
@@ -32,7 +33,10 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 - Use `@/lib/supabase/server` in Server Components and Actions, `@/lib/supabase/client` in Client Components. `@/lib/supabase/admin` bypasses RLS: server-only, and only after an explicit permission check.
 - `src/proxy.ts` refreshes the auth session. Protect data with RLS policies, not just UI checks.
 - A user's role (`patient` | `doctor` | `lab` | `admin`) lives in Supabase `app_metadata.role`, which only the secret key can write. Never trust `user_metadata` for roles.
-- Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic. Admin pages use `requireAdmin()`, which also needs a second factor.
+- Call `requireRole()` from `@/lib/auth/session` in every dashboard layout and before any data access; the proxy redirect is only optimistic. It also enforces two-factor: doctors, labs and admins always, patients once they've paired an app. The database applies the same rule to clinical data (`private.second_factor_ok`, a restrictive policy plus a write trigger on each table), so add both to any new clinical table. `/two-factor` serves every role.
+- Care recipients: the person treated isn't assumed to be the account holder. Clinical tables carry `care_recipient_id` next to `patient_id`, paired by a foreign key to `care_recipients`, so a record can't name someone from another account. Contact details stay on `patient_profiles`, the medical profile on the person's `care_recipients` row.
+- Notifications: triggers write `notifications` rows (a kind and a link, no text); wording is in `src/features/notifications/lib/notifications.ts`. Reminders run from `/api/cron/appointment-reminders`, called by `.github/workflows/reminders.yml` with `CRON_SECRET` (not Vercel Cron, which is daily on Hobby).
+- Rate limits go through `isRateLimited()` in `@/lib/rate-limit.server` (shared across servers via `hit_rate_limit`, hashed identifiers). Security events go through `recordSecurityEvent()`.
 - Doctor verification: doctors start `pending` and stay out of `doctor_directory` until an admin approves them. Admins come only from `npm run admin:create`; `private.is_admin()` needs the role and an `aal2` session, and admin pages use the admin's own session, not the secret key. Sensitive actions go in the append-only `audit_log` through `private.write_audit`, ids only. Large files go straight from the browser to Storage on signed upload links, never through a Server Action (Vercel's 4.5 MB limit). Design: `docs/verification.md`.
 - `npm run db:seed` creates/updates the demo accounts, profiles and doctor hours (password from `SEED_USER_PASSWORD` in `.env.local`).
 - Appointments: patients book slots generated from doctors' weekly hours by `get_doctor_slots`. Booking, cancelling, outcomes and schedule saves go through SECURITY DEFINER functions (`supabase/migrations/*_appointments.sql`, latest `get_doctor_slots` / `book_appointment` in `*_booking_fixes.sql`) that check the caller; exclusion constraints stop overlapping bookings for a doctor or a patient. Only doctors in `doctor_directory` (today: email confirmed) are listed or bookable; slots and booking read through it. Times display in the doctor's timezone via `src/lib/datetime.ts`.

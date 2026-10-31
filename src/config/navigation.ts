@@ -60,7 +60,8 @@ export const footerNav: { title: string; links: NavItem[] }[] = [
       { title: "About", href: "/about" },
       { title: "Contact", href: "/contact" },
       { title: "FAQs", href: "/#faq" },
-      { title: "Privacy Policy", href: "#" },
+      { title: "Privacy Policy", href: "/legal/privacy" },
+      { title: "Terms of Use", href: "/legal/terms" },
     ],
   },
 ];
@@ -69,5 +70,6 @@ export const footerNav: { title: string; links: NavItem[] }[] = [
 export const compactFooterNav: NavItem[] = [
   { title: "About", href: "/about" },
   { title: "Contact", href: "/contact" },
-  { title: "Privacy Policy", href: "#" },
+  { title: "Privacy Policy", href: "/legal/privacy" },
+  { title: "Terms of Use", href: "/legal/terms" },
 ];

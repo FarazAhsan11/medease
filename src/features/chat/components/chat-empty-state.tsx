@@ -9,7 +9,7 @@ export function ChatEmptyState() {
       <IconTile icon={MessageCircleHeartIcon} size="lg" />
       <h2 className="mt-4 text-lg font-semibold">How are you feeling today?</h2>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
-        Describe your symptoms and CareDoc will ask a couple of follow-up
+        Describe your symptoms and our assistant will ask a couple of follow-up
         questions before suggesting the right specialist.
       </p>
       <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">

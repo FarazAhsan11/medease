@@ -14,12 +14,6 @@ export type AboutItem = {
   description: string;
 };
 
-export type AboutTestimonial = {
-  quote: string;
-  author: string;
-  role: string;
-};
-
 export const values: AboutItem[] = [
   {
     icon: SparklesIcon,
@@ -28,13 +22,13 @@ export const values: AboutItem[] = [
   },
   {
     icon: ClockIcon,
-    title: "Mon – Sat",
-    description: "Consultations available from 11 AM to 4 PM.",
+    title: "On your schedule",
+    description: "Each doctor publishes their own hours.",
   },
   {
     icon: ShieldCheckIcon,
     title: "Private by design",
-    description: "Encrypted records you control.",
+    description: "Your records are visible only to you and your doctors.",
   },
 ];
 
@@ -56,26 +50,5 @@ export const aboutFeatures: AboutItem[] = [
     title: "Lab test bookings",
     description:
       "Conveniently book lab tests and receive results directly through your account.",
-  },
-];
-
-export const aboutTestimonials: AboutTestimonial[] = [
-  {
-    quote:
-      "MedEase has made managing my health so much easier. The appointment booking system is a lifesaver!",
-    author: "Sarah W.",
-    role: "Patient since 2023",
-  },
-  {
-    quote:
-      "The lab services are quick and reliable. I love having all my results in one place.",
-    author: "James L.",
-    role: "Patient since 2024",
-  },
-  {
-    quote:
-      "The digital records feature has been a game-changer for me. No more worrying about misplaced files!",
-    author: "Emily R.",
-    role: "Patient since 2022",
   },
 ];

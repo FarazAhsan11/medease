@@ -12,7 +12,7 @@ import type { FormState } from "@/lib/form-state";
 const requiredText = (message: string, max: number) =>
   z.string().trim().min(1, message).max(max, `Use ${max} characters or fewer.`);
 
-const phoneSchema = z
+export const phoneSchema = z
   .string()
   .trim()
   .regex(/^\+?[\d\s-]{7,20}$/, "Enter a valid phone number.");

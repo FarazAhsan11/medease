@@ -12,7 +12,7 @@ export function ChatHeader() {
           <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-card bg-success" />
         </div>
         <div>
-          <h1 className="text-sm font-semibold">CareDoc</h1>
+          <h1 className="text-sm font-semibold">MedEase assistant</h1>
           <p className="text-xs text-muted-foreground">
             AI medical assistant · Online
           </p>

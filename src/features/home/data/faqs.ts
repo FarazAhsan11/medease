@@ -5,23 +5,23 @@ export type Faq = {
 
 export const faqs: Faq[] = [
   {
-    question: "How does the AI recommend doctors?",
+    question: "How do I find the right doctor?",
     answer:
-      "Our AI recommends doctors based on your health profile, preferences, and ratings from other users.",
+      "Search by name, specialty, gender and city. Every doctor listed has been checked by our team against their PMDC registration.",
   },
   {
-    question: "How do I book a lab test?",
+    question: "Can I book a lab test?",
     answer:
-      "You can book a lab test through our app or website by selecting the test, choosing a time slot, and confirming the appointment.",
+      "Not yet. Lab booking is coming soon, and the lab pages show sample information until then.",
   },
   {
     question: "Is my medical data secure?",
     answer:
-      "Yes, your medical data is protected with advanced encryption and security protocols, ensuring your privacy and confidentiality at all times.",
+      "Your data is encrypted in transit and at rest by our database provider, video calls are encrypted between you and your doctor, and only you and the doctors you see can read your clinical records. You can also add two-factor authentication to your account.",
   },
   {
-    question: "What are the payment methods available?",
+    question: "How do I pay for a consultation?",
     answer:
-      "We accept various payment methods including credit cards, debit cards, and online payment services for your convenience.",
+      "Online payment isn't available yet. Each doctor's fee is shown when you book, and you arrange payment directly with them.",
   },
 ];

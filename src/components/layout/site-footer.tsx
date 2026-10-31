@@ -1,20 +1,10 @@
 import Link from "next/link";
 
-import {
-  FacebookIcon,
-  InstagramIcon,
-  TwitterIcon,
-} from "@/components/icons/social-icons";
 import { Container } from "@/components/layout/container";
 import { Logo } from "@/components/layout/logo";
+import { EmergencyNotice } from "@/components/shared/emergency-notice";
 import { compactFooterNav, footerNav } from "@/config/navigation";
 import { siteConfig } from "@/config/site";
-
-const socialLinks = [
-  { label: "Facebook", icon: FacebookIcon },
-  { label: "Twitter", icon: TwitterIcon },
-  { label: "Instagram", icon: InstagramIcon },
-];
 
 type SiteFooterProps = {
   compact?: boolean;
@@ -25,11 +15,14 @@ export function SiteFooter({ compact = false }: SiteFooterProps) {
     return (
       <footer className="border-t">
         <Container className="flex flex-col gap-3 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            &copy; 2024 {siteConfig.name}. Not a substitute for professional
-            medical advice.
-          </p>
-          <ul className="flex gap-4">
+          <div className="grid gap-1">
+            <EmergencyNotice />
+            <p>
+              &copy; {new Date().getFullYear()} {siteConfig.name}. Not a
+              substitute for professional medical advice.
+            </p>
+          </div>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
             {compactFooterNav.map((link) => (
               <li key={link.title}>
                 <Link
@@ -52,18 +45,7 @@ export function SiteFooter({ compact = false }: SiteFooterProps) {
         <div className="max-w-xs space-y-4">
           <Logo inverted />
           <p className="text-sm leading-relaxed">{siteConfig.description}</p>
-          <div className="flex gap-3">
-            {socialLinks.map(({ label, icon: Icon }) => (
-              <a
-                key={label}
-                href="#"
-                aria-label={label}
-                className="flex size-8 items-center justify-center rounded-full bg-white/5 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <Icon className="size-3.5" />
-              </a>
-            ))}
-          </div>
+          <EmergencyNotice className="text-white" />
         </div>
 
         {footerNav.map((section) => (
@@ -89,7 +71,10 @@ export function SiteFooter({ compact = false }: SiteFooterProps) {
 
       <div className="border-t border-white/10">
         <Container className="flex flex-col gap-2 py-6 text-xs sm:flex-row sm:items-center sm:justify-between">
-          <p>&copy; 2024 {siteConfig.name}. All rights reserved.</p>
+          <p>
+            &copy; {new Date().getFullYear()} {siteConfig.name}. All rights
+            reserved.
+          </p>
           <p>Not a substitute for professional medical advice.</p>
         </Container>
       </div>

@@ -89,8 +89,8 @@ export function LabBookingForm({ dates, timeSlots }: LabBookingFormProps) {
       )}
 
       <div className="flex justify-end border-t pt-5">
-        <Button type="button" disabled={!date || !time} className="h-9 px-5">
-          Confirm booking
+        <Button type="button" disabled className="h-9 px-5">
+          Booking coming soon
         </Button>
       </div>
     </section>

@@ -14,6 +14,13 @@ export function databaseErrorState(
   const known = messages[error.message];
   if (known) return formError(known, error.message);
 
+  if (error.message === "second_factor_required") {
+    return formError(
+      "Please pass your two-factor check, then try again.",
+      error.message,
+    );
+  }
+
   if (/fetch failed|network/i.test(error.message)) {
     return formError(NETWORK_ERROR_MESSAGE, "network_error");
   }

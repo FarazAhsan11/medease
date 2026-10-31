@@ -8,6 +8,7 @@ import { FormField, fieldErrorProps } from "@/components/shared/form-field";
 import { TimeSlotPicker } from "@/components/shared/time-slot-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { bookAppointment } from "@/features/booking/actions/book-appointment";
+import { EmergencyNotice } from "@/components/shared/emergency-notice";
 import { BookingSummary } from "@/features/booking/components/booking-summary";
 import type { BookingDay } from "@/features/booking/data/doctor-slots";
 import { useFormAction } from "@/hooks/use-form-action";
@@ -108,6 +109,7 @@ export function BookingForm({ doctorId, fee, days }: BookingFormProps) {
       </FormField>
 
       <BookingSummary day={day} slot={selected} fee={fee} pending={pending} />
+      <EmergencyNotice className="text-muted-foreground" />
     </form>
   );
 }

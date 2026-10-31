@@ -5,11 +5,20 @@ import { findAuthUserByEmail } from "@/features/auth/lib/auth-users";
 import { emailSchema } from "@/features/auth/schemas/sign-in";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, type FormState } from "@/lib/form-state";
+import {
+  isIpRateLimited,
+  RATE_LIMITED_MESSAGE,
+  rateLimits,
+} from "@/lib/rate-limit.server";
 
 export const resendConfirmation = withFormErrors(
   async (_previousState: FormState, formData: FormData) => {
     const parsed = emailSchema.safeParse(formData.get("email"));
     if (!parsed.success) return formError("Enter a valid email address.");
+
+    if (await isIpRateLimited(rateLimits.resendConfirmationIp)) {
+      return formError(RATE_LIMITED_MESSAGE, "rate_limited");
+    }
 
     const user = await findAuthUserByEmail(parsed.data);
     if (user && !user.email_confirmed_at) {

@@ -2,15 +2,24 @@
 
 import { redirect } from "next/navigation";
 
+import { twoFactorRoute } from "@/config/routes";
 import { sendConfirmationEmail } from "@/features/auth/lib/auth-emails";
 import { authFormError } from "@/features/auth/lib/auth-error";
 import { findAuthUserByEmail } from "@/features/auth/lib/auth-users";
 import { signInSchema } from "@/features/auth/schemas/sign-in";
 import { getPostLoginPath } from "@/lib/auth/redirects";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
+import { isSecondFactorRequired } from "@/lib/auth/session";
 import { setFlash } from "@/lib/flash.server";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, validationError, type FormState } from "@/lib/form-state";
+import {
+  isIpRateLimited,
+  isRateLimited,
+  RATE_LIMITED_MESSAGE,
+  rateLimits,
+} from "@/lib/rate-limit.server";
+import { recordSecurityEvent } from "@/lib/security-events.server";
 import { createClient } from "@/lib/supabase/server";
 
 export const signIn = withFormErrors(
@@ -22,6 +31,14 @@ export const signIn = withFormErrors(
     const next = formData.get("next");
 
     if (!parsed.success) return validationError(parsed.error);
+
+    const limited =
+      (await isIpRateLimited(rateLimits.signInIp)) ||
+      (await isRateLimited(
+        rateLimits.signInAccount,
+        parsed.data.email.toLowerCase(),
+      ));
+    if (limited) return formError(RATE_LIMITED_MESSAGE, "rate_limited");
 
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
@@ -49,8 +66,18 @@ export const signIn = withFormErrors(
       );
     }
 
+    await recordSecurityEvent(data.user.id, "auth.signed_in");
+
+    const path = getPostLoginPath(role, typeof next === "string" ? next : null);
+    const hasFactor = data.user.factors?.some(
+      (factor) => factor.status === "verified",
+    );
+    if (isSecondFactorRequired(role) || hasFactor) {
+      redirect(`${twoFactorRoute}?next=${encodeURIComponent(path)}`);
+    }
+
     await setFlash("success", "Welcome back! You're signed in.");
-    redirect(getPostLoginPath(role, typeof next === "string" ? next : null));
+    redirect(path);
   },
 );
 

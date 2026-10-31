@@ -4,7 +4,12 @@ import { sendPasswordResetEmail } from "@/features/auth/lib/auth-emails";
 import { findAuthUserByEmail } from "@/features/auth/lib/auth-users";
 import { forgotPasswordSchema } from "@/features/auth/schemas/password";
 import { withFormErrors } from "@/lib/form-action.server";
-import { validationError, type FormState } from "@/lib/form-state";
+import { formError, validationError, type FormState } from "@/lib/form-state";
+import {
+  isIpRateLimited,
+  RATE_LIMITED_MESSAGE,
+  rateLimits,
+} from "@/lib/rate-limit.server";
 
 export const requestPasswordReset = withFormErrors(
   async (_previousState: FormState, formData: FormData) => {
@@ -12,6 +17,10 @@ export const requestPasswordReset = withFormErrors(
       email: formData.get("email"),
     });
     if (!parsed.success) return validationError(parsed.error);
+
+    if (await isIpRateLimited(rateLimits.passwordResetIp)) {
+      return formError(RATE_LIMITED_MESSAGE, "rate_limited");
+    }
 
     // Same answer whether or not the account exists (or is rate limited), so
     // this can't be used to find out who has an account.

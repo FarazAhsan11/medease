@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { BackLink } from "@/components/shared/back-link";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { patientRoutes } from "@/config/routes";
@@ -12,10 +13,11 @@ export const metadata: Metadata = {
 export default function PatientBookLabTestsPage() {
   return (
     <>
+      <PreviewNotice feature="Lab booking" />
       <BackLink href={patientRoutes.labTests}>Back to my lab tests</BackLink>
       <DashboardPageHeader
         title="Book a lab test"
-        description="Choose a test or package. Home sample collection is free."
+        description="Sample tests and packages."
       />
       <LabTestDirectory />
     </>

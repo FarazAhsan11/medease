@@ -1,5 +1,6 @@
 import { ArrowUpIcon } from "lucide-react";
 
+import { EmergencyNotice } from "@/components/shared/emergency-notice";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -13,14 +14,11 @@ export function ChatComposer() {
           placeholder="Describe your symptoms…"
           className="max-h-40 min-h-9 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
         />
-        <Button type="button" size="icon" aria-label="Send message">
+        <Button type="button" size="icon" aria-label="Send message" disabled>
           <ArrowUpIcon />
         </Button>
       </form>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        CareDoc offers general guidance, not a diagnosis. In an emergency,
-        contact your local emergency number.
-      </p>
+      <EmergencyNotice className="mt-2 justify-center text-muted-foreground" />
     </div>
   );
 }

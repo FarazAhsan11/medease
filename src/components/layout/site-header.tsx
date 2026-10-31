@@ -6,15 +6,17 @@ import { NavLinks } from "@/components/layout/nav-links";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { dashboards } from "@/config/dashboards";
+import type { NotificationFeed } from "@/features/notifications/lib/notifications";
 import type { SessionUser } from "@/lib/auth/session";
 
 type SiteHeaderProps = {
   user: SessionUser | null;
+  notifications: NotificationFeed | null;
 };
 
 // One header for everyone: guests get the public links, signed-in users get
 // their role's links plus notifications and the account menu.
-export function SiteHeader({ user }: SiteHeaderProps) {
+export function SiteHeader({ user, notifications }: SiteHeaderProps) {
   const role = user?.role ?? null;
 
   return (
@@ -29,7 +31,14 @@ export function SiteHeader({ user }: SiteHeaderProps) {
         <div className="flex items-center gap-1">
           {user ? (
             <>
-              <NotificationsMenu role={user.role} />
+              {notifications && (
+                // Keyed so a different account never inherits this one's bell.
+                <NotificationsMenu
+                  key={user.id}
+                  userId={user.id}
+                  feed={notifications}
+                />
+              )}
               <UserMenu role={user.role} name={user.name} email={user.email} />
             </>
           ) : (

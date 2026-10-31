@@ -27,13 +27,6 @@ export type DashboardRole = "patient" | "doctor" | "lab" | "admin";
 
 type DashboardNavItem = NavItem & { icon: LucideIcon };
 
-export type DashboardNotification = {
-  id: string;
-  title: string;
-  time: string;
-  unread: boolean;
-};
-
 export type DashboardConfig = {
   label: string;
   home: string;
@@ -43,7 +36,6 @@ export type DashboardConfig = {
   nav: DashboardNavItem[];
   moreNav: DashboardNavItem[];
   account: DashboardNavItem;
-  notifications: DashboardNotification[];
 };
 
 export const dashboards: Record<DashboardRole, DashboardConfig> = {
@@ -92,26 +84,6 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
       href: "/patient/settings",
       icon: SettingsIcon,
     },
-    notifications: [
-      {
-        id: "n1",
-        title: "Your CBC report is ready to view",
-        time: "10 min ago",
-        unread: true,
-      },
-      {
-        id: "n2",
-        title: "Reminder: Dr. Nida Ali on Fri at 11:30 AM",
-        time: "2 hours ago",
-        unread: true,
-      },
-      {
-        id: "n3",
-        title: "Atorvastatin refill is due in 3 days",
-        time: "Yesterday",
-        unread: false,
-      },
-    ],
   },
   doctor: {
     label: "Doctor",
@@ -134,20 +106,6 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     ],
     moreNav: [],
     account: { title: "Profile", href: "/doctor/profile", icon: UserRoundIcon },
-    notifications: [
-      {
-        id: "n1",
-        title: "Shabna Firdos sent you a message",
-        time: "5 min ago",
-        unread: true,
-      },
-      {
-        id: "n2",
-        title: "New booking: Ali Khan at 12:00 PM",
-        time: "1 hour ago",
-        unread: false,
-      },
-    ],
   },
   lab: {
     label: "Laboratory",
@@ -165,20 +123,6 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
       href: "/lab/profile",
       icon: SettingsIcon,
     },
-    notifications: [
-      {
-        id: "n1",
-        title: "3 new home collections booked for tomorrow",
-        time: "12 min ago",
-        unread: true,
-      },
-      {
-        id: "n2",
-        title: "Lipid profile results pending upload for 4 patients",
-        time: "1 hour ago",
-        unread: true,
-      },
-    ],
   },
   admin: {
     label: "Admin",
@@ -191,9 +135,8 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     moreNav: [],
     account: {
       title: "Two-factor",
-      href: "/admin/two-factor",
+      href: "/two-factor",
       icon: KeyRoundIcon,
     },
-    notifications: [],
   },
 };

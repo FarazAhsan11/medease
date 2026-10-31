@@ -1,3 +1,4 @@
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { SignInPrompt } from "@/components/shared/sign-in-prompt";
 import { patientRoutes } from "@/config/routes";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
@@ -20,6 +21,9 @@ export function ChatPanel({ locked = false, className }: ChatPanelProps) {
       )}
     >
       <ChatHeader />
+      <div className="p-3 pb-0">
+        <PreviewNotice feature="The AI assistant" />
+      </div>
       <div aria-live="polite" className="flex flex-1 flex-col overflow-y-auto">
         <ChatEmptyState />
       </div>
@@ -27,7 +31,7 @@ export function ChatPanel({ locked = false, className }: ChatPanelProps) {
         <div className="border-t p-4">
           <SignInPrompt
             title="Log in to start chatting"
-            description="Your conversation with CareDoc stays private to your account."
+            description="Your conversation stays private to your account."
             href={patientRoutes.talkToAi}
             className="bg-background"
           />

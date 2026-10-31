@@ -2,7 +2,7 @@ import { CheckCircle2Icon, CircleIcon } from "lucide-react";
 import Link from "next/link";
 
 import { PanelCard } from "@/components/shared/panel-card";
-import { doctorRoutes } from "@/config/routes";
+import { doctorRoutes, twoFactorRoute } from "@/config/routes";
 import type { DoctorVerification } from "@/features/doctor-verification/data/verification";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,13 @@ export function VerificationChecklist({
 }) {
   const { documents, hasHours, status } = verification;
   const items = [
+    // The doctor area opens only after two-factor, so this is always ticked.
+    {
+      label: "Two-factor authentication",
+      done: true,
+      href: twoFactorRoute,
+      linkLabel: "Manage",
+    },
     { label: "Profile photo", done: documents.photo },
     { label: "PMDC license", done: documents.license },
     { label: "Degree certificate", done: documents.degree },
@@ -20,6 +27,7 @@ export function VerificationChecklist({
       label: "Weekly hours",
       done: hasHours,
       href: doctorRoutes.availability,
+      linkLabel: "Set up",
     },
     { label: "Verified by our team", done: status === "approved" },
   ];
@@ -45,12 +53,12 @@ export function VerificationChecklist({
                   {item.done ? " (done)" : " (to do)"}
                 </span>
               </span>
-              {!item.done && item.href && (
+              {item.href && (!item.done || item.href === twoFactorRoute) && (
                 <Link
                   href={item.href}
                   className="text-xs text-primary hover:underline"
                 >
-                  Set up
+                  {item.linkLabel}
                 </Link>
               )}
             </li>

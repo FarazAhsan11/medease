@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { DocumentsTable } from "@/features/health-records/components/documents-table";
 import { MedicalSummaryCard } from "@/features/health-records/components/medical-summary-card";
@@ -8,14 +9,20 @@ import {
   healthDocuments,
   vitals,
 } from "@/features/health-records/data/health-records";
+import { getPatientProfile } from "@/features/settings/data/patient-profile";
+import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Health records",
 };
 
-export default function PatientRecordsPage() {
+export default async function PatientRecordsPage() {
+  const user = await requireRole("patient");
+  const profile = await getPatientProfile(user.id, user.email);
+
   return (
     <>
+      <PreviewNotice feature="Vitals and document storage" />
       <DashboardPageHeader
         title="Health records"
         description="Your vitals, medical history, and documents in one place."
@@ -27,7 +34,7 @@ export default function PatientRecordsPage() {
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
         <DocumentsTable documents={healthDocuments} />
-        <MedicalSummaryCard />
+        {profile && <MedicalSummaryCard profile={profile} />}
       </div>
     </>
   );

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-// The admin's paired authenticator app, if they've finished pairing one.
+// The signed-in user's paired authenticator app, if they've finished pairing one.
 export async function getVerifiedFactorId() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.mfa.listFactors();

@@ -84,6 +84,11 @@ export function getEmailEnv(): EmailEnv {
   return result.data;
 }
 
+// Protects the scheduled job endpoints. Unset, they refuse every request.
+export function getCronSecret() {
+  return process.env.CRON_SECRET || null;
+}
+
 // Optional TURN relay for video calls on networks that block direct
 // connections. Without it calls use free public STUN servers only.
 const turnEnvSchema = z.object({

@@ -65,13 +65,6 @@ export const vitals: Vital[] = [
   },
 ];
 
-export const medicalSummary = {
-  bloodGroup: "O+",
-  allergies: ["Penicillin", "Peanuts"],
-  conditions: ["Type 2 diabetes", "High cholesterol"],
-  emergencyContact: "Sara Raza · +92 300 7777777",
-};
-
 export const healthDocuments: HealthDocument[] = [
   {
     id: "doc-1",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { BackLink } from "@/components/shared/back-link";
 import { patientRoutes } from "@/config/routes";
 import { LabBookingForm } from "@/features/lab-tests/components/lab-booking-form";
@@ -30,6 +31,7 @@ export default async function PatientBookLabTestPage({
 
   return (
     <>
+      <PreviewNotice feature="Lab booking" />
       <BackLink href={patientRoutes.bookLabTests}>Back to lab tests</BackLink>
       <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
         <LabTestSummary test={test} />

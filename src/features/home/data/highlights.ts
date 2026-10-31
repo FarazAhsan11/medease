@@ -28,6 +28,6 @@ export const highlights: Highlight[] = [
     icon: ShieldCheckIcon,
     title: "Secure consultations",
     description:
-      "Private, encrypted video consultations keep your health information safe.",
+      "Video calls are encrypted in transit and run directly between you and your doctor.",
   },
 ];

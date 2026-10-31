@@ -1,0 +1,76 @@
+# QA-01: every pull request and every push to main must pass these.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push replaces the run for the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, types, database rules, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - name: Requirements tracker
+        run: npm run srs -- --check
+      # Applies every migration to a fresh Postgres, then tests each rule.
+      - name: Migrations and database rules
+        run: npm run test:sql
+      # Placeholders, never real keys: the build makes no database calls.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+          SUPABASE_SECRET_KEY: sb_secret_placeholder
+          SITE_URL: https://example.com
+          NEXT_TELEMETRY_DISABLED: 1
+
+  supabase-services:
+    name: Auth, two-factor and Storage on a local Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Not yet proven on GitHub, so it reports without blocking. Remove this line
+    # after it has passed once.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase and apply the migrations
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit,postgres-meta
+      - name: Read the local keys
+        run: |
+          supabase status -o env \
+            | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=' \
+            | tr -d '"' >> "$GITHUB_ENV"
+      - name: Test the real services
+        run: node scripts/test-db.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ env.SERVICE_ROLE_KEY }}

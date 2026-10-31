@@ -1,3 +1,6 @@
+// One page for every role, outside the role areas that redirect to it.
+export const twoFactorRoute = "/two-factor";
+
 // Signed-in flows live inside each role's dashboard so the UI never switches
 // to the public site mid-task. Public pages link here for booking actions.
 export const patientRoutes = {
@@ -13,6 +16,8 @@ export const patientRoutes = {
   prescription: (prescriptionId: string) =>
     `/patient/prescriptions/${prescriptionId}`,
   talkToAi: "/patient/talk-to-ai",
+  records: "/patient/records",
+  settings: "/patient/settings",
   consultation: (appointmentId: string) =>
     `/patient/consultation/${appointmentId}`,
 } as const;
@@ -48,5 +53,4 @@ export const adminRoutes = {
   home: "/admin",
   doctor: (doctorId: string) => `/admin/doctors/${doctorId}`,
   auditLog: "/admin/audit-log",
-  twoFactor: "/admin/two-factor",
 } as const;

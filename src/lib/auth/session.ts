@@ -5,7 +5,7 @@ import { cache } from "react";
 import { z } from "zod";
 
 import { dashboards, type DashboardRole } from "@/config/dashboards";
-import { adminRoutes } from "@/config/routes";
+import { twoFactorRoute } from "@/config/routes";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
 import { hasPublicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -46,23 +46,43 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   };
 });
 
+// These roles handle other people's health data, so a password isn't enough.
+// Keep in step with private.second_factor_ok in the database.
+const secondFactorRoles: readonly DashboardRole[] = ["doctor", "lab", "admin"];
+
+export const isSecondFactorRequired = (role: DashboardRole) =>
+  secondFactorRoles.includes(role);
+
+// Asks Supabase rather than trusting the session cookie. Cached because
+// requireRole runs in layouts and pages alike. If the check fails the page opens
+// and the database rule still guards the data.
+const hasPairedFactor = cache(async () => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.mfa.listFactors();
+
+  return (data?.totp.length ?? 0) > 0;
+});
+
+// Patients choose, so for them it depends on whether they've paired an app.
+async function needsSecondFactorCheck(user: SessionUser) {
+  if (user.assuranceLevel === "aal2") return false;
+  if (isSecondFactorRequired(user.role)) return true;
+
+  return hasPairedFactor();
+}
+
 // Use in every dashboard layout and data access path. The proxy only does an
-// optimistic redirect; this is the real authorization check.
+// optimistic redirect; this is the real authorization check. It covers the
+// second factor too: the database enforces the same rule on clinical data
+// (private.second_factor_ok), so this redirect is the friendly half of it.
 export async function requireRole(role: DashboardRole): Promise<SessionUser> {
   const user = await getSessionUser();
 
   if (!user) redirect(dashboards[role].loginHref);
   if (user.role !== role) redirect(dashboards[user.role].home);
+  if (await needsSecondFactorCheck(user)) redirect(twoFactorRoute);
 
   return user;
 }
 
-// Admin pages also need a second factor. The database checks the same claim
-// (private.is_admin), so this redirect is only the friendly half of the rule.
-export async function requireAdmin(): Promise<SessionUser> {
-  const user = await requireRole("admin");
-
-  if (user.assuranceLevel !== "aal2") redirect(adminRoutes.twoFactor);
-
-  return user;
-}
+export const requireAdmin = () => requireRole("admin");

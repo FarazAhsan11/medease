@@ -1,5 +1,33 @@
 # Roadmap
 
+## Next session (left open 2026-11-01)
+
+Requirement status is in [srs.md](./srs.md). Nothing below is committed yet.
+
+**You need to do**
+
+1. Set `CRON_SECRET` on Vercel; on GitHub set the secret `CRON_SECRET` and the variable `SITE_URL`.
+2. Know that demo doctor and lab logins now must pair an authenticator app.
+
+**Test next: all three migrations are applied** (written and passing in `npm run test:sql`, not yet tried live)
+
+- NTF-01: the bell, unread count, mark read, and a live update arriving through Realtime. Move to Built when it works.
+- APT-04: add time off, see the slots vanish, cancel an affected booking from the availability page.
+- APT-05: call `/api/cron/appointment-reminders` with the secret and check one reminder email.
+- SEC-02: click through the app, including a video call and a document upload, watching the console for Content-Security-Policy blocks. Headers are written but no page has been loaded with them.
+- QA-01: push and see `ci.yml` pass, then remove `continue-on-error` from the local Supabase job.
+
+**Finish next**
+
+- SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404. Write them first; AUTH-03 depends on them.
+- AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Consent changes also finish SEC-04.
+- SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
+- SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
+- SEC-05: rate limit document uploads. AUTH-07: bot protection.
+- Then the rest of Phase 0: AUTH-05, SEC-06, ADM-04, CALL-03, NTF-04, OBS-01.
+
+**Waiting on you or others**: REL-01 and REL-02 (paid Supabase, staging), CMPL-03 (counsel).
+
 Last updated: 2026-10-20
 
 ## Milestone 1: Foundations (done)

@@ -2,6 +2,7 @@ import { PlusIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { patientRoutes } from "@/config/routes";
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default function PatientLabTestsPage() {
   return (
     <>
+      <PreviewNotice feature="Lab booking" />
       <DashboardPageHeader
         title="Lab tests"
         description="Track your bookings and download reports when they're ready."

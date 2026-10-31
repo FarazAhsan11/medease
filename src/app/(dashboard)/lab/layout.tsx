@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -10,5 +11,10 @@ export const metadata: Metadata = {
 export default async function LabLayout({ children }: { children: ReactNode }) {
   await requireRole("lab");
 
-  return children;
+  return (
+    <>
+      <PreviewNotice feature="The lab dashboard" />
+      {children}
+    </>
+  );
 }

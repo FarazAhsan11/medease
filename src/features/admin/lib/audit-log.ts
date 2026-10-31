@@ -10,6 +10,15 @@ export const auditActions: Record<string, string> = {
   "doctor.approved": "Approved a doctor",
   "doctor.needs_info": "Asked a doctor for more information",
   "doctor.rejected": "Rejected a doctor",
+  "auth.signed_in": "Signed in",
+  "auth.password_changed": "Changed their password",
+  "mfa.enrolled": "Turned on two-factor",
+  "mfa.disabled": "Turned off two-factor",
+  "mfa.recovery_codes_created": "Created recovery codes",
+  "mfa.recovery_code_used": "Used a recovery code",
+  "prescription.issued": "Issued a prescription",
+  "prescription.replaced": "Edited a prescription",
+  "prescription.cancelled": "Cancelled a prescription",
 };
 
 export type AuditSearch = {

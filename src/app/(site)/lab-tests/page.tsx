@@ -1,8 +1,7 @@
-import { FileCheck2Icon, HouseIcon, ShieldCheckIcon } from "lucide-react";
 import type { Metadata } from "next";
 
 import { Container } from "@/components/layout/container";
-import { FeatureStrip } from "@/components/shared/feature-strip";
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { LabTestDirectory } from "@/features/lab-tests/components/lab-test-directory";
 
@@ -10,34 +9,16 @@ export const metadata: Metadata = {
   title: "Lab Tests",
 };
 
-const benefits = [
-  {
-    icon: HouseIcon,
-    title: "Free home collection",
-    description: "A trained phlebotomist visits you",
-  },
-  {
-    icon: FileCheck2Icon,
-    title: "Digital reports",
-    description: "Delivered to your dashboard",
-  },
-  {
-    icon: ShieldCheckIcon,
-    title: "Certified partner labs",
-    description: "Quality-checked results",
-  },
-];
-
 export default function LabTestsPage() {
   return (
     <>
       <PageHeader
         eyebrow="Lab tests"
-        title="Book lab tests from home"
-        description="Choose a test or health package, pick a slot, and we'll collect your sample at your doorstep."
+        title="Lab tests"
+        description="A look at what booking lab tests on MedEase will be like."
       />
       <Container className="space-y-12 py-8">
-        <FeatureStrip items={benefits} />
+        <PreviewNotice feature="Lab booking" />
         <LabTestDirectory />
       </Container>
     </>

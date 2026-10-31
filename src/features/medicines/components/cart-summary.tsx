@@ -65,8 +65,8 @@ export function CartSummary({ items }: CartSummaryProps) {
         </div>
       </dl>
 
-      <Button type="button" className="mt-5 h-9 w-full">
-        Checkout
+      <Button type="button" disabled className="mt-5 h-9 w-full">
+        Checkout coming soon
       </Button>
       <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <TruckIcon className="size-3.5" aria-hidden />
