@@ -1,5 +1,6 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { BellIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -34,31 +35,43 @@ export function NotificationsMenu({ userId, feed }: NotificationsMenuProps) {
   const [items, setItems] = useState(feed.items);
   const [unread, setUnread] = useState(feed.unread);
 
-  // Row level security decides what this channel receives.
+  // Row level security decides what this channel receives, so it has to join
+  // with the user's token: without setAuth() it joins as anon and is refused.
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const notification = toNotification(payload.new as NotificationRow);
-          setItems((current) =>
-            [notification, ...current].slice(0, NOTIFICATIONS_SHOWN),
-          );
-          setUnread((count) => count + 1);
-        },
-      )
-      .subscribe();
+    let channel: RealtimeChannel | null = null;
+    let stopped = false;
+
+    async function subscribe() {
+      await supabase.realtime.setAuth();
+      if (stopped) return;
+
+      channel = supabase
+        .channel(`notifications:${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const notification = toNotification(payload.new as NotificationRow);
+            setItems((current) =>
+              [notification, ...current].slice(0, NOTIFICATIONS_SHOWN),
+            );
+            setUnread((count) => count + 1);
+          },
+        )
+        .subscribe();
+    }
+
+    void subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      stopped = true;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [userId]);
 

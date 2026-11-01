@@ -48,9 +48,6 @@ jobs:
     name: Auth, two-factor and Storage on a local Supabase
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Not yet proven on GitHub, so it reports without blocking. Remove this line
-    # after it has passed once.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

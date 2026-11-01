@@ -2,24 +2,25 @@
 
 ## Next session (left open 2026-11-01)
 
-Requirement status is in [srs.md](./srs.md). Nothing below is committed yet.
+Requirement status is in [srs.md](./srs.md).
 
 **You need to do**
 
-1. Set `CRON_SECRET` on Vercel; on GitHub set the secret `CRON_SECRET` and the variable `SITE_URL`.
+1. Set `CRON_SECRET` on Vercel; on GitHub set the secret `CRON_SECRET` and the variable `SITE_URL`. Reminders do nothing until then: every scheduled run so far was skipped.
 2. Know that demo doctor and lab logins now must pair an authenticator app.
+3. Push, and check `ci.yml` goes green. That finishes QA-01.
 
-**Test next: all three migrations are applied** (written and passing in `npm run test:sql`, not yet tried live)
+**Live tested 2026-11-01** (throwaway accounts, two browser sessions, dev and production builds)
 
-- NTF-01: the bell, unread count, mark read, and a live update arriving through Realtime. Move to Built when it works.
-- APT-04: add time off, see the slots vanish, cancel an affected booking from the availability page.
-- APT-05: call `/api/cron/appointment-reminders` with the secret and check one reminder email.
-- SEC-02: click through the app, including a video call and a document upload, watching the console for Content-Security-Policy blocks. Headers are written but no page has been loaded with them.
-- QA-01: push and see `ci.yml` pass, then remove `continue-on-error` from the local Supabase job.
+- NTF-01 works and is Built. It was broken: the bell joined Realtime as `anon` and was refused without any visible error, so nothing arrived live until a reload.
+- APT-04 works: slots vanish and return, the affected booking is listed, cancelling tells the patient live. Stays Partial for refunds (needs payments) and rescheduling.
+- APT-05 works: one claim, one send, a second run sends nothing, and the bell updates live. The mail server accepted the email; nobody has looked at it in an inbox. Stays Partial for other channels (NTF-03) and a join link.
+- SEC-02 is Built: no blocks in development; in production only Zod's harmless probe.
+- Calls: about 1 call in 5 to 10 stuck on "Connecting" with no error, when an ICE candidate arrived before the offer. Fixed: 30 of 30 calls connected, in both join orders, and 6 of 6 patient refreshes reconnected.
 
 **Finish next**
 
-- SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404. Write them first; AUTH-03 depends on them.
+- SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404 (production also logs a console error on every page that prefetches them). Write them first; AUTH-03 depends on them.
 - AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Consent changes also finish SEC-04.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.

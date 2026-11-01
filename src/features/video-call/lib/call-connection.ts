@@ -31,6 +31,8 @@ type Events = {
   onJoinFailed: () => void;
 };
 
+const POLITE_OFFER_GRACE_MS = 2000;
+
 type Options = {
   supabase: SupabaseClient;
   appointmentId: string;
@@ -55,6 +57,7 @@ export class CallConnection {
   private ignoreOffer = false;
   private restartedIce = false;
   private pendingCandidates: RTCIceCandidateInit[] = [];
+  private offerTimer: ReturnType<typeof setTimeout> | null = null;
   private connectedOnce = false;
   private closed = false;
   private media: MediaState;
@@ -143,7 +146,8 @@ export class CallConnection {
   private handlePresence() {
     if (this.closed) return;
     if (this.otherIsPresent()) {
-      this.ensurePeer();
+      if (this.polite) this.offerAfterGrace();
+      else this.ensurePeer();
     } else if (this.pc) {
       // They dropped or closed the tab without saying goodbye.
       this.closePeer();
@@ -151,15 +155,34 @@ export class CallConnection {
     }
   }
 
+  // Both sides see each other at the same moment, so both would offer. Rolling
+  // back a colliding offer can leave Chromium unable to gather candidates, and
+  // the call then sits on "Connecting" with no error. The doctor's offer normally
+  // lands within the grace period; offering after it covers a doctor whose tab
+  // already has a connection, as after the patient refreshes.
+  private offerAfterGrace() {
+    if (this.pc || this.offerTimer) return;
+
+    this.offerTimer = setTimeout(() => {
+      this.offerTimer = null;
+      if (!this.closed && !this.pc && this.otherIsPresent()) this.ensurePeer();
+    }, POLITE_OFFER_GRACE_MS);
+  }
+
+  private clearOfferTimer() {
+    if (this.offerTimer) clearTimeout(this.offerTimer);
+    this.offerTimer = null;
+  }
+
   private ensurePeer() {
     if (this.pc) return this.pc;
 
+    this.clearOfferTimer();
     const { iceServers, localStream, events } = this.options;
     const pc = new RTCPeerConnection({ iceServers });
     this.pc = pc;
     this.makingOffer = false;
     this.ignoreOffer = false;
-    this.pendingCandidates = [];
 
     for (const track of localStream.getTracks()) {
       pc.addTrack(track, localStream);
@@ -222,6 +245,8 @@ export class CallConnection {
   }
 
   private closePeer() {
+    this.clearOfferTimer();
+    this.pendingCandidates = [];
     if (!this.pc) return;
     this.pc.ontrack = null;
     this.pc.onnegotiationneeded = null;
@@ -255,6 +280,14 @@ export class CallConnection {
 
     // Signals from a new tab replace the connection to the old one.
     if (stale) this.closePeer();
+
+    // A candidate can beat the offer it belongs to. Opening the connection for
+    // it would make this side offer too, and the two offers then collide.
+    if (signal.kind === "candidate" && !this.pc) {
+      this.pendingCandidates.push(signal.candidate);
+      return;
+    }
+
     const pc = this.ensurePeer();
     this.remoteSessionId = signal.session;
     try {
