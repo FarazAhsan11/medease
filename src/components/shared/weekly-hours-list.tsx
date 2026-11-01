@@ -1,38 +1,61 @@
 import { formatClockTime, weekdayNames } from "@/lib/datetime";
 
+type Hours = { weekday: number; start: string; end: string };
+
 type WeeklyHoursListProps = {
-  hours: { weekday: number; start: string; end: string }[];
+  hours: Hours[];
 };
 
-// Monday-first, one line per day: "Mon  10:00 AM – 1:00 PM, 5:00 PM – 8:00 PM".
-const order = [1, 2, 3, 4, 5, 6, 0];
+type DayGroup = { first: number; last: number; ranges: string[] };
+
+const mondayFirst = [1, 2, 3, 4, 5, 6, 0];
+
+function shortDay(weekday: number) {
+  return weekdayNames[weekday].slice(0, 3);
+}
+
+// Days in a row with the same hours share one line: "Mon – Fri".
+function groupDays(hours: Hours[]) {
+  const groups: DayGroup[] = [];
+
+  for (const weekday of mondayFirst) {
+    const ranges = hours
+      .filter((item) => item.weekday === weekday)
+      .map(
+        (item) =>
+          `${formatClockTime(item.start)} – ${formatClockTime(item.end)}`,
+      );
+    const previous = groups.at(-1);
+
+    if (previous?.ranges.join() === ranges.join()) previous.last = weekday;
+    else groups.push({ first: weekday, last: weekday, ranges });
+  }
+
+  return groups;
+}
 
 export function WeeklyHoursList({ hours }: WeeklyHoursListProps) {
   return (
-    <dl className="grid gap-1.5 text-sm">
-      {order.map((weekday) => {
-        const ranges = hours.filter((item) => item.weekday === weekday);
-
-        return (
-          <div key={weekday} className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">
-              {weekdayNames[weekday].slice(0, 3)}
-            </dt>
-            <dd className="text-right">
-              {ranges.length > 0 ? (
-                ranges
-                  .map(
-                    (range) =>
-                      `${formatClockTime(range.start)} – ${formatClockTime(range.end)}`,
-                  )
-                  .join(", ")
-              ) : (
-                <span className="text-muted-foreground">Closed</span>
-              )}
-            </dd>
-          </div>
-        );
-      })}
+    <dl className="grid gap-2 text-sm">
+      {groupDays(hours).map(({ first, last, ranges }) => (
+        <div key={first} className="flex justify-between gap-4">
+          <dt className="whitespace-nowrap text-muted-foreground">
+            {shortDay(first)}
+            {first !== last && ` – ${shortDay(last)}`}
+          </dt>
+          <dd className="text-right whitespace-nowrap">
+            {ranges.length > 0 ? (
+              ranges.map((range) => (
+                <span key={range} className="block">
+                  {range}
+                </span>
+              ))
+            ) : (
+              <span className="text-muted-foreground">Closed</span>
+            )}
+          </dd>
+        </div>
+      ))}
     </dl>
   );
 }

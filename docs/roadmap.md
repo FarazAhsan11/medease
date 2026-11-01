@@ -6,7 +6,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **You need to do**
 
-1. Set `CRON_SECRET` on Vercel; on GitHub set the secret `CRON_SECRET` and the variable `SITE_URL`. Reminders do nothing until then: every scheduled run so far was skipped.
+1. Set `CRON_SECRET` on the Vercel project `medease-5elw` and redeploy. Reminders do nothing until then: every scheduled run so far was skipped. Skip the GitHub secret and variable: REL-07 removes that workflow.
 2. Know that demo doctor and lab logins now must pair an authenticator app.
 3. Push, and check `ci.yml` goes green. That finishes QA-01.
 
@@ -20,6 +20,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
+- REL-07: start reminders from `pg_cron` and `pg_net` instead of GitHub Actions, and retry failed emails. Design in [Reminder scheduler](#reminder-scheduler-rel-07-next).
 - SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404 (production also logs a console error on every page that prefetches them). Write them first; AUTH-03 depends on them.
 - AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Consent changes also finish SEC-04.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
@@ -29,7 +30,108 @@ Requirement status is in [srs.md](./srs.md).
 
 **Waiting on you or others**: REL-01 and REL-02 (paid Supabase, staging), CMPL-03 (counsel).
 
-Last updated: 2026-10-20
+Last updated: 2026-11-01
+
+## Reminder scheduler (REL-07, next)
+
+Today GitHub Actions calls `/api/cron/appointment-reminders` every 15 minutes (`.github/workflows/reminders.yml`). GitHub turns off scheduled workflows after 60 days without repo activity, so reminders could stop with no warning. Supabase will start the job instead.
+
+The route stays. It sends email with Nodemailer, which the database can't do, so only the trigger moves. `pg_cron` runs the schedule and `pg_net` makes the HTTP call.
+
+### Build
+
+**1. Retry failed emails.** Today a reminder is claimed before its email goes out, so a failed send is lost and the run still returns 200.
+
+- Add `emailed_at` and `last_attempt_at` to `appointment_reminders`, plus `attempts` (default 0). Set `emailed_at = sent_at` on existing rows so old reminders aren't sent again.
+- `claim_appointment_reminders()` still calls `private.notify` only on the first insert. It also returns rows with no `emailed_at`, fewer than 3 attempts, no attempt in the last 10 minutes, and an appointment that is still `booked` and in the future. It updates `attempts` and `last_attempt_at` on every row it returns, so overlapping runs can't send the same email twice.
+- Add `mark_appointment_reminder_emailed(appointment_id, kind)` for `service_role` only.
+- In the route, add `appointment_id` to `DueReminder`, mark each email that was sent, and return 502 with the counts if any failed.
+
+**2. Add the trigger.** The migration `*_reminder_schedule.sql`:
+
+```sql
+create or replace function private.request_appointment_reminders()
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_url text;
+  v_secret text;
+begin
+  select decrypted_secret into v_site_url
+  from vault.decrypted_secrets where name = 'reminders_site_url';
+
+  select decrypted_secret into v_secret
+  from vault.decrypted_secrets where name = 'reminders_cron_secret';
+
+  -- A database without these secrets, such as staging, sends nothing.
+  if v_site_url is null or v_secret is null then
+    return;
+  end if;
+
+  perform net.http_get(
+    url := v_site_url || '/api/cron/appointment-reminders',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || v_secret),
+    timeout_milliseconds := 120000
+  );
+end;
+$$;
+
+revoke execute on function private.request_appointment_reminders() from public;
+
+select cron.schedule(
+  'appointment-reminders',
+  '*/15 * * * *',
+  'select private.request_appointment_reminders()'
+);
+```
+
+- Set the timeout as above. `pg_net` defaults to 2 seconds, which is too short for sending email.
+- Don't put `create extension` in the migration. `npm run test:sql` runs on PGlite, which has neither extension, so they're enabled in the dashboard.
+- Never put a secret in a migration: this repo is public.
+
+**3. Test it.** In `SUPABASE_STUBS` (`scripts/lib/test-database.mjs`), add `cron`, `net` and `vault` schemas with stand-ins that record their calls. In `scripts/test-sql.mjs` check that:
+
+- without secrets, no request is made
+- with secrets, the URL, header and timeout are right
+- the job is scheduled every 15 minutes
+- a failed email is sent again, with no second notification
+- cancelled, past and fully emailed reminders are skipped, and retries stop after 3 attempts
+
+### Switch over
+
+1. Set `CRON_SECRET` on Vercel and redeploy.
+2. In Supabase, go to Database > Extensions and enable `pg_cron` and `pg_net`.
+3. Store the secrets in the SQL Editor, using the production address and the same `CRON_SECRET`. These lines stay out of the repo. To change a value later, use `vault.update_secret`.
+
+   ```sql
+   select vault.create_secret('https://medease-5elw.vercel.app', 'reminders_site_url');
+   select vault.create_secret('<CRON_SECRET value>', 'reminders_cron_secret');
+   ```
+
+4. Run the migrations in the SQL Editor.
+5. After the next quarter hour, check the real result. Expect `200` and `{"claimed":0,"emailed":0}` when nothing is due.
+
+   ```sql
+   select status_code, content, timed_out, error_msg, created
+   from net._http_response
+   order by created desc
+   limit 5;
+   ```
+
+6. Delete `.github/workflows/reminders.yml`.
+7. Update the Notifications line in `CLAUDE.md`, the `CRON_SECRET` comment in `.env.example` and the comment in `src/app/api/cron/appointment-reminders/route.ts`, which all still describe GitHub.
+8. Set REL-07 to Built and run `npm run srs -- --write`. APT-05 stays Partial for other channels and a join link.
+
+### Know before relying on it
+
+- `cron.job_run_details` only shows that the SQL ran, so it can say `succeeded` when the route failed. The HTTP result is in `net._http_response`, kept for 6 hours.
+- Nothing alerts anyone yet if runs stop or fail. That's REL-04 and OBS-03.
+- While a request waits to go out, `pg_net` holds the secret in `net.http_request_queue`, where any role that can log in to the database can read it.
+- A new Supabase project needs both extensions enabled before this migration, or the migration fails. Each project also needs its own Vault secrets; staging should point at staging or have none.
+
+**Done when**: a due reminder arrives from a scheduled run with GitHub Actions removed, a wrong secret gets 401, a forced email failure is retried with only one in-app notice, and `npm run test:sql`, `npm run lint` and `npm run typecheck` pass.
 
 ## Milestone 1: Foundations (done)
 
@@ -57,7 +159,7 @@ Doctors write, edit (as a new version) and cancel prescriptions for an appointme
 Remind patients to take their medicines at the times their doctor set (morning, afternoon, night), using the prescription data from item 1.
 
 - **Schedule**: a scheduled job runs three times a day, once per dose time (e.g. 08:00, 14:00, 21:00 in the patient's timezone; the clinic timezone stored on the prescription until patients have their own). Each run gathers, per patient, the medicines due at that time today using the same course rules as the app (`getCourse`: daily every day, weekly on the start weekday, as-needed never, finished courses skipped) and sends one email per patient listing that time's doses.
-- **Runner**: Vercel Cron calling a protected Route Handler (secret header), or Supabase `pg_cron` + an Edge Function. The handler reads with the admin client (it runs without a user), so it must only ever read due doses and the patient's own email.
+- **Runner**: `pg_cron` and `pg_net` calling a protected Route Handler (secret header), the same way as appointment reminders (REL-07). The handler reads with the admin client (it runs without a user), so it must only ever read due doses and the patient's own email.
 - **No duplicates**: a `medication_reminders_sent` table (patient, date, dose time), unique, inserted before sending, so a retried or overlapping run never emails twice.
 - **Patient control**: reminders are opt-in per patient (a setting with on/off and preferred times), with an unsubscribe link in every email. Off by default until the patient turns it on.
 - **Privacy decision**: an email listing medicine names reveals health information to anyone who can read the inbox. Options: list names (most useful, needs the patient's explicit opt-in) or send a generic "Time for your evening medicines" with a link to the app. Decide before building.

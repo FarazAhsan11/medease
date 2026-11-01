@@ -1,7 +1,6 @@
 "use client";
 
 import { VideoIcon } from "lucide-react";
-import Link from "next/link";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { getCallWindow } from "@/features/appointments/lib/appointments";
@@ -36,8 +35,10 @@ export function JoinCallButton({
 
   const open = now !== 0 && now >= opensAt;
   if (open) {
+    // A plain link on purpose: Permissions-Policy is read on a full page load,
+    // and a client navigation would keep this page's camera ban.
     return (
-      <Link
+      <a
         href={href}
         className={cn(
           buttonVariants({ size: "sm", variant }),
@@ -50,7 +51,7 @@ export function JoinCallButton({
           <span className="relative inline-flex size-2 rounded-full bg-current" />
         </span>
         Join call
-      </Link>
+      </a>
     );
   }
 
