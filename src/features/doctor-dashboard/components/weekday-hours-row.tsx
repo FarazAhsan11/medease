@@ -34,7 +34,7 @@ export function WeekdayHoursRow({
     );
 
   return (
-    <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
+    <li className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-start sm:gap-3">
       <div className="flex h-9 items-center gap-3 sm:w-36">
         <Switch
           id={id}
@@ -51,7 +51,7 @@ export function WeekdayHoursRow({
       {enabled ? (
         <div className="grid flex-1 gap-2">
           {ranges.map((range, index) => (
-            <div key={index} className="flex items-center gap-2">
+            <div key={index} className="flex flex-wrap items-center gap-2">
               <Input
                 type="time"
                 value={range.start}
@@ -82,28 +82,24 @@ export function WeekdayHoursRow({
                   <Trash2Icon />
                 </Button>
               )}
+              {index === ranges.length - 1 &&
+                ranges.length < MAX_RANGES_PER_DAY && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-primary"
+                    onClick={() =>
+                      onChange([...ranges, { start: range.end, end: "21:00" }])
+                    }
+                  >
+                    <PlusIcon aria-hidden />
+                    Add hours
+                  </Button>
+                )}
             </div>
           ))}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {ranges.length < MAX_RANGES_PER_DAY && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1 px-2 text-primary"
-                onClick={() =>
-                  onChange([
-                    ...ranges,
-                    { start: ranges.at(-1)?.end ?? "09:00", end: "21:00" },
-                  ])
-                }
-              >
-                <PlusIcon aria-hidden />
-                Add hours
-              </Button>
-            )}
-            {problem && <p className="text-xs text-destructive">{problem}</p>}
-          </div>
+          {problem && <p className="text-xs text-destructive">{problem}</p>}
         </div>
       ) : (
         <p className="flex h-9 items-center text-sm text-muted-foreground">

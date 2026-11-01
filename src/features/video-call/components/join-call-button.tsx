@@ -20,7 +20,8 @@ type JoinCallButtonProps = {
 const HOUR_MS = 60 * 60_000;
 
 // Live from 5 minutes before the appointment until its call window closes
-// (CALL_WINDOW); a countdown in the last hour before that; hidden once over.
+// (CALL_WINDOW); a countdown in the last hour before that; otherwise hidden,
+// since a button that can't be pressed for days is only noise.
 export function JoinCallButton({
   startsAt,
   endsAt,
@@ -53,7 +54,8 @@ export function JoinCallButton({
     );
   }
 
-  const soon = now !== 0 && opensAt - now < HOUR_MS;
+  if (now === 0 || opensAt - now >= HOUR_MS) return null;
+
   return (
     <Button
       type="button"
@@ -64,7 +66,7 @@ export function JoinCallButton({
       className={cn("gap-1.5", className)}
     >
       <VideoIcon aria-hidden />
-      {soon ? `Join in ${formatCountdown(opensAt - now)}` : "Join call"}
+      Join in {formatCountdown(opensAt - now)}
     </Button>
   );
 }

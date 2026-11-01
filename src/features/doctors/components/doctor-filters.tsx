@@ -1,4 +1,5 @@
 import { SlidersHorizontalIcon } from "lucide-react";
+import Form from "next/form";
 import Link from "next/link";
 
 import { FormField } from "@/components/shared/form-field";
@@ -8,10 +9,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import {
-  genders,
-  specializations,
-} from "@/features/auth/data/registration-options";
+import { genders } from "@/features/auth/data/registration-options";
 import type { DoctorSearch } from "@/features/doctors/data/doctor-directory";
 
 type DoctorFiltersProps = {
@@ -19,8 +17,8 @@ type DoctorFiltersProps = {
   search: DoctorSearch;
 };
 
-// A plain GET form: filters live in the URL, so results are shareable and
-// work without JavaScript.
+// Filters live in the URL, so results are shareable and work without
+// JavaScript. Specialty is in the search bar above.
 export function DoctorFilters({ action, search }: DoctorFiltersProps) {
   return (
     <aside className="h-fit rounded-2xl border bg-card p-5 lg:sticky lg:top-20">
@@ -29,23 +27,11 @@ export function DoctorFilters({ action, search }: DoctorFiltersProps) {
         <h2 className="text-sm font-semibold">Filters</h2>
       </div>
 
-      <form action={action} className="mt-5 grid gap-4">
+      <Form action={action} className="mt-5 grid gap-4">
         {search.q && <input type="hidden" name="q" value={search.q} />}
-        <FormField id="filter-specialty" label="Specialty">
-          <NativeSelect
-            id="filter-specialty"
-            name="specialty"
-            defaultValue={search.specialty}
-            className="w-full"
-          >
-            <NativeSelectOption value="">Any</NativeSelectOption>
-            {specializations.map((option) => (
-              <NativeSelectOption key={option} value={option}>
-                {option}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </FormField>
+        {search.specialty && (
+          <input type="hidden" name="specialty" value={search.specialty} />
+        )}
         <FormField id="filter-gender" label="Gender">
           <NativeSelect
             id="filter-gender"
@@ -79,7 +65,7 @@ export function DoctorFilters({ action, search }: DoctorFiltersProps) {
           </Link>
           <Button type="submit">Apply</Button>
         </div>
-      </form>
+      </Form>
     </aside>
   );
 }

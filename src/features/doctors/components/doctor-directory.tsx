@@ -25,8 +25,9 @@ export async function DoctorDirectory({
         specialties={specializations}
         action={searchAction}
         defaultValues={{ q: search.q, specialty: search.specialty }}
+        keep={{ gender: search.gender, city: search.city }}
       />
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
         <DoctorFilters action={searchAction} search={search} />
         <div>
           <DoctorList

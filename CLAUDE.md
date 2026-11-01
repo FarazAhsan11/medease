@@ -51,11 +51,12 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 - Prescriptions: doctors issue them per appointment (from its start until 14 days after) through `issue_prescription` / `cancel_prescription` (`supabase/migrations/*_prescriptions.sql`); edits create a new version that replaces the active one, one active per appointment. Patients and doctors only read. Course and dosing rules live in `src/features/prescriptions/lib/prescriptions.ts`. Design: `docs/prescriptions.md`.
 - Video calls: WebRTC peer to peer; Supabase Realtime private channel `call:<appointment id>` carries signaling, guarded by `can_join_call` policies on `realtime.messages` (participants only, from 5 min before the start until 15 min after the slot ends, at least 30 min after the start: `call_closes_at` in SQL, `CALL_WINDOW` in the app). Engine in `src/features/video-call/lib/call-connection.ts`. Optional TURN via `TURN_*` env vars.
 - Realtime: `await supabase.realtime.setAuth()` before joining any channel that RLS guards. Without it the join goes out as `anon` and is refused with no visible error.
-- Auth emails are ours, not Supabase's: accounts are created with the admin API, and confirmation/reset tokens are generated, hashed into `auth_tokens`, and checked in `src/features/auth/lib/auth-tokens.ts`. Emails go out through Nodemailer (`SMTP_*` vars); templates live in `src/features/auth/emails/`. Every email link starts from `getSiteUrl()` (`SITE_URL`, checked at startup in `src/instrumentation.ts`), never from request headers.
+- Auth emails are ours, not Supabase's: accounts are created with the admin API, and confirmation/reset tokens are generated, hashed into `auth_tokens`, and checked in `src/features/auth/lib/auth-tokens.ts`. Emails go out through Nodemailer (`SMTP_*` vars) after the response, so a failed send drops the token and the person uses Resend; templates live in `src/features/auth/emails/`. Every email link starts from `getSiteUrl()` (`SITE_URL`, checked at startup in `src/instrumentation.ts`), never from request headers.
 
 ## Rules
 
 - Build every feature from small reusable components, one per kebab-case file. Reuse existing components before creating new ones.
+- Any page that waits on the server gets a `loading.tsx` using `PageSkeleton` (`@/components/shared/page-skeleton`): it shows the page straight away and lets dynamic routes prefetch. `NavigationProgress` in the shell covers every link and GET form with no extra code; GET forms use `Form` from `next/form`.
 - Server Components by default; `"use client"` only on the smallest interactive leaf.
 - Mutations via Server Actions, validated with Zod on the server.
 - Base UI uses the `render` prop, not `asChild`. Style links as buttons with `buttonVariants()`.

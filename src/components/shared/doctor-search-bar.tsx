@@ -1,4 +1,5 @@
 import { SearchIcon } from "lucide-react";
+import Form from "next/form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ type DoctorSearchBarProps = {
   specialties: readonly string[];
   action?: string;
   defaultValues?: { q?: string; specialty?: string };
+  // Filters set elsewhere on the page, kept when searching again.
+  keep?: { gender?: string; city?: string };
   className?: string;
 };
 
@@ -19,10 +22,11 @@ export function DoctorSearchBar({
   specialties,
   action = "/find-doctor",
   defaultValues,
+  keep = {},
   className,
 }: DoctorSearchBarProps) {
   return (
-    <form
+    <Form
       role="search"
       action={action}
       className={cn(
@@ -30,6 +34,10 @@ export function DoctorSearchBar({
         className,
       )}
     >
+      {Object.entries(keep).map(
+        ([name, value]) =>
+          value && <input key={name} type="hidden" name={name} value={value} />,
+      )}
       <NativeSelect
         name="specialty"
         aria-label="Specialty"
@@ -59,6 +67,6 @@ export function DoctorSearchBar({
       <Button type="submit" className="h-10 px-5">
         Search
       </Button>
-    </form>
+    </Form>
   );
 }

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import {
   confirmSignUpEmail,
   resetPasswordEmail,
@@ -21,8 +23,10 @@ type Recipient = {
 
 export type AuthEmailStatus = "sent" | "cooldown" | "rate_limited";
 
-// Issues a token, builds the link and sends it. If sending fails the token is
-// removed, so the user isn't stuck behind the cooldown for nothing.
+// Issues a token and emails the link after the response, because SMTP can take
+// seconds and the person would be left waiting on the form. If sending fails
+// (sendMail logs it) the token is removed, so the user isn't stuck behind the
+// cooldown and "Resend" works straight away.
 async function sendTokenEmail(
   { userId, email }: Recipient,
   purpose: TokenPurpose,
@@ -32,13 +36,14 @@ async function sendTokenEmail(
   const issued = await issueAuthToken(userId, purpose);
   if (issued.status !== "issued") return issued.status;
 
-  try {
-    const url = buildLink(issued.token, getSiteUrl());
-    await sendMail({ to: email, ...buildEmail(url) });
-  } catch (error) {
-    await deleteAuthToken(issued.id);
-    throw error;
-  }
+  const content = buildEmail(buildLink(issued.token, getSiteUrl()));
+  after(async () => {
+    try {
+      await sendMail({ to: email, ...content });
+    } catch {
+      await deleteAuthToken(issued.id);
+    }
+  });
 
   return "sent";
 }

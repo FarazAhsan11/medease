@@ -28,31 +28,27 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
         </div>
       </div>
 
-      <ul className="mt-4 grid gap-2 text-sm text-muted-foreground">
+      <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
         {doctor.city && (
-          <li className="flex items-center gap-2">
+          <li className="flex min-w-0 items-center gap-1.5">
             <MapPinIcon className="size-4 shrink-0" aria-hidden />
             <span className="truncate">{doctor.city}</span>
           </li>
         )}
-        <li className="flex items-center gap-2">
+        <li className="flex items-center gap-1.5">
           <BriefcaseMedicalIcon className="size-4 shrink-0" aria-hidden />
-          {doctor.experienceYears} years experience
+          {doctor.experienceYears} years
         </li>
       </ul>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <VerifiedBadge licenseNumber={doctor.licenseNumber} />
-        {bookable ? (
-          <StatusBadge tone="success" dot>
-            Accepting appointments
-          </StatusBadge>
-        ) : (
+      <div className="mt-3 mb-4 flex flex-wrap gap-2">
+        <VerifiedBadge />
+        {!bookable && (
           <StatusBadge tone="muted">Not taking bookings</StatusBadge>
         )}
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
         <div>
           <p className="text-xs text-muted-foreground">Consultation</p>
           <p className="text-sm font-semibold">

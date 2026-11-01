@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NavMoreMenu } from "@/components/layout/nav-more-menu";
-import type { DashboardRole } from "@/config/dashboards";
+import { dashboards, type DashboardRole } from "@/config/dashboards";
 import { getHeaderNav } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 
@@ -14,13 +14,13 @@ type NavLinksProps = {
   onNavigate?: () => void;
 };
 
-// The longest matching href wins, so "/patient" stays inactive on
-// "/patient/appointments" while "/patient/appointments" lights up.
-function getActiveHref(pathname: string, hrefs: string[]) {
+// The longest matching href wins. The home link only matches itself, so
+// "Overview" isn't lit on pages with no link of their own, like Settings.
+function getActiveHref(pathname: string, hrefs: string[], home: string) {
   return hrefs
     .filter(
       (href) =>
-        pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)),
+        pathname === href || (href !== home && pathname.startsWith(`${href}/`)),
     )
     .sort((a, b) => b.length - a.length)[0];
 }
@@ -37,6 +37,7 @@ export function NavLinks({
   const activeHref = getActiveHref(
     pathname,
     [...links, ...more].map((item) => item.href),
+    role ? dashboards[role].home : "/",
   );
 
   return (

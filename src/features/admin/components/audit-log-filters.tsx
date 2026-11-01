@@ -1,3 +1,4 @@
+import Form from "next/form";
 import Link from "next/link";
 
 import { FormField } from "@/components/shared/form-field";
@@ -10,14 +11,14 @@ import {
 import { adminRoutes } from "@/config/routes";
 import { auditActions, type AuditSearch } from "@/features/admin/lib/audit-log";
 
-// A plain GET form: the filters live in the URL and need no client code.
+// The filters live in the URL, so a filtered view can be reloaded or shared.
 export function AuditLogFilters({ search }: { search: AuditSearch }) {
   const filtered = Boolean(
     search.user || search.action || search.from || search.to,
   );
 
   return (
-    <form
+    <Form
       action={adminRoutes.auditLog}
       className="grid items-end gap-3 rounded-2xl border bg-card p-5 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto]"
     >
@@ -59,6 +60,6 @@ export function AuditLogFilters({ search }: { search: AuditSearch }) {
           </Link>
         )}
       </div>
-    </form>
+    </Form>
   );
 }

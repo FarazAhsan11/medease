@@ -29,15 +29,22 @@ export function AppointmentsPanel({
 }: AppointmentsPanelProps) {
   const [selectedId, setSelectedId] = useState(appointments[0]?.id);
   const selected = appointments.find((item) => item.id === selectedId);
+  // Cancelled visits stay listed but aren't counted, matching the stat above.
+  const booked = appointments.filter(
+    (item) => item.status !== "cancelled",
+  ).length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+    <div
+      className={cn(
+        "grid items-start gap-6",
+        selected && "lg:grid-cols-[minmax(0,1fr)_360px]",
+      )}
+    >
       <PanelCard
         title="Today's schedule"
         description={
-          appointments.length === 1
-            ? "1 appointment"
-            : `${appointments.length} appointments`
+          booked === 1 ? "1 appointment" : `${booked} appointments`
         }
       >
         {appointments.length > 0 ? (
@@ -85,7 +92,7 @@ export function AppointmentsPanel({
         )}
       </PanelCard>
       {selected && (
-        <PanelCard title="Patient details" className="h-fit">
+        <PanelCard title="Patient details">
           <div className="p-5">
             <AppointmentDetails
               appointment={selected}

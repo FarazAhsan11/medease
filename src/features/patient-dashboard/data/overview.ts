@@ -1,15 +1,11 @@
 import {
   BotIcon,
-  CalendarDaysIcon,
-  FileHeartIcon,
   FlaskConicalIcon,
-  PillIcon,
   ShoppingBagIcon,
   StethoscopeIcon,
   type LucideIcon,
 } from "lucide-react";
 
-import type { Stat } from "@/components/shared/stat-card";
 import { patientRoutes } from "@/config/routes";
 
 export type QuickAction = {
@@ -18,33 +14,6 @@ export type QuickAction = {
   href: string;
   icon: LucideIcon;
 };
-
-export const patientStats: Stat[] = [
-  {
-    label: "Upcoming visits",
-    value: "2",
-    hint: "Next on Fri, Oct 9",
-    icon: CalendarDaysIcon,
-  },
-  {
-    label: "Lab reports",
-    value: "1 ready",
-    hint: "1 still processing",
-    icon: FlaskConicalIcon,
-  },
-  {
-    label: "Active medicines",
-    value: "3",
-    hint: "1 refill due soon",
-    icon: PillIcon,
-  },
-  {
-    label: "Health records",
-    value: "12",
-    hint: "Last added Oct 5",
-    icon: FileHeartIcon,
-  },
-];
 
 export const quickActions: QuickAction[] = [
   {

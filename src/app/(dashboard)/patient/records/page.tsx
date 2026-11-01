@@ -32,7 +32,7 @@ export default async function PatientRecordsPage() {
           <VitalCard key={vital.label} vital={vital} />
         ))}
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <DocumentsTable documents={healthDocuments} />
         {profile && <MedicalSummaryCard profile={profile} />}
       </div>

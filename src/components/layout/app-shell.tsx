@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { FlashToaster } from "@/components/providers/flash-toaster";
@@ -19,6 +20,7 @@ export async function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <NavigationProgress />
       <div className="contents print:hidden">
         <SiteHeader user={user} notifications={notifications} />
       </div>
