@@ -1,6 +1,16 @@
 // One page for every role, outside the role areas that redirect to it.
 export const twoFactorRoute = "/two-factor";
 
+export const legalRoutes = {
+  index: "/legal",
+  document: (slug: string) => `/legal/${slug}`,
+  privacy: "/legal/privacy",
+  terms: "/legal/terms",
+  telemedicineConsent: "/legal/telemedicine-consent",
+  refunds: "/legal/refunds",
+  partnerTerms: "/legal/partner-terms",
+} as const;
+
 // Signed-in flows live inside each role's dashboard so the UI never switches
 // to the public site mid-task. Public pages link here for booking actions.
 export const patientRoutes = {

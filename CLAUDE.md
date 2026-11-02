@@ -34,6 +34,7 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 - `src/components/shared/` components used by 2+ features
 - `src/components/layout/` the app shell: header, nav, user menu, footer
 - Static mock data lives in each feature's `data/` folder until the backend is connected
+- Legal pages are data in `src/features/legal/data`, one file per document. They describe only what exists: when a feature, provider or data type changes, update the document and raise its `version` if the meaning changed. The provider table in `privacy-policy.ts` must match what's really in use.
 
 ## Supabase
 

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { dashboards, type DashboardRole } from "@/config/dashboards";
+import { legalRoutes } from "@/config/routes";
 
 export type NavItem = {
   title: string;
@@ -52,6 +53,7 @@ export const footerNav: { title: string; links: NavItem[] }[] = [
       { title: "Register your lab", href: "/register/lab" },
       { title: "Doctor login", href: "/login/doctor" },
       { title: "Lab login", href: "/login/lab" },
+      { title: "Partner terms", href: legalRoutes.partnerTerms },
     ],
   },
   {
@@ -60,8 +62,10 @@ export const footerNav: { title: string; links: NavItem[] }[] = [
       { title: "About", href: "/about" },
       { title: "Contact", href: "/contact" },
       { title: "FAQs", href: "/#faq" },
-      { title: "Privacy Policy", href: "/legal/privacy" },
-      { title: "Terms of Use", href: "/legal/terms" },
+      { title: "Privacy Policy", href: legalRoutes.privacy },
+      { title: "Terms of Use", href: legalRoutes.terms },
+      { title: "Telemedicine consent", href: legalRoutes.telemedicineConsent },
+      { title: "Refund policy", href: legalRoutes.refunds },
     ],
   },
 ];
@@ -70,6 +74,7 @@ export const footerNav: { title: string; links: NavItem[] }[] = [
 export const compactFooterNav: NavItem[] = [
   { title: "About", href: "/about" },
   { title: "Contact", href: "/contact" },
-  { title: "Privacy Policy", href: "/legal/privacy" },
-  { title: "Terms of Use", href: "/legal/terms" },
+  { title: "Privacy Policy", href: legalRoutes.privacy },
+  { title: "Terms of Use", href: legalRoutes.terms },
+  { title: "Legal", href: legalRoutes.index },
 ];

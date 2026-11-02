@@ -23,14 +23,21 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
-- SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404 (production also logs a console error on every page that prefetches them). Write them first; AUTH-03 depends on them.
-- AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Consent changes also finish SEC-04.
+- AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Store each document's `version` from `src/features/legal/data`. Consent changes also finish SEC-04.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
 - SEC-05: rate limit document uploads. AUTH-07: bot protection.
 - Then the rest of Phase 0: AUTH-05, SEC-06, ADM-04, CALL-03, NTF-04, OBS-01.
 
-**Waiting on you or others**: REL-01 and REL-02 (paid Supabase, staging), CMPL-03 (counsel).
+**Waiting on you or others**: REL-01 and REL-02 (paid Supabase, staging). CMPL-03: counsel reviews the five legal documents, which finishes SUP-01. Points to raise:
+
+- The documents speak as MedEase and name no legal company. Counsel needs the registered name and country, which may also change the choice of Pakistani law and courts.
+- The Contact page shows only a phone number and hours, and its form doesn't send (SUP-02), yet the Privacy Policy tells people to contact us to use their rights. Add a support email.
+- The 18+ account rule is in the Terms but sign-up doesn't check age.
+- Retention periods are promises ahead of the code: only notifications and the reminder log purge automatically today (PRV-05).
+- Deletion and data export are by email until AUTH-05 and AUTH-08 exist.
+- The 72-hour breach target has no plan behind it yet (PRV-07).
+- Google receives email content: moving off Gmail (NTF-04) changes the provider table. A TURN relay (CALL-03) adds a provider too.
 
 Last updated: 2026-11-02
 
