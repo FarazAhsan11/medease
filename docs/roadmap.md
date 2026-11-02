@@ -11,6 +11,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Live tested 2026-11-02**
 
+- AUTH-03, CMPL-02 and PRV-02 work on production: sign-up for all three roles stores the right documents; existing accounts stop at `/consent`, with no way round it; a changed version asks for that document only; a withdrawn patient keeps the account, can't book, and can give consent again. Doctors meet two-factor first. PRV-02 stays Partial for AI-04, REC-03 and PRO-04. Two-factor followed by a doctor's dashboard wasn't driven with a paired app. Demo accounts will meet `/consent` at their next login.
 - REL-07 works: the 17:00 UTC scheduled run returned `200` with `{"claimed":0,"emailed":0}`, and production refuses a wrong secret with `401`. Nothing was due, so no reminder email has gone through this path yet. The first real one will show in `net._http_response`. A failed send and a failed mark were tested against stand-in database and mail servers.
 
 **Live tested 2026-11-01** (throwaway accounts, two browser sessions, dev and production builds)
@@ -23,7 +24,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
-- AUTH-03, CMPL-02, PRV-02: code and `test:sql` tests are done; `20261102120000_user_consents.sql` is not on production yet. Apply it and deploy straight after: until then the old code gets an unexplained error on booking, and the new code can't open a dashboard without the table. Then sign up with throwaway accounts for all three roles, accept at `/consent` with an older account, withdraw and give consent in patient settings, and run `npm run test:db`. Mark AUTH-03 and CMPL-02 Built. PRV-02 goes to Partial: AI-04, REC-03 and PRO-04 add their own consents. The Terms and Privacy Policy can only be left by closing the account, which needs AUTH-07. SEC-04 stays Partial for shared-record opens and break-glass.
+- Password forms: they submit through `onSubmit`, so a click before hydration falls back to a native GET and puts the email and password in the URL, where Vercel's logs can see them. Seen on `/login` during the consent test. Give every form holding a password `method="post"`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
 - SEC-05: rate limit document uploads. AUTH-07: bot protection.
