@@ -24,7 +24,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
-- MED-01, MED-02: code and tests are done, and `20261102180000_medicine_reminders.sql` is on production. Push the code, then check that a scheduled run answers with JSON in `net._http_response` (until the route is deployed it answers 200 with the not-found page, so the status alone proves nothing) and that a due reminder lands in a real inbox. Mark MED-01 Built, and MED-02 Partial for the other channels. Then Milestone 2 item 2.
+- MED-01, MED-02: live since `d43b21f`, and the scheduled job reaches the route (the 18:15 UTC run on 2026-11-02 answered `{"claimed":0,"emailed":0}`). Still to see: a due reminder in a real inbox, from a test patient with an active prescription and a reminder time just ahead. Then mark MED-01 Built, and MED-02 Partial for the other channels, and move to Milestone 2 item 2. In `net._http_response` read the body, not the status: cron calls carry an `Authorization` header, and with one a missing route answers 200 with the not-found page instead of 404.
 - The Phase 0 items below wait until close to launch (decided 2026-11-02), except SEC-05 and SEC-06 before records uploads and ADM-04 before labs.
 - Password forms: they submit through `onSubmit`, so a click before hydration falls back to a native GET and puts the email and password in the URL, where Vercel's logs can see them. Seen on `/login` during the consent test. Give every form holding a password `method="post"`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
@@ -166,7 +166,7 @@ Every item follows the existing patterns: a migration in `supabase/migrations/`,
 
 Doctors write, edit (as a new version) and cancel prescriptions for an appointment from its start until 14 days after; patients see current medicines, today's doses and every prescription, printable, with email notices. Full design and rules in [prescriptions.md](./prescriptions.md). Needs the migration `20261020120000_prescriptions.sql` run on the database.
 
-### 1b. Medicine reminders by email (built, 2026-11-02; awaiting deploy)
+### 1b. Medicine reminders by email (live, 2026-11-02; awaiting a first real reminder)
 
 Remind patients at the times they choose (morning, afternoon, night), using the prescription data from item 1.
 
