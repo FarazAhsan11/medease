@@ -1,14 +1,14 @@
 # Roadmap
 
-## Next session (left open 2026-11-01)
+## Next session (left open 2026-11-02)
 
 Requirement status is in [srs.md](./srs.md).
 
 **You need to do**
 
-1. Set `CRON_SECRET` on the Vercel project `medease-5elw` and redeploy. Reminders do nothing until then: every scheduled run so far was skipped. Skip the GitHub secret and variable: REL-07 removes that workflow.
+1. Follow [Switch over](#switch-over) for REL-07, in that order. Reminders do nothing until `CRON_SECRET` is set on the Vercel project `medease-5elw`: every scheduled run so far was skipped. Skip the GitHub secret and variable: REL-07 removes that workflow.
 2. Know that demo doctor and lab logins now must pair an authenticator app.
-3. Push, and check `ci.yml` goes green. That finishes QA-01.
+3. When you push, check `ci.yml` goes green. That finishes QA-01.
 
 **Live tested 2026-11-01** (throwaway accounts, two browser sessions, dev and production builds)
 
@@ -20,7 +20,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
-- REL-07: start reminders from `pg_cron` and `pg_net` instead of GitHub Actions, and retry failed emails. Design in [Reminder scheduler](#reminder-scheduler-rel-07-next).
+- REL-07: the code and tests are done (migration `20261102090000_reminder_schedule.sql`). What's left is the [Switch over](#switch-over), then deleting the workflow and setting it to Built.
 - SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404 (production also logs a console error on every page that prefetches them). Write them first; AUTH-03 depends on them.
 - AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Consent changes also finish SEC-04.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
@@ -30,7 +30,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Waiting on you or others**: REL-01 and REL-02 (paid Supabase, staging), CMPL-03 (counsel).
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Reminder scheduler (REL-07, next)
 
@@ -43,7 +43,7 @@ The route stays. It sends email with Nodemailer, which the database can't do, so
 **1. Retry failed emails.** Today a reminder is claimed before its email goes out, so a failed send is lost and the run still returns 200.
 
 - Add `emailed_at` and `last_attempt_at` to `appointment_reminders`, plus `attempts` (default 0). Set `emailed_at = sent_at` on existing rows so old reminders aren't sent again.
-- `claim_appointment_reminders()` still calls `private.notify` only on the first insert. It also returns rows with no `emailed_at`, fewer than 3 attempts, no attempt in the last 10 minutes, and an appointment that is still `booked` and in the future. It updates `attempts` and `last_attempt_at` on every row it returns, so overlapping runs can't send the same email twice.
+- `claim_appointment_reminders()` still calls `private.notify` only on the first insert. It also returns rows with no `emailed_at`, fewer than 3 attempts, no attempt in the last 10 minutes, and an appointment that is still `booked` and in the future. A 24-hour reminder isn't retried inside the last hour, because it says "tomorrow". It updates `attempts` and `last_attempt_at` on every row it returns, so overlapping runs can't send the same email twice.
 - Add `mark_appointment_reminder_emailed(appointment_id, kind)` for `service_role` only.
 - In the route, add `appointment_id` to `DueReminder`, mark each email that was sent, and return 502 with the counts if any failed.
 
@@ -101,7 +101,7 @@ select cron.schedule(
 
 ### Switch over
 
-1. Set `CRON_SECRET` on Vercel and redeploy.
+1. Push this code, then set `CRON_SECRET` on Vercel and redeploy. This must come before the migration: the older route never marks emails as sent, so each reminder would go out three times.
 2. In Supabase, go to Database > Extensions and enable `pg_cron` and `pg_net`.
 3. Store the secrets in the SQL Editor, using the production address and the same `CRON_SECRET`. These lines stay out of the repo. To change a value later, use `vault.update_secret`.
 
@@ -110,7 +110,7 @@ select cron.schedule(
    select vault.create_secret('<CRON_SECRET value>', 'reminders_cron_secret');
    ```
 
-4. Run the migrations in the SQL Editor.
+4. Run `20261102090000_reminder_schedule.sql` in the SQL Editor.
 5. After the next quarter hour, check the real result. Expect `200` and `{"claimed":0,"emailed":0}` when nothing is due.
 
    ```sql
@@ -121,13 +121,13 @@ select cron.schedule(
    ```
 
 6. Delete `.github/workflows/reminders.yml`.
-7. Update the Notifications line in `CLAUDE.md`, the `CRON_SECRET` comment in `.env.example` and the comment in `src/app/api/cron/appointment-reminders/route.ts`, which all still describe GitHub.
-8. Set REL-07 to Built and run `npm run srs -- --write`. APT-05 stays Partial for other channels and a join link.
+7. Set REL-07 to Built and run `npm run srs -- --write`. APT-05 stays Partial for other channels and a join link.
 
 ### Know before relying on it
 
 - `cron.job_run_details` only shows that the SQL ran, so it can say `succeeded` when the route failed. The HTTP result is in `net._http_response`, kept for 6 hours.
 - Nothing alerts anyone yet if runs stop or fail. That's REL-04 and OBS-03.
+- An email that goes out but can't be marked as sent is sent again, so a patient may rarely get a duplicate. That's the chosen side: a duplicate is better than a missed reminder.
 - While a request waits to go out, `pg_net` holds the secret in `net.http_request_queue`, where any role that can log in to the database can read it.
 - A new Supabase project needs both extensions enabled before this migration, or the migration fails. Each project also needs its own Vault secrets; staging should point at staging or have none.
 

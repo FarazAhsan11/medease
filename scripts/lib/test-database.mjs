@@ -93,6 +93,44 @@ const SUPABASE_STUBS = /* sql */ `
     select nullif(current_setting('realtime.topic', true), '');
   $$;
   grant execute on function realtime.topic() to authenticated;
+
+  -- pg_cron, pg_net and Vault aren't in PGlite. These stand-ins record what
+  -- they're asked to do, so a test can read it back.
+  create schema cron;
+  create table cron.job (
+    jobname text primary key,
+    schedule text not null,
+    command text not null
+  );
+  create function cron.schedule(job_name text, schedule text, command text)
+  returns bigint language sql as $$
+    insert into cron.job values (job_name, schedule, command)
+    on conflict (jobname) do update
+      set schedule = excluded.schedule, command = excluded.command;
+    select 1::bigint;
+  $$;
+
+  create schema net;
+  create table net.requests (
+    url text not null,
+    headers jsonb not null,
+    timeout_milliseconds integer not null
+  );
+  create function net.http_get(
+    url text,
+    params jsonb default '{}',
+    headers jsonb default '{}',
+    timeout_milliseconds integer default 5000
+  ) returns bigint language sql as $$
+    insert into net.requests values (url, headers, timeout_milliseconds);
+    select 1::bigint;
+  $$;
+
+  create schema vault;
+  create table vault.decrypted_secrets (
+    name text primary key,
+    decrypted_secret text not null
+  );
 `;
 
 // Every migration in filename order, the same order Supabase would apply them.

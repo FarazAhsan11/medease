@@ -2383,26 +2383,32 @@ async function testTimeOff({ patient }) {
   check("the slots return", (await slotDays(doctor.id)).has(day(5)));
 }
 
+async function reminderVisit(
+  doctor,
+  minutes,
+  bookedHoursAgo,
+  status = "booked",
+) {
+  const patient = await createPatient();
+  const id = await createAppointment(doctor, patient, {
+    from: minutes,
+    status,
+  });
+  await db.query(
+    `update public.appointments
+     set created_at = now() - make_interval(hours => $2::int) where id = $1`,
+    [id, bookedHoursAgo],
+  );
+  return { id, patient };
+}
+
 async function testReminders() {
   section("Appointment reminders (APT-05)");
 
   const doctor = await createDoctor();
   const server = { role: "service_role" };
   const claim = () => rpc(server, "claim_appointment_reminders");
-
-  const visitFor = async (minutes, bookedHoursAgo, status = "booked") => {
-    const patient = await createPatient();
-    const id = await createAppointment(doctor, patient, {
-      from: minutes,
-      status,
-    });
-    await db.query(
-      `update public.appointments
-       set created_at = now() - make_interval(hours => $2::int) where id = $1`,
-      [id, bookedHoursAgo],
-    );
-    return { id, patient };
-  };
+  const visitFor = (...args) => reminderVisit(doctor, ...args);
 
   denied(
     "a guest can't run the job",
@@ -2491,6 +2497,210 @@ async function testReminders() {
         tomorrow.patient.id,
       ])
     ).rows.length === 0,
+  );
+}
+
+async function testReminderRetries() {
+  section("Failed reminder emails (REL-07)");
+
+  const server = { role: "service_role" };
+  const visit = async (minutes = 23 * 60) =>
+    reminderVisit(await createDoctor(), minutes, 48);
+  const claimFor = async ({ id }) =>
+    (await rpc(server, "claim_appointment_reminders")).data?.filter(
+      (row) => row.appointment_id === id,
+    ) ?? [];
+  const mark = (caller, { id }) =>
+    rpc(caller, "mark_appointment_reminder_emailed", {
+      p_appointment_id: id,
+      p_kind: "24h",
+    });
+  const lastTriedLongAgo = ({ id }) =>
+    db.query(
+      `update public.appointment_reminders
+       set last_attempt_at = now() - interval '11 minutes'
+       where appointment_id = $1`,
+      [id],
+    );
+
+  const failed = await visit();
+  check("the first run claims it", (await claimFor(failed)).length === 1);
+
+  denied("a guest can't mark it as sent", await mark(null, failed));
+  denied(
+    "a user can't mark it as sent",
+    await mark(await createPatient(), failed),
+  );
+
+  check(
+    "a run minutes later leaves it alone",
+    (await claimFor(failed)).length === 0,
+  );
+
+  await lastTriedLongAgo(failed);
+  const retry = await claimFor(failed);
+  check(
+    "a failed email is sent again",
+    retry.length === 1 &&
+      retry[0].kind === "24h" &&
+      retry[0].patient_email === failed.patient.email,
+  );
+  check(
+    "an overlapping run can't send it twice",
+    (await claimFor(failed)).length === 0,
+  );
+
+  const { rows: bell } = await db.query(
+    `select 1 from public.notifications
+     where user_id = $1 and kind = 'appointment_reminder'`,
+    [failed.patient.id],
+  );
+  check("a retry rings the bell only once", bell.length === 1);
+
+  await lastTriedLongAgo(failed);
+  check("the third try goes out", (await claimFor(failed)).length === 1);
+  await lastTriedLongAgo(failed);
+  check(
+    "retries stop after 3 attempts",
+    (await claimFor(failed)).length === 0,
+  );
+
+  const sent = await visit();
+  await claimFor(sent);
+  succeeded("the job marks it as sent", await mark(server, sent));
+  await lastTriedLongAgo(sent);
+  check("a sent email isn't retried", (await claimFor(sent)).length === 0);
+
+  const cancelled = await visit();
+  await claimFor(cancelled);
+  await db.query(
+    `update public.appointments set status = 'cancelled' where id = $1`,
+    [cancelled.id],
+  );
+  await lastTriedLongAgo(cancelled);
+  check(
+    "a cancelled visit isn't retried",
+    (await claimFor(cancelled)).length === 0,
+  );
+
+  const past = await visit();
+  await claimFor(past);
+  await db.query(
+    `update public.appointments
+     set starts_at = now() - interval '2 hours',
+         ends_at = now() - interval '90 minutes'
+     where id = $1`,
+    [past.id],
+  );
+  await lastTriedLongAgo(past);
+  check("a past visit isn't retried", (await claimFor(past)).length === 0);
+
+  const close = await visit();
+  await claimFor(close);
+  await db.query(
+    `update public.appointments
+     set starts_at = now() + interval '30 minutes',
+         ends_at = now() + interval '50 minutes'
+     where id = $1`,
+    [close.id],
+  );
+  await lastTriedLongAgo(close);
+  check(
+    "inside the last hour only the 1-hour one goes out",
+    (await claimFor(close)).map((row) => row.kind).join() === "1h",
+  );
+}
+
+async function testReminderSchedule() {
+  section("Starting reminders from the database (REL-07)");
+
+  const { rows: jobs } = await db.query(
+    `select schedule, command from cron.job where jobname = 'appointment-reminders'`,
+  );
+  check(
+    "the job runs every 15 minutes",
+    jobs.length === 1 && jobs[0].schedule === "*/15 * * * *",
+  );
+
+  const runJob = () => db.query(jobs[0].command);
+  const requests = async () =>
+    (await db.query(`select * from net.requests`)).rows;
+  const addSecret = (name, value) =>
+    db.query(`insert into vault.decrypted_secrets values ($1, $2)`, [
+      name,
+      value,
+    ]);
+
+  denied(
+    "a guest can't start it",
+    await rpc(null, "request_appointment_reminders", {}, "private"),
+  );
+  denied(
+    "a user can't start it",
+    await rpc(
+      await createPatient(),
+      "request_appointment_reminders",
+      {},
+      "private",
+    ),
+  );
+
+  await runJob();
+  check("without secrets, no request is made", (await requests()).length === 0);
+
+  await addSecret("reminders_site_url", "https://medease.example/");
+  await runJob();
+  check(
+    "half the secrets still make no request",
+    (await requests()).length === 0,
+  );
+
+  await addSecret("reminders_cron_secret", "test-cron-value");
+  await runJob();
+  const made = await requests();
+  check("with secrets, one request is made", made.length === 1);
+  check(
+    "it calls the reminders route",
+    made[0]?.url === "https://medease.example/api/cron/appointment-reminders",
+    made[0]?.url,
+  );
+  check(
+    "it sends the secret as a bearer token",
+    made[0]?.headers.Authorization === "Bearer test-cron-value",
+  );
+  check(
+    "it waits long enough for email",
+    made[0]?.timeout_milliseconds === 120000,
+  );
+}
+
+async function testReminderUpgrade() {
+  section("Upgrading reminders that were already sent (REL-07)");
+
+  const older = await createOlderDatabase(
+    "20261101150000_notifications_time_off.sql",
+  );
+  const id = randomUUID();
+
+  // The row is all this test needs, so skip the appointment behind it.
+  await older.db.exec(`set session_replication_role = replica`);
+  await older.db.query(
+    `insert into public.appointment_reminders (appointment_id, kind, sent_at)
+     values ($1, '24h', now() - interval '1 day')`,
+    [id],
+  );
+  await older.db.exec(`set session_replication_role = origin`);
+
+  await older.upgrade();
+
+  const { rows } = await older.db.query(
+    `select emailed_at = sent_at as sent, attempts
+     from public.appointment_reminders where appointment_id = $1`,
+    [id],
+  );
+  check(
+    "old reminders count as sent, so nobody hears again",
+    rows[0]?.sent === true && rows[0]?.attempts === 0,
   );
 }
 
@@ -2639,7 +2849,10 @@ try {
   await testNotifications(await freshPatients());
   await testTimeOff(await freshPatients());
   await testReminders();
+  await testReminderRetries();
+  await testReminderSchedule();
   await testUpgrade();
+  await testReminderUpgrade();
   await testSchemaRules();
   await testEveryRefusalIsTested();
 } catch (error) {
