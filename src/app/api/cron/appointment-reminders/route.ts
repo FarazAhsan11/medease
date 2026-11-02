@@ -1,10 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
 import { patientRoutes } from "@/config/routes";
 import { appointmentReminderEmail } from "@/features/appointments/emails/appointment-email-templates";
-import { getCronSecret, getSiteUrl } from "@/lib/env.server";
+import { isCronAuthorized } from "@/lib/cron-auth.server";
+import { getSiteUrl } from "@/lib/env.server";
 import { sendMail } from "@/lib/mailer.server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -16,16 +15,6 @@ type DueReminder = {
   starts_at: string;
   timezone: string;
 };
-
-function isAuthorized(request: Request) {
-  const secret = getCronSecret();
-  if (!secret) return false;
-
-  const given = Buffer.from(request.headers.get("authorization") ?? "");
-  const expected = Buffer.from(`Bearer ${secret}`);
-
-  return given.length === expected.length && timingSafeEqual(given, expected);
-}
 
 // An email that went out but can't be marked counts as failed: it's sent again,
 // which beats losing a reminder.
@@ -55,7 +44,7 @@ async function sendReminder(
 // reads only the due reminders and answers with counts, never who they were for.
 // The 502 is what shows a failed send in net._http_response.
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

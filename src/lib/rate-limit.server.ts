@@ -24,6 +24,7 @@ export const rateLimits = {
     windowSeconds: ONE_HOUR,
   },
   contactIp: { name: "contact-ip", limit: 5, windowSeconds: ONE_HOUR },
+  unsubscribeIp: { name: "unsubscribe-ip", limit: 20, windowSeconds: ONE_HOUR },
   twoFactorCode: {
     name: "2fa-code",
     limit: 10,

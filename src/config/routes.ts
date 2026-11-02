@@ -1,6 +1,8 @@
 // One page for every role, outside the role areas that redirect to it.
 export const twoFactorRoute = "/two-factor";
 export const consentRoute = "/consent";
+// Opened from an email, so it works without signing in.
+export const unsubscribeRoute = "/unsubscribe";
 
 export const legalRoutes = {
   index: "/legal",

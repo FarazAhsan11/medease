@@ -30,6 +30,8 @@ type EmailParts = {
   action?: { label: string; url: string };
   code?: string;
   footnote?: string;
+  // Shown small under the footnote, for things like unsubscribing.
+  footerLink?: { label: string; url: string };
 };
 
 function escapeHtml(value: string) {
@@ -51,6 +53,7 @@ export function renderEmail({
   action,
   code,
   footnote,
+  footerLink,
 }: EmailParts): EmailContent {
   const e = escapeHtml;
 
@@ -88,6 +91,7 @@ export function renderEmail({
   ${codeBlock}
   ${button}
   ${footnote ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid ${colors.border};font-size:12px;line-height:18px;color:${colors.muted};">${e(footnote)}</p>` : ""}
+  ${footerLink ? `<p style="margin:8px 0 0;font-size:12px;line-height:18px;"><a href="${e(footerLink.url)}" style="color:${colors.primary};">${e(footerLink.label)}</a></p>` : ""}
 </td></tr>
 <tr><td style="padding:20px 4px 0;font-size:12px;line-height:18px;color:${colors.muted};text-align:center;">
   ${e(siteConfig.name)} &middot; ${e(siteConfig.tagline)}<br>Not a substitute for professional medical advice.
@@ -105,6 +109,7 @@ export function renderEmail({
     ...(code ? [code, ""] : []),
     ...(action ? [`${action.label}: ${action.url}`, ""] : []),
     ...(footnote ? [footnote, ""] : []),
+    ...(footerLink ? [`${footerLink.label}: ${footerLink.url}`, ""] : []),
     `${siteConfig.name} · ${siteConfig.tagline}`,
   ].join("\n");
 

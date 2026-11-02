@@ -24,6 +24,8 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
+- MED-01, MED-02: code and tests are done, and `20261102180000_medicine_reminders.sql` is on production. Push the code, then check that a scheduled run answers with JSON in `net._http_response` (until the route is deployed it answers 200 with the not-found page, so the status alone proves nothing) and that a due reminder lands in a real inbox. Mark MED-01 Built, and MED-02 Partial for the other channels. Then Milestone 2 item 2.
+- The Phase 0 items below wait until close to launch (decided 2026-11-02), except SEC-05 and SEC-06 before records uploads and ADM-04 before labs.
 - Password forms: they submit through `onSubmit`, so a click before hydration falls back to a native GET and puts the email and password in the URL, where Vercel's logs can see them. Seen on `/login` during the consent test. Give every form holding a password `method="post"`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
@@ -164,17 +166,18 @@ Every item follows the existing patterns: a migration in `supabase/migrations/`,
 
 Doctors write, edit (as a new version) and cancel prescriptions for an appointment from its start until 14 days after; patients see current medicines, today's doses and every prescription, printable, with email notices. Full design and rules in [prescriptions.md](./prescriptions.md). Needs the migration `20261020120000_prescriptions.sql` run on the database.
 
-### 1b. Medicine reminders by email (next)
+### 1b. Medicine reminders by email (built, 2026-11-02; awaiting deploy)
 
-Remind patients to take their medicines at the times their doctor set (morning, afternoon, night), using the prescription data from item 1.
+Remind patients at the times they choose (morning, afternoon, night), using the prescription data from item 1.
 
-- **Schedule**: a scheduled job runs three times a day, once per dose time (e.g. 08:00, 14:00, 21:00 in the patient's timezone; the clinic timezone stored on the prescription until patients have their own). Each run gathers, per patient, the medicines due at that time today using the same course rules as the app (`getCourse`: daily every day, weekly on the start weekday, as-needed never, finished courses skipped) and sends one email per patient listing that time's doses.
-- **Runner**: `pg_cron` and `pg_net` calling a protected Route Handler (secret header), the same way as appointment reminders (REL-07). The handler reads with the admin client (it runs without a user), so it must only ever read due doses and the patient's own email.
-- **No duplicates**: a `medication_reminders_sent` table (patient, date, dose time), unique, inserted before sending, so a retried or overlapping run never emails twice.
-- **Patient control**: reminders are opt-in per patient (a setting with on/off and preferred times), with an unsubscribe link in every email. Off by default until the patient turns it on.
-- **Privacy decision**: an email listing medicine names reveals health information to anyone who can read the inbox. Options: list names (most useful, needs the patient's explicit opt-in) or send a generic "Time for your evening medicines" with a link to the app. Decide before building.
-- **Later**: in-app notifications (the header bell is still mock data) and "mark as taken" tracking.
-- **Done when**: a patient who opted in gets one email at each dose time listing exactly the medicines due then, never twice, and none after a course ends or a prescription is cancelled.
+- **Schedule**: `pg_cron` job `medicine-reminders` calls `/api/cron/medicine-reminders` every 15 minutes through `pg_net`, with the same Vault secrets as appointment reminders. `claim_medicine_reminders()` decides what's due in the database.
+- **Due**: from the patient's chosen time, in their timezone, until an hour later. A dose reminder hours late could lead someone to double up, so a late one is dropped. `private.has_dose_due` repeats `getCourse` on the clinic's calendar, so a reminder agrees with what the app shows that day.
+- **No duplicates**: `medicine_reminders` has one row per patient, day and dose time, inserted before sending. A failed email is retried, 3 tries at most, 10 minutes apart, inside the same hour, while the dose is still due and reminders are still on.
+- **Patient control**: opt-in, off by default, in patient settings. Every email has an unsubscribe link that works signed out; the token does nothing else, and turning off takes a click because mail scanners open links.
+- **Privacy**: one generic email, "Time for your morning medicines", with a link to the app. It never names a medicine (decided 2026-11-02), so there's no setting for that.
+- **Family**: reminders go to the account holder, whoever the medicine is for.
+- **Later**: other channels, in-app notifications, and "mark as taken" tracking (MED-03).
+- **Done when**: a patient who opted in gets one email at each dose time, never twice, and none after a course ends or a prescription is cancelled.
 
 ### 2. Visit summaries and health records
 

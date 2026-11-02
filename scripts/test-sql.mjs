@@ -2709,6 +2709,503 @@ async function testReminderUpgrade() {
   );
 }
 
+// A zone where it's about noon right now, so a reminder's hour can't cross midnight
+// whenever these tests run. Etc/GMT names have the sign reversed.
+function middayZone() {
+  const hoursAhead = 12 - new Date().getUTCHours();
+  return {
+    zone: `Etc/GMT${hoursAhead >= 0 ? "-" : "+"}${Math.abs(hoursAhead)}`,
+    // "HH:MM" on that zone's clock, some minutes from now.
+    clock: (minutes) =>
+      new Date(Date.now() + hoursAhead * 60 * MINUTE + minutes * MINUTE)
+        .toISOString()
+        .slice(11, 16),
+  };
+}
+
+async function testMedicineReminderSettings() {
+  section("Medicine reminder settings (MED-02)");
+
+  const patient = await createPatient();
+  const other = await createPatient();
+  const doctor = await createDoctor();
+  const server = { role: "service_role" };
+  const settings = (fields = {}) => ({
+    p_enabled: true,
+    p_morning: "07:30",
+    p_afternoon: "13:00",
+    p_night: "22:00",
+    p_timezone: "Asia/Dubai",
+    ...fields,
+  });
+  const save = (caller, fields) =>
+    rpc(caller, "save_medicine_reminders", settings(fields));
+  const rowOf = async ({ id }) =>
+    (
+      await db.query(
+        `select * from public.medicine_reminder_settings where patient_id = $1`,
+        [id],
+      )
+    ).rows[0];
+
+  denied("a guest can't save", await save(null));
+  refused("a doctor can't save", await save(doctor), "not_patient");
+  refused(
+    "the morning has to come before the afternoon",
+    await save(patient, { p_morning: "15:00" }),
+    "invalid_reminder_times",
+  );
+  refused(
+    "the afternoon has to come before the night",
+    await save(patient, { p_night: "13:00" }),
+    "invalid_reminder_times",
+  );
+  refused(
+    "a missing time is refused",
+    await save(patient, { p_night: null }),
+    "invalid_reminder_times",
+  );
+  refused(
+    "a zone that doesn't exist is refused",
+    await save(patient, { p_timezone: "Mars/Olympus" }),
+    "invalid_timezone",
+  );
+  check("nothing was saved by those", !(await rowOf(patient)));
+
+  succeeded("a patient saves their settings", await save(patient));
+  const saved = await rowOf(patient);
+  check(
+    "the settings are stored",
+    saved?.enabled === true &&
+      saved?.morning_time === "07:30:00" &&
+      saved?.afternoon_time === "13:00:00" &&
+      saved?.night_time === "22:00:00" &&
+      saved?.timezone === "Asia/Dubai",
+  );
+
+  succeeded(
+    "saving again changes the same row",
+    await save(patient, { p_enabled: false, p_night: "23:15" }),
+  );
+  const changed = await rowOf(patient);
+  check(
+    "the change holds and the unsubscribe link keeps working",
+    changed?.enabled === false &&
+      changed?.night_time === "23:15:00" &&
+      changed?.unsubscribe_token === saved?.unsubscribe_token,
+  );
+
+  await save(other);
+  const rows = async (caller) =>
+    (
+      await as(
+        caller,
+        `select patient_id from public.medicine_reminder_settings`,
+      )
+    ).data ?? [];
+  const seen = await rows(patient);
+  check(
+    "a patient reads only their own",
+    seen.length === 1 && seen[0].patient_id === patient.id,
+  );
+  check("a doctor reads none", (await rows(doctor)).length === 0);
+  denied(
+    "a guest reads nothing",
+    await as(null, `select 1 from public.medicine_reminder_settings`),
+  );
+  denied(
+    "a patient can't write the table directly",
+    await as(
+      patient,
+      `update public.medicine_reminder_settings set enabled = true`,
+    ),
+  );
+
+  await db.query(
+    `insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`,
+    [patient.id],
+  );
+  check(
+    "with an app paired, a password alone reads nothing",
+    (await rows(patient)).length === 0,
+  );
+  check(
+    "with the second factor they read it",
+    (await rows({ ...patient, aal: "aal2" })).length === 1,
+  );
+  refused(
+    "and a password alone can't save",
+    {
+      ...(await save(patient)),
+      fn: "require_second_factor",
+    },
+    "second_factor_required",
+  );
+  succeeded(
+    "with the second factor they can",
+    await save({ ...patient, aal: "aal2" }),
+  );
+
+  const token = saved?.unsubscribe_token;
+  const unsubscribe = (caller, value) =>
+    rpc(caller, "unsubscribe_medicine_reminders", { p_token: value });
+
+  denied("a guest can't call it directly", await unsubscribe(null, token));
+  denied("nor can a patient", await unsubscribe(other, token));
+
+  const unknown = await unsubscribe(server, randomUUID());
+  check(
+    "an unknown token changes nothing",
+    unknown.data?.[0]?.unsubscribe_medicine_reminders === false &&
+      (await rowOf(patient))?.enabled === true,
+  );
+  const done = await unsubscribe(server, token);
+  check(
+    "the emailed link turns reminders off without signing in",
+    done.data?.[0]?.unsubscribe_medicine_reminders === true &&
+      (await rowOf(patient))?.enabled === false,
+  );
+  check("and nobody else's", (await rowOf(other))?.enabled === true);
+}
+
+async function testMedicineReminders() {
+  section("Medicine reminders (MED-01)");
+
+  const server = { role: "service_role" };
+  const { zone, clock } = middayZone();
+  const claim = () => rpc(server, "claim_medicine_reminders");
+  const claimedFor = async ({ id }) =>
+    (await claim()).data?.filter((row) => row.patient_id === id) ?? [];
+
+  // A patient with reminders on whose morning dose was due `minutesAgo`. The other
+  // two dose times are far off, so only that one can match.
+  const remindedPatient = async (minutesAgo = 5, fields = {}) => {
+    const patient = await createPatient();
+    await db.query(
+      `insert into public.medicine_reminder_settings (
+         patient_id, enabled, timezone, morning_time, afternoon_time, night_time
+       ) values ($1, $2, $3, $4, $5, '23:30')`,
+      [patient.id, fields.enabled ?? true, zone, clock(-minutesAgo), "23:00"],
+    );
+    return patient;
+  };
+
+  // A prescription issued `daysAgo`. A new doctor each time, so visits can't overlap.
+  const prescribe = async (patient, items = [medicine()], daysAgo = 0) => {
+    const doctor = await createDoctor();
+    const visit = await startedVisit(doctor, patient);
+    const result = await issue(doctor, visit, { p_items: items });
+    const id = issued(result)?.id;
+    await db.query(
+      `update public.prescriptions
+       set issued_at = issued_at - make_interval(days => $2::int) where id = $1`,
+      [id, daysAgo],
+    );
+    return { doctor, visit, id };
+  };
+
+  const remindedFor = async (items, daysAgo) => {
+    const patient = await remindedPatient();
+    await prescribe(patient, items, daysAgo);
+    return (await claimedFor(patient)).length;
+  };
+
+  denied(
+    "a guest can't run the job",
+    await rpc(null, "claim_medicine_reminders"),
+  );
+  denied(
+    "a user can't run it",
+    await rpc(await createPatient(), "claim_medicine_reminders"),
+  );
+  const mark = (caller, row) =>
+    rpc(caller, "mark_medicine_reminder_emailed", {
+      p_patient_id: row.patient_id,
+      p_local_date: row.local_date,
+      p_dose_time: row.dose_time,
+    });
+  denied(
+    "a user can't mark one as sent",
+    await mark(await createPatient(), {
+      patient_id: randomUUID(),
+      local_date: "2026-01-01",
+      dose_time: "morning",
+    }),
+  );
+  denied(
+    "the log is closed even to the secret key",
+    await as(server, `select * from public.medicine_reminders`),
+  );
+
+  await claim();
+
+  const patient = await remindedPatient();
+  await prescribe(patient, [medicine(), medicine({ medicine: "Paracetamol" })]);
+  const first = await claimedFor(patient);
+  check("two medicines at one time make one reminder", first.length === 1);
+  check(
+    "it's for the dose time that's due",
+    first[0]?.dose_time === "morning",
+    first[0]?.dose_time,
+  );
+  check(
+    "it carries what the email needs and no medicines",
+    first[0]?.patient_name === "Sql" &&
+      first[0]?.patient_email === patient.email &&
+      Boolean(first[0]?.unsubscribe_token) &&
+      Object.keys(first[0] ?? {})
+        .sort()
+        .join() ===
+        "dose_time,local_date,patient_email,patient_id,patient_name,unsubscribe_token",
+  );
+  check("the next run sends nothing", (await claimedFor(patient)).length === 0);
+
+  check(
+    "a medicine for another time of day doesn't count",
+    (await remindedFor([medicine({ dose_times: ["night"] })])) === 0,
+  );
+  check(
+    "a medicine taken only when needed never reminds",
+    (await remindedFor([
+      medicine({ frequency: "as_needed", dose_times: [] }),
+    ])) === 0,
+  );
+  check("the first day of a course reminds", (await remindedFor()) === 1);
+  check(
+    "the last day of a course reminds",
+    (await remindedFor([medicine({ duration_days: 5 })], 4)) === 1,
+  );
+  check(
+    "the day after a course ends doesn't",
+    (await remindedFor([medicine({ duration_days: 5 })], 5)) === 0,
+  );
+  check(
+    "an ongoing medicine keeps reminding",
+    (await remindedFor([medicine({ duration_days: null })], 200)) === 1,
+  );
+  const weekly = [medicine({ frequency: "weekly", duration_days: 60 })];
+  check(
+    "a weekly medicine reminds on its day",
+    (await remindedFor(weekly, 14)) === 1,
+  );
+  check("and not on the others", (await remindedFor(weekly, 3)) === 0);
+
+  const cancelled = await remindedPatient();
+  const toCancel = await prescribe(cancelled);
+  await rpc(toCancel.doctor, "cancel_prescription", {
+    p_prescription_id: toCancel.id,
+    p_reason: TAG,
+  });
+  check(
+    "a cancelled prescription doesn't remind",
+    (await claimedFor(cancelled)).length === 0,
+  );
+
+  const replaced = await remindedPatient();
+  const toReplace = await prescribe(replaced);
+  await issue(toReplace.doctor, toReplace.visit, {
+    p_items: [medicine({ dose_times: ["night"] })],
+    p_replaces_id: toReplace.id,
+  });
+  check(
+    "only the newest version of a prescription counts",
+    (await claimedFor(replaced)).length === 0,
+  );
+
+  const off = await remindedPatient(5, { enabled: false });
+  await prescribe(off);
+  check(
+    "reminders stay off until turned on",
+    (await claimedFor(off)).length === 0,
+  );
+
+  const early = await remindedPatient(-10);
+  await prescribe(early);
+  check(
+    "nothing goes out before the time",
+    (await claimedFor(early)).length === 0,
+  );
+
+  const late = await remindedPatient(61);
+  await prescribe(late);
+  check(
+    "a reminder over an hour late is dropped",
+    (await claimedFor(late)).length === 0,
+  );
+
+  const unconfirmed = await remindedPatient();
+  await prescribe(unconfirmed);
+  await db.query(
+    `update auth.users set email_confirmed_at = null where id = $1`,
+    [unconfirmed.id],
+  );
+  check(
+    "an unconfirmed email address gets nothing",
+    (await claimedFor(unconfirmed)).length === 0,
+  );
+
+  const noRow = await createPatient();
+  await prescribe(noRow);
+  check(
+    "a patient who never opened settings gets nothing",
+    (await claimedFor(noRow)).length === 0,
+  );
+
+  // Retries --------------------------------------------------------------------
+
+  const rewind = (who, fields) =>
+    db.query(
+      `update public.medicine_reminders
+       set last_attempt_at = last_attempt_at - interval '11 minutes' ${fields ?? ""}
+       where patient_id = $1`,
+      [who.id],
+    );
+  const logOf = async (who) =>
+    (
+      await db.query(
+        `select * from public.medicine_reminders where patient_id = $1`,
+        [who.id],
+      )
+    ).rows;
+
+  const failing = await remindedPatient();
+  await prescribe(failing);
+  const [failed] = await claimedFor(failing);
+  check(
+    "a failed email isn't retried straight away",
+    (await claimedFor(failing)).length === 0,
+  );
+  await rewind(failing);
+  check(
+    "it's sent again 10 minutes later",
+    (await claimedFor(failing)).length === 1,
+  );
+  await rewind(failing);
+  check("and a third time", (await claimedFor(failing)).length === 1);
+  await rewind(failing);
+  check("then it stops", (await claimedFor(failing)).length === 0);
+  check(
+    "and it's still one reminder",
+    (await logOf(failing)).length === 1 &&
+      (await logOf(failing))[0].attempts === 3 &&
+      failed?.dose_time === "morning",
+  );
+
+  const delivered = await remindedPatient();
+  await prescribe(delivered);
+  const [sent] = await claimedFor(delivered);
+  succeeded("the route marks a sent email", await mark(server, sent));
+  await rewind(delivered);
+  check(
+    "a sent email isn't sent again",
+    (await claimedFor(delivered)).length === 0,
+  );
+
+  const stopped = await remindedPatient();
+  const stoppedRx = await prescribe(stopped);
+  await claimedFor(stopped);
+  await rpc(stoppedRx.doctor, "cancel_prescription", {
+    p_prescription_id: stoppedRx.id,
+    p_reason: TAG,
+  });
+  await rewind(stopped);
+  check(
+    "a retry stops if the prescription is cancelled meanwhile",
+    (await claimedFor(stopped)).length === 0,
+  );
+
+  const unsubscribed = await remindedPatient();
+  await prescribe(unsubscribed);
+  await claimedFor(unsubscribed);
+  await db.query(
+    `update public.medicine_reminder_settings set enabled = false where patient_id = $1`,
+    [unsubscribed.id],
+  );
+  await rewind(unsubscribed);
+  check(
+    "a retry stops if the patient turns reminders off",
+    (await claimedFor(unsubscribed)).length === 0,
+  );
+
+  const stale = await remindedPatient();
+  await prescribe(stale);
+  await claimedFor(stale);
+  await rewind(stale, ", scheduled_for = scheduled_for - interval '1 hour'");
+  check(
+    "a retry stops once the hour has passed",
+    (await claimedFor(stale)).length === 0,
+  );
+
+  // Housekeeping ---------------------------------------------------------------
+
+  const old = await remindedPatient(5, { enabled: false });
+  await db.query(
+    `insert into public.medicine_reminders (patient_id, local_date, dose_time, scheduled_for, sent_at)
+     values ($1, '2020-01-01', 'night', now() - interval '91 days', now() - interval '91 days'),
+            ($1, '2020-01-02', 'night', now() - interval '89 days', now() - interval '89 days')`,
+    [old.id],
+  );
+  await claim();
+  check(
+    "the send log is kept for 90 days",
+    (await logOf(old)).map((row) => row.dose_time).length === 1,
+  );
+
+  await db.query(`delete from auth.users where id = $1`, [delivered.id]);
+  check(
+    "deleting an account removes its reminders",
+    (await logOf(delivered)).length === 0,
+  );
+
+  // The job --------------------------------------------------------------------
+
+  const { rows: jobs } = await db.query(
+    `select schedule, command from cron.job where jobname = 'medicine-reminders'`,
+  );
+  check(
+    "the job runs every 15 minutes",
+    jobs.length === 1 && jobs[0].schedule === "*/15 * * * *",
+  );
+  denied(
+    "a user can't start it",
+    await rpc(
+      await createPatient(),
+      "request_medicine_reminders",
+      {},
+      "private",
+    ),
+  );
+  denied(
+    "nor can they ask what's due",
+    await rpc(
+      await createPatient(),
+      "has_dose_due",
+      { p_patient_id: randomUUID(), p_dose_time: "morning" },
+      "private",
+    ),
+  );
+
+  await db.query(`delete from net.requests`);
+  await db.query(jobs[0].command);
+  const { rows: made } = await db.query(`select * from net.requests`);
+  check(
+    "it calls the medicine reminders route with the shared secrets",
+    made.length === 1 &&
+      made[0].url === "https://medease.example/api/cron/medicine-reminders" &&
+      made[0].headers.Authorization === "Bearer test-cron-value" &&
+      made[0].timeout_milliseconds === 120000,
+    made[0]?.url,
+  );
+
+  await db.query(`delete from net.requests`);
+  await db.query(`delete from vault.decrypted_secrets`);
+  await db.query(jobs[0].command);
+  check(
+    "without secrets, no request is made",
+    (await db.query(`select 1 from net.requests`)).rows.length === 0,
+  );
+}
+
 // The rules that must hold for everything in the schema, including tables and
 // functions that don't exist yet.
 async function testSchemaRules() {
@@ -3062,6 +3559,8 @@ try {
   await testReminders();
   await testReminderRetries();
   await testReminderSchedule();
+  await testMedicineReminderSettings();
+  await testMedicineReminders();
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

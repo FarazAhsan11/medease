@@ -27,6 +27,7 @@ export const privacyPolicy: LegalDocument = {
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
           "Clinical records: prescriptions your doctor issues and notes your doctor writes.",
+          "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
           "Call details: when each person joined and left a call. We do not record audio or video.",
           "Doctor and lab details: licence or registration numbers, specialty, clinic or lab address, verification documents and the outcome of our review.",
           "Security details: sign-in events, two-factor settings and hashed IP addresses.",
