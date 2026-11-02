@@ -6,9 +6,12 @@ Requirement status is in [srs.md](./srs.md).
 
 **You need to do**
 
-1. Follow [Switch over](#switch-over) for REL-07, in that order. Reminders do nothing until `CRON_SECRET` is set on the Vercel project `medease-5elw`: every scheduled run so far was skipped. Skip the GitHub secret and variable: REL-07 removes that workflow.
-2. Know that demo doctor and lab logins now must pair an authenticator app.
-3. When you push, check `ci.yml` goes green. That finishes QA-01.
+1. Know that demo doctor and lab logins now must pair an authenticator app.
+2. Check `ci.yml` is green on GitHub. That finishes QA-01.
+
+**Live tested 2026-11-02**
+
+- REL-07 works: the 17:00 UTC scheduled run returned `200` with `{"claimed":0,"emailed":0}`, and production refuses a wrong secret with `401`. Nothing was due, so no reminder email has gone through this path yet. The first real one will show in `net._http_response`. A failed send and a failed mark were tested against stand-in database and mail servers.
 
 **Live tested 2026-11-01** (throwaway accounts, two browser sessions, dev and production builds)
 
@@ -20,7 +23,6 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
-- REL-07: the code and tests are done (migration `20261102090000_reminder_schedule.sql`). What's left is the [Switch over](#switch-over), then deleting the workflow and setting it to Built.
 - SUP-01: the footer now links to `/legal/privacy` and `/legal/terms`, and those pages don't exist yet, so they 404 (production also logs a console error on every page that prefetches them). Write them first; AUTH-03 depends on them.
 - AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Consent changes also finish SEC-04.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
@@ -32,9 +34,9 @@ Requirement status is in [srs.md](./srs.md).
 
 Last updated: 2026-11-02
 
-## Reminder scheduler (REL-07, next)
+## Reminder scheduler (REL-07, built 2026-11-02)
 
-Today GitHub Actions calls `/api/cron/appointment-reminders` every 15 minutes (`.github/workflows/reminders.yml`). GitHub turns off scheduled workflows after 60 days without repo activity, so reminders could stop with no warning. Supabase will start the job instead.
+GitHub Actions used to call `/api/cron/appointment-reminders` every 15 minutes. GitHub turns off scheduled workflows after 60 days without repo activity, so reminders could stop with no warning. Supabase starts the job instead.
 
 The route stays. It sends email with Nodemailer, which the database can't do, so only the trigger moves. `pg_cron` runs the schedule and `pg_net` makes the HTTP call.
 
