@@ -125,6 +125,16 @@ async function createUser(role, { confirmed = true } = {}) {
   if (error) throw new Error(`createUser: ${error.message}`);
 
   createdUsers.push(data.user.id);
+
+  // Booking needs this, so it's the normal case for a patient.
+  if (role === "patient") {
+    const { error: consentError } = await admin.rpc("record_consents", {
+      p_user_id: data.user.id,
+      p_consents: [{ document: "telemedicine-consent", version: "1.0" }],
+    });
+    if (consentError) throw new Error(`consents: ${consentError.message}`);
+  }
+
   return { id: data.user.id, email, password };
 }
 

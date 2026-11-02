@@ -5,6 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DashboardRole } from "@/config/dashboards";
 import { sendConfirmationEmail } from "@/features/auth/lib/auth-emails";
 import { authFormError } from "@/features/auth/lib/auth-error";
+import { requiredConsents } from "@/features/consent/lib/consent-documents";
+import { withVersions } from "@/features/consent/lib/consent-versions";
 import { getUnexpectedErrorMessage, isNetworkError } from "@/lib/errors";
 import { formError, type FormState } from "@/lib/form-state";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -23,7 +25,8 @@ type CreateAccountResult =
   { status: "confirm-email" } | { status: "error"; error: FormState };
 
 // Creates the account with the admin API, so Supabase sends no email and the
-// role is set atomically, then sends our own confirmation email.
+// role is set atomically, then sends our own confirmation email. The caller's
+// schema has already checked the consent boxes, so they're recorded here.
 export async function createAccount({
   role,
   email,
@@ -49,6 +52,13 @@ export async function createAccount({
 
   try {
     await saveProfile(admin, userId);
+
+    const { error: consentError } = await admin.rpc("record_consents", {
+      p_user_id: userId,
+      p_consents: withVersions(requiredConsents[role]),
+    });
+    if (consentError) throw new Error(`consents: ${consentError.message}`);
+
     step = "email";
     await sendConfirmationEmail({ userId, email, name: fullName }, next);
   } catch (cause) {

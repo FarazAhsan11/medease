@@ -10,6 +10,8 @@ import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button"
 import { PasswordInput } from "@/features/auth/components/password-input";
 import { SignUpConfirmation } from "@/features/auth/components/sign-up-confirmation";
 import { labServices } from "@/features/auth/data/registration-options";
+import { ConsentFields } from "@/features/consent/components/consent-fields";
+import { requiredConsents } from "@/features/consent/lib/consent-documents";
 import type { SignUpState } from "@/features/auth/schemas/sign-up";
 import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
@@ -144,6 +146,11 @@ export function LabRegisterForm() {
             {...fieldErrorProps("lab-password", fieldError("password"))}
           />
         </FormField>
+        <ConsentFields
+          idPrefix="lab"
+          documents={requiredConsents.lab}
+          fieldError={fieldError}
+        />
         <AuthSubmitButton pending={pending} pendingLabel="Registering…">
           Register laboratory
         </AuthSubmitButton>

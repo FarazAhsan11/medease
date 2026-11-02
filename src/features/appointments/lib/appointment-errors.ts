@@ -25,6 +25,8 @@ const messages: Record<string, string> = {
     "You prescribed for this appointment, so it can't be a no-show. Mark it completed, or cancel the prescription first.",
   not_doctor: "Only doctors can change a schedule.",
   overlapping_hours: "Some of your hours overlap. Adjust them and try again.",
+  consent_required:
+    "Booking needs your telemedicine consent. You can give it in Settings.",
   invalid_schedule:
     "Your schedule couldn't be saved. Check the hours and try again.",
 };

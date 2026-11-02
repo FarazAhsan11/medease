@@ -87,13 +87,21 @@ function overlapRefused(label, result, constraint) {
 
 // Fixtures, written directly as the database owner ----------------------------
 
-async function createUser(role, { confirmed = true } = {}) {
+async function createUser(role, { confirmed = true, consented = true } = {}) {
   const email = `${randomUUID()}@example.invalid`;
   const { rows } = await db.query(
     `insert into auth.users (email, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
      values ($1, $2, $3, $4) returning id`,
     [email, confirmed ? new Date() : null, { role }, { full_name: TAG }],
   );
+  // Booking needs this, so it's the normal case for a patient.
+  if (role === "patient" && consented) {
+    await db.query(
+      `insert into public.user_consents (user_id, document, version)
+       values ($1, 'telemedicine-consent', '1.0')`,
+      [rows[0].id],
+    );
+  }
   // The app won't let these roles past two-factor, so that's the normal case;
   // tests for the rule itself ask for aal1.
   const aal = ["doctor", "lab", "admin"].includes(role) ? "aal2" : "aal1";
@@ -2560,10 +2568,7 @@ async function testReminderRetries() {
   await lastTriedLongAgo(failed);
   check("the third try goes out", (await claimFor(failed)).length === 1);
   await lastTriedLongAgo(failed);
-  check(
-    "retries stop after 3 attempts",
-    (await claimFor(failed)).length === 0,
-  );
+  check("retries stop after 3 attempts", (await claimFor(failed)).length === 0);
 
   const sent = await visit();
   await claimFor(sent);
@@ -2798,6 +2803,212 @@ async function testSchemaRules() {
 
 // QA-02 asks for every `raise exception` path. Read the functions as they stand
 // after all migrations, and fail on any refusal no test above produced.
+async function testConsents() {
+  section("Consent records (AUTH-03, CMPL-02, PRV-02)");
+
+  const server = { role: "service_role" };
+  const patient = await createUser("patient", { consented: false });
+  const other = await createUser("patient", { consented: false });
+  const doctor = await createDoctor();
+  const terms = { document: "terms", version: "1.0" };
+  const telemedicine = { document: "telemedicine-consent", version: "1.0" };
+  let bookings = 0;
+
+  const accept = (caller, list) =>
+    rpc(caller, "accept_consents", { p_consents: JSON.stringify(list) });
+  const record = (caller, userId, list) =>
+    rpc(caller, "record_consents", {
+      p_user_id: userId,
+      p_consents: JSON.stringify(list),
+    });
+  const withdraw = (caller, document) =>
+    rpc(caller, "withdraw_consent", { p_document: document });
+  const inSaveConsents = (result) => ({ ...result, fn: "save_consents" });
+  const rowsFor = async (userId) =>
+    (
+      await db.query(
+        `select document, version, withdrawn_at from public.user_consents
+         where user_id = $1 order by id`,
+        [userId],
+      )
+    ).rows;
+  const auditFor = async (userId, action) =>
+    (
+      await db.query(
+        `select actor_id, actor_role, details from public.audit_log
+         where target_id = $1 and action = $2`,
+        [userId, action],
+      )
+    ).rows;
+  const book = (user) =>
+    createAppointment(doctor, user, { from: 120 + ++bookings * 60 }).then(
+      () => ({}),
+      (error) => ({ error, fn: "require_telemedicine_consent" }),
+    );
+
+  denied("a guest can't accept", await accept(null, [terms]));
+  denied(
+    "a guest can't withdraw",
+    await withdraw(null, "telemedicine-consent"),
+  );
+  denied(
+    "a guest can't record a consent",
+    await record(null, patient.id, [terms]),
+  );
+  denied(
+    "a user can't record a consent for someone",
+    await record(other, patient.id, [terms]),
+  );
+  denied(
+    "a user can't write the table directly",
+    await as(
+      patient,
+      `insert into public.user_consents (user_id, document, version)
+       values ($1, 'terms', '1.0')`,
+      [patient.id],
+    ),
+  );
+  denied(
+    "a user can't clear a withdrawal directly",
+    await as(patient, `update public.user_consents set withdrawn_at = null`),
+  );
+
+  refused(
+    "an empty list is refused",
+    inSaveConsents(await accept(patient, [])),
+    "invalid_consent",
+  );
+  refused(
+    "an unknown document is refused",
+    inSaveConsents(
+      await accept(patient, [{ document: "made-up", version: "1.0" }]),
+    ),
+    "invalid_consent",
+  );
+  refused(
+    "a malformed version is refused",
+    inSaveConsents(
+      await accept(patient, [{ document: "terms", version: "latest" }]),
+    ),
+    "invalid_consent",
+  );
+  refused(
+    "an entry with no version is refused",
+    inSaveConsents(await accept(patient, [{ document: "terms" }])),
+    "invalid_consent",
+  );
+  check("refused lists save nothing", (await rowsFor(patient.id)).length === 0);
+
+  refused("booking needs the consent", await book(patient), "consent_required");
+  refused(
+    "nothing to withdraw yet",
+    await withdraw(patient, "telemedicine-consent"),
+    "not_consented",
+  );
+
+  succeeded(
+    "the server records consent at sign-up",
+    await record(server, other.id, [terms]),
+  );
+  const [signUpAudit] = await auditFor(other.id, "consent.accepted");
+  check(
+    "sign-up consent is logged against the account",
+    signUpAudit?.actor_id === other.id &&
+      signUpAudit?.actor_role === "patient" &&
+      signUpAudit?.details.document === "terms" &&
+      signUpAudit?.details.version === "1.0",
+    JSON.stringify(signUpAudit),
+  );
+
+  succeeded(
+    "a person accepts documents",
+    await accept(patient, [terms, telemedicine]),
+  );
+  check("both are stored", (await rowsFor(patient.id)).length === 2);
+  succeeded("accepting again is harmless", await accept(patient, [terms]));
+  check(
+    "accepting again adds no row or log entry",
+    (await rowsFor(patient.id)).length === 2 &&
+      (await auditFor(patient.id, "consent.accepted")).length === 2,
+  );
+  succeeded(
+    "a new version is a new row",
+    await accept(patient, [{ document: "terms", version: "1.1" }]),
+  );
+  check(
+    "the earlier version stays on record",
+    (await rowsFor(patient.id)).filter((row) => row.document === "terms")
+      .length === 2,
+  );
+
+  const { data: own } = await as(
+    patient,
+    `select user_id from public.user_consents`,
+  );
+  check(
+    "people read only their own consents",
+    own?.length === 3 && own.every((row) => row.user_id === patient.id),
+    JSON.stringify(own),
+  );
+  denied(
+    "guests can't read consents",
+    await as(null, `select id from public.user_consents`),
+  );
+
+  refused(
+    "the Terms can't be withdrawn on their own",
+    await withdraw(patient, "terms"),
+    "not_withdrawable",
+  );
+  succeeded("a consented patient books", await book(patient));
+  refused(
+    "a booked visit has to be cancelled first",
+    await withdraw(patient, "telemedicine-consent"),
+    "upcoming_appointments",
+  );
+  check(
+    "the refused withdrawal changes nothing",
+    (await rowsFor(patient.id)).every((row) => row.withdrawn_at === null),
+  );
+
+  await db.query(
+    `update public.appointments set status = 'cancelled' where patient_id = $1`,
+    [patient.id],
+  );
+  succeeded(
+    "with no visits booked, the consent is withdrawn",
+    await withdraw(patient, "telemedicine-consent"),
+  );
+  const withdrawn = (await rowsFor(patient.id)).find(
+    (row) => row.document === "telemedicine-consent",
+  );
+  check("the row is kept and marked", withdrawn?.withdrawn_at !== null);
+  const [withdrawAudit] = await auditFor(patient.id, "consent.withdrawn");
+  check(
+    "the withdrawal is logged",
+    withdrawAudit?.actor_id === patient.id &&
+      withdrawAudit?.details.document === "telemedicine-consent",
+    JSON.stringify(withdrawAudit),
+  );
+  refused(
+    "a withdrawn patient can't book",
+    await book(patient),
+    "consent_required",
+  );
+
+  succeeded(
+    "the consent can be given again",
+    await accept(patient, [telemedicine]),
+  );
+  check(
+    "giving it again adds a row",
+    (await rowsFor(patient.id)).filter(
+      (row) => row.document === "telemedicine-consent",
+    ).length === 2,
+  );
+  succeeded("and booking works again", await book(patient));
+}
+
 async function testEveryRefusalIsTested() {
   section("Every refusal has a test (QA-02)");
 
@@ -2851,6 +3062,7 @@ try {
   await testReminders();
   await testReminderRetries();
   await testReminderSchedule();
+  await testConsents();
   await testUpgrade();
   await testReminderUpgrade();
   await testSchemaRules();

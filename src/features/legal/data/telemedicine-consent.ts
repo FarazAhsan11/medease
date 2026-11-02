@@ -61,7 +61,7 @@ export const telemedicineConsent: LegalDocument = {
     {
       title: "Your choice",
       body: [
-        "Telemedicine is your choice. You can see a doctor in person instead, stop a consultation at any time, and withdraw this consent by contacting us. Withdrawing means you can no longer book consultations here. It does not affect care you have already received.",
+        "Telemedicine is your choice. You can see a doctor in person instead, stop a consultation at any time, and withdraw this consent in your account settings once any booked visits are cancelled. Withdrawing means you can no longer book consultations here until you give it again. It does not affect care you have already received.",
       ],
     },
   ],

@@ -6,6 +6,8 @@ import { AuthFooterLink } from "@/features/auth/components/auth-footer-link";
 import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
 import { SignUpConfirmation } from "@/features/auth/components/sign-up-confirmation";
 import type { SignUpState } from "@/features/auth/schemas/sign-up";
+import { ConsentFields } from "@/features/consent/components/consent-fields";
+import { requiredConsents } from "@/features/consent/lib/consent-documents";
 import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
 
@@ -28,6 +30,11 @@ export function RegisterForm({ next }: RegisterFormProps) {
       <form onSubmit={onSubmit} className="grid gap-4" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
         <AccountFields idPrefix="register" fieldError={fieldError} />
+        <ConsentFields
+          idPrefix="register"
+          documents={requiredConsents.patient}
+          fieldError={fieldError}
+        />
         <AuthSubmitButton pending={pending} pendingLabel="Creating account…">
           Create account
         </AuthSubmitButton>

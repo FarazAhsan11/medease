@@ -5,7 +5,8 @@ import { cache } from "react";
 import { z } from "zod";
 
 import { dashboards, type DashboardRole } from "@/config/dashboards";
-import { twoFactorRoute } from "@/config/routes";
+import { consentRoute, twoFactorRoute } from "@/config/routes";
+import { getPendingConsents } from "@/features/consent/data/consents";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
 import { hasPublicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -75,12 +76,19 @@ async function needsSecondFactorCheck(user: SessionUser) {
 // optimistic redirect; this is the real authorization check. It covers the
 // second factor too: the database enforces the same rule on clinical data
 // (private.second_factor_ok), so this redirect is the friendly half of it.
+// Consent is checked alongside so the page doesn't wait on one, then the other.
 export async function requireRole(role: DashboardRole): Promise<SessionUser> {
   const user = await getSessionUser();
 
   if (!user) redirect(dashboards[role].loginHref);
   if (user.role !== role) redirect(dashboards[user.role].home);
-  if (await needsSecondFactorCheck(user)) redirect(twoFactorRoute);
+
+  const [secondFactorNeeded, pendingConsents] = await Promise.all([
+    needsSecondFactorCheck(user),
+    getPendingConsents(user.role),
+  ]);
+  if (secondFactorNeeded) redirect(twoFactorRoute);
+  if (pendingConsents.length > 0) redirect(consentRoute);
 
   return user;
 }

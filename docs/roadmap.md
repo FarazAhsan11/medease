@@ -23,7 +23,7 @@ Requirement status is in [srs.md](./srs.md).
 
 **Finish next**
 
-- AUTH-03, CMPL-02, PRV-02: consent at sign-up, a `user_consents` table, and a gate in `requireRole()` for existing accounts. Store each document's `version` from `src/features/legal/data`. Consent changes also finish SEC-04.
+- AUTH-03, CMPL-02, PRV-02: code and `test:sql` tests are done; `20261102120000_user_consents.sql` is not on production yet. Apply it and deploy straight after: until then the old code gets an unexplained error on booking, and the new code can't open a dashboard without the table. Then sign up with throwaway accounts for all three roles, accept at `/consent` with an older account, withdraw and give consent in patient settings, and run `npm run test:db`. Mark AUTH-03 and CMPL-02 Built. PRV-02 goes to Partial: AI-04, REC-03 and PRO-04 add their own consents. The Terms and Privacy Policy can only be left by closing the account, which needs AUTH-07. SEC-04 stays Partial for shared-record opens and break-glass.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
 - SEC-05: rate limit document uploads. AUTH-07: bot protection.

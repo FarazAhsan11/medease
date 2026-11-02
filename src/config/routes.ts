@@ -1,5 +1,6 @@
 // One page for every role, outside the role areas that redirect to it.
 export const twoFactorRoute = "/two-factor";
+export const consentRoute = "/consent";
 
 export const legalRoutes = {
   index: "/legal",

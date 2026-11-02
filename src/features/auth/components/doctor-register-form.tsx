@@ -17,6 +17,8 @@ import {
   specializations,
 } from "@/features/auth/data/registration-options";
 import type { SignUpState } from "@/features/auth/schemas/sign-up";
+import { ConsentFields } from "@/features/consent/components/consent-fields";
+import { requiredConsents } from "@/features/consent/lib/consent-documents";
 import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
 
@@ -130,6 +132,12 @@ export function DoctorRegisterForm() {
           degree and photo from your dashboard. Patients can find you once our
           team has verified them.
         </p>
+
+        <ConsentFields
+          idPrefix="doctor"
+          documents={requiredConsents.doctor}
+          fieldError={fieldError}
+        />
 
         <AuthSubmitButton pending={pending} pendingLabel="Creating account…">
           Create doctor account

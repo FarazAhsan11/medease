@@ -7,6 +7,10 @@ import {
 } from "@/features/auth/data/registration-options";
 import { newPasswordSchema } from "@/features/auth/schemas/password";
 import { emailSchema } from "@/features/auth/schemas/sign-in";
+import {
+  generalConsentField,
+  telemedicineConsentField,
+} from "@/features/consent/schemas/consent";
 import type { FormState } from "@/lib/form-state";
 
 const requiredText = (message: string, max: number) =>
@@ -23,9 +27,12 @@ const accountSchema = z.object({
   email: emailSchema,
   phone: phoneSchema,
   password: newPasswordSchema,
+  consent: generalConsentField,
 });
 
-export const patientSignUpSchema = accountSchema;
+export const patientSignUpSchema = accountSchema.extend({
+  telemedicineConsent: telemedicineConsentField,
+});
 
 export const doctorSignUpSchema = accountSchema.extend({
   age: z.coerce
@@ -48,6 +55,7 @@ export const labSignUpSchema = z.object({
   address: requiredText("Enter your lab's address.", 300),
   services: z.array(z.enum(labServices)),
   password: newPasswordSchema,
+  consent: generalConsentField,
 });
 
 // `confirmEmail` is set when the account needs email confirmation first.

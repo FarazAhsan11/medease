@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { ChangePasswordCard } from "@/features/auth/components/change-password-card";
+import { TelemedicineConsentCard } from "@/features/consent/components/telemedicine-consent-card";
+import { hasTelemedicineConsent } from "@/features/consent/data/consents";
 import { MissingPatientProfileNotice } from "@/features/settings/components/missing-patient-profile-notice";
 import { PersonalInfoForm } from "@/features/settings/components/personal-info-form";
 import { getPatientProfile } from "@/features/settings/data/patient-profile";
@@ -15,9 +17,10 @@ export const metadata: Metadata = {
 
 export default async function PatientSettingsPage() {
   const user = await requireRole("patient");
-  const [profile, factorId] = await Promise.all([
+  const [profile, factorId, consentGiven] = await Promise.all([
     getPatientProfile(user.id, user.email),
     getVerifiedFactorId(),
+    hasTelemedicineConsent(),
   ]);
 
   return (
@@ -35,6 +38,7 @@ export default async function PatientSettingsPage() {
         <div className="grid h-fit gap-6">
           <TwoFactorCard enabled={Boolean(factorId)} />
           <ChangePasswordCard />
+          <TelemedicineConsentCard given={consentGiven} />
         </div>
       </div>
     </>
