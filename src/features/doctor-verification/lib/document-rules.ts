@@ -1,6 +1,6 @@
 export const DOCUMENTS_BUCKET = "doctor-documents";
 
-const MB = 1024 * 1024;
+export const MB = 1024 * 1024;
 
 export const documentKinds = ["photo", "license", "degree"] as const;
 

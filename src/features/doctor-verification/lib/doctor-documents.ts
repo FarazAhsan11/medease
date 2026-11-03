@@ -7,9 +7,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   documentRules,
   DOCUMENTS_BUCKET,
-  isAllowedFile,
+  MB,
   type DocumentKind,
 } from "@/features/doctor-verification/lib/document-rules";
+import { verifyUpload } from "@/lib/uploads/verify-upload.server";
 
 export const DOCUMENT_LINK_SECONDS = 5 * 60;
 
@@ -42,8 +43,9 @@ export async function isAcceptableUpload(
 ) {
   if (!path.startsWith(`${doctorId}/${kind}-`)) return false;
 
-  const { data, error } = await admin.storage.from(DOCUMENTS_BUCKET).info(path);
-  if (error) return false;
-
-  return isAllowedFile(kind, data.contentType ?? "", data.size ?? 0);
+  const { maxMb, types } = documentRules[kind];
+  return verifyUpload(admin, DOCUMENTS_BUCKET, path, {
+    maxBytes: maxMb * MB,
+    types,
+  });
 }

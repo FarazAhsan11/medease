@@ -25,12 +25,14 @@ Requirement status is in [srs.md](./srs.md).
 **Finish next**
 
 - MED-01, MED-02: live since `d43b21f`, and the scheduled job reaches the route (the 18:15 UTC run on 2026-11-02 answered `{"claimed":0,"emailed":0}`). Still to see: a due reminder in a real inbox, from a test patient with an active prescription and a reminder time just ahead. Then mark MED-01 Built, and MED-02 Partial for the other channels, and move to Milestone 2 item 2. In `net._http_response` read the body, not the status: cron calls carry an `Authorization` header, and with one a missing route answers 200 with the not-found page instead of 404.
-- The Phase 0 items below wait until close to launch (decided 2026-11-02), except SEC-05 and SEC-06 before records uploads and ADM-04 before labs.
+- The Phase 0 items below wait until close to launch (decided 2026-11-02), except ADM-04 before labs.
+- Upload safety is done for records (2026-11-03): SEC-05's upload limit and SEC-06's checks are built and live-tested through doctor verification (GPS stripped with rotation kept; HTML sent as a PDF and a PNG named `.jpg` both refused and deleted; the limit refuses the 21st batch). REC-02 must use `verifyUpload` and `rateLimits.uploadUser` the same way. SEC-06 stays Partial for malware scanning, needed before REC-03 shares files with doctors.
+- Next: Milestone 2 item 2, visit summaries and health records (REC-01, REC-02, REC-04, REC-05).
 - Done 2026-11-03 (PRV-01): every form submitted through `onSubmit` now has `method="post"`, so a click before hydration posts to the page (which just renders it again) instead of putting passwords, codes or clinical fields in the URL. Keep it on new forms. PRV-01 stays Partial: the doctor's patient search still puts a patient's name in the URL as `?q=`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
-- SEC-05: rate limit document uploads. AUTH-07: bot protection.
-- Then the rest of Phase 0: AUTH-05, SEC-06, ADM-04, CALL-03, NTF-04, OBS-01.
+- SEC-05: the contact form (with SUP-02). AUTH-07: bot protection.
+- Then the rest of Phase 0: AUTH-05, ADM-04, CALL-03, NTF-04, OBS-01.
 
 **Waiting on you or others**: REL-01 and REL-02 (paid Supabase, staging). CMPL-03: counsel reviews the five legal documents, which finishes SUP-01. Points to raise:
 
@@ -42,7 +44,7 @@ Requirement status is in [srs.md](./srs.md).
 - The 72-hour breach target has no plan behind it yet (PRV-07).
 - Google receives email content: moving off Gmail (NTF-04) changes the provider table. A TURN relay (CALL-03) adds a provider too.
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## Reminder scheduler (REL-07, built 2026-11-02)
 

@@ -35,6 +35,9 @@ export const rateLimits = {
     limit: 5,
     windowSeconds: FIFTEEN_MINUTES,
   },
+  // Each call hands out signed upload links for one batch of files; counted
+  // per account, which is always signed in.
+  uploadUser: { name: "upload-user", limit: 20, windowSeconds: ONE_HOUR },
 } as const satisfies Record<string, RateLimit>;
 
 export const RATE_LIMITED_MESSAGE =

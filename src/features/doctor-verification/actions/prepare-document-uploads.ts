@@ -10,6 +10,11 @@ import {
 import { getSessionUser } from "@/lib/auth/session";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError } from "@/lib/form-state";
+import {
+  isRateLimited,
+  RATE_LIMITED_MESSAGE,
+  rateLimits,
+} from "@/lib/rate-limit.server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Hands the browser one signed upload link per file. Only the doctor
@@ -29,6 +34,10 @@ export const prepareDocumentUploads = withFormErrors<
       "Only doctors can upload verification documents.",
       "not_doctor",
     );
+  }
+
+  if (await isRateLimited(rateLimits.uploadUser, user.id)) {
+    return formError(RATE_LIMITED_MESSAGE, "rate_limited");
   }
 
   const verification = await getDoctorVerification(user.id);
