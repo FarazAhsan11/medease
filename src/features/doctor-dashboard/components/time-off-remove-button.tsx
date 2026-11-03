@@ -15,7 +15,7 @@ export function TimeOffRemoveButton({
   const { pending, onSubmit } = useFormAction(removeTimeOff, initialFormState);
 
   return (
-    <form onSubmit={onSubmit}>
+    <form method="post" onSubmit={onSubmit}>
       <input type="hidden" name="id" value={id} />
       <Button
         type="submit"

@@ -23,7 +23,7 @@ export function AppointmentOutcomeButtons({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <form onSubmit={onSubmit}>
+      <form method="post" onSubmit={onSubmit}>
         <input type="hidden" name="appointmentId" value={appointmentId} />
         <input type="hidden" name="outcome" value="completed" />
         <Button type="submit" size="sm" disabled={pending} className="gap-1.5">
@@ -32,7 +32,7 @@ export function AppointmentOutcomeButtons({
         </Button>
       </form>
       {allowNoShow && (
-        <form onSubmit={onSubmit}>
+        <form method="post" onSubmit={onSubmit}>
           <input type="hidden" name="appointmentId" value={appointmentId} />
           <input type="hidden" name="outcome" value="no_show" />
           <Button

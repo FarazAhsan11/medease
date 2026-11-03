@@ -34,7 +34,7 @@ export function TwoFactorCodeForm({
   const error = fieldError("code");
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+    <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       <input type="hidden" name="factorId" value={factorId} />
       {next && <input type="hidden" name="next" value={next} />}
       <FormField id="two-factor-code" label="6-digit code" error={error}>

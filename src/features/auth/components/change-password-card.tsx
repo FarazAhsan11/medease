@@ -22,6 +22,7 @@ export function ChangePasswordCard() {
   return (
     <PanelCard title="Password" description="Use at least 8 characters.">
       <form
+        method="post"
         ref={formRef}
         onSubmit={onSubmit}
         className="grid gap-4 p-5"

@@ -13,7 +13,7 @@ export function ContactForm() {
         We usually respond within 24 hours.
       </p>
 
-      <form className="mt-6 grid gap-4">
+      <form method="post" className="mt-6 grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField id="contact-name" label="Full name">
             <Input id="contact-name" name="name" placeholder="Ali Raza" />

@@ -27,7 +27,7 @@ export function LabProfileForm({ profile }: LabProfileFormProps) {
       title="Laboratory details"
       description="Shown to patients when they book a test."
     >
-      <form className="grid gap-5 p-5">
+      <form method="post" className="grid gap-5 p-5">
         <div className="flex items-center gap-4">
           <IconTile icon={FlaskConicalIcon} size="lg" tone="solid" />
           <Button type="button" variant="outline" size="sm">

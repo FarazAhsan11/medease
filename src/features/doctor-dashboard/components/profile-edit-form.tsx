@@ -58,6 +58,7 @@ export function ProfileEditForm({ profile, onDone }: ProfileEditFormProps) {
       description="Patients see your name, specialty, city, experience, clinic and bio."
     >
       <form
+        method="post"
         onSubmit={onSubmit}
         className="grid gap-4 p-5 sm:grid-cols-2"
         noValidate

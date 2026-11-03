@@ -39,7 +39,7 @@ export function DoctorRegisterForm() {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
         <AccountFields idPrefix="doctor" fieldError={fieldError} />
 
         <div className="grid grid-cols-2 gap-3">

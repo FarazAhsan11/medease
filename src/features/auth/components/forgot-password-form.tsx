@@ -37,7 +37,7 @@ export function ForgotPasswordForm() {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
         <FormField id="reset-email" label="Email" error={emailError}>
           <Input
             id="reset-email"

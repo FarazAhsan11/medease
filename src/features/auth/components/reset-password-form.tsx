@@ -18,7 +18,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   );
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+    <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       <input type="hidden" name="token" value={token} />
       <FormField
         id="new-password"

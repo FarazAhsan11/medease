@@ -20,6 +20,7 @@ export function TimeOffForm({ today }: { today: string }) {
 
   return (
     <form
+      method="post"
       ref={formRef}
       onSubmit={onSubmit}
       className="grid items-start gap-4 sm:grid-cols-[1fr_1fr_auto]"

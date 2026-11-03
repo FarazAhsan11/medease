@@ -52,6 +52,7 @@ export function ScheduleForm(props: ScheduleFormProps) {
 
   return (
     <form
+      method="post"
       onSubmit={onSubmit}
       className="grid gap-6 xl:grid-cols-[1.5fr_1fr]"
       noValidate

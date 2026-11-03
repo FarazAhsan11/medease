@@ -20,7 +20,7 @@ export function RecoveryCodesRegenerate() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-2">
+    <form method="post" onSubmit={onSubmit} className="grid gap-2">
       <p className="text-sm text-muted-foreground">
         Used some, or lost them? New codes replace all your old ones.
       </p>

@@ -26,7 +26,7 @@ export function UnsubscribeForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-3" noValidate>
+    <form method="post" onSubmit={onSubmit} className="grid gap-3" noValidate>
       <input type="hidden" name="token" value={token} />
       <p className="text-sm text-muted-foreground">
         You&apos;ll stop getting emails at your dose times. Your medicines stay

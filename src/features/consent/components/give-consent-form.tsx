@@ -17,7 +17,7 @@ export function GiveConsentForm() {
   );
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+    <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       <ConsentFields
         idPrefix="settings"
         documents={[TELEMEDICINE_CONSENT]}

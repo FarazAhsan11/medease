@@ -33,7 +33,12 @@ export function RecoveryCodeForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 border-t pt-4" noValidate>
+    <form
+      method="post"
+      onSubmit={onSubmit}
+      className="grid gap-4 border-t pt-4"
+      noValidate
+    >
       <FormField
         id="recovery-code"
         label="Recovery code"

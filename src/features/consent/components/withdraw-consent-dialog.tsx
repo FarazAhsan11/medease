@@ -43,7 +43,7 @@ export function WithdrawConsentDialog() {
             again. Your records and past care stay as they are.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <form onSubmit={onSubmit}>
+        <form method="post" onSubmit={onSubmit}>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Keep it</AlertDialogCancel>
             <Button

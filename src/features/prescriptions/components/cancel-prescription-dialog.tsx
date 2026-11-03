@@ -52,7 +52,7 @@ export function CancelPrescriptionDialog({
         Cancel prescription
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <form onSubmit={onSubmit} className="grid gap-4">
+        <form method="post" onSubmit={onSubmit} className="grid gap-4">
           <input type="hidden" name="prescriptionId" value={prescriptionId} />
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this prescription?</AlertDialogTitle>

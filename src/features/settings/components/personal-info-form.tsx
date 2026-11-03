@@ -118,7 +118,12 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
       title="Personal information"
       description="Your name and phone number are shared with doctors you book."
     >
-      <form onSubmit={onSubmit} className="grid gap-6 p-5" noValidate>
+      <form
+        method="post"
+        onSubmit={onSubmit}
+        className="grid gap-6 p-5"
+        noValidate
+      >
         <FormSection title="About you">
           {input("firstName", "First name", { autoComplete: "given-name" })}
           {input("lastName", "Last name", { autoComplete: "family-name" })}

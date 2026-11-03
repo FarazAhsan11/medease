@@ -7,7 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 export function ChatComposer() {
   return (
     <div className="border-t p-4">
-      <form className="flex items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+      <form
+        method="post"
+        className="flex items-end gap-2 rounded-2xl border bg-background p-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30"
+      >
         <Textarea
           rows={1}
           aria-label="Describe your symptoms"

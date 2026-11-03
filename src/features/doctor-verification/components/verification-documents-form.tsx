@@ -24,6 +24,7 @@ export function VerificationDocumentsForm() {
       description="Choose the files you want to add or replace."
     >
       <form
+        method="post"
         ref={form}
         onSubmit={onSubmit}
         className="grid gap-4 p-5"

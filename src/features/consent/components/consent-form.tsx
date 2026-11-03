@@ -21,7 +21,7 @@ export function ConsentForm({
   );
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+    <form method="post" onSubmit={onSubmit} className="grid gap-5" noValidate>
       <ConsentFields
         idPrefix="accept"
         documents={documents}

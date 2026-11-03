@@ -66,7 +66,7 @@ export function ConversationView({ thread }: ConversationViewProps) {
         })}
       </ol>
 
-      <form className="flex items-end gap-2 border-t p-4">
+      <form method="post" className="flex items-end gap-2 border-t p-4">
         <Button
           type="button"
           variant="ghost"

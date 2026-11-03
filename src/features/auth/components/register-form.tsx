@@ -27,7 +27,7 @@ export function RegisterForm({ next }: RegisterFormProps) {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
         <AccountFields idPrefix="register" fieldError={fieldError} />
         <ConsentFields

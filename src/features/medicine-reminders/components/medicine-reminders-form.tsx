@@ -41,7 +41,12 @@ export function MedicineRemindersForm({
   );
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 p-5" noValidate>
+    <form
+      method="post"
+      onSubmit={onSubmit}
+      className="grid gap-4 p-5"
+      noValidate
+    >
       <div className="flex items-start justify-between gap-4 rounded-xl bg-muted p-3">
         <div>
           <label

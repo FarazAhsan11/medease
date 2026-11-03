@@ -18,7 +18,7 @@ export function ResendConfirmationForm({ email }: ResendConfirmationFormProps) {
   );
 
   return (
-    <form onSubmit={onSubmit}>
+    <form method="post" onSubmit={onSubmit}>
       <input type="hidden" name="email" value={email} />
       <Button
         type="submit"

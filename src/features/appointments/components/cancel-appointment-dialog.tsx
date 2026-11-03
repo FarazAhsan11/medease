@@ -56,7 +56,7 @@ export function CancelAppointmentDialog({
         {triggerLabel}
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <form onSubmit={onSubmit} className="grid gap-4">
+        <form method="post" onSubmit={onSubmit} className="grid gap-4">
           <input type="hidden" name="appointmentId" value={appointmentId} />
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this appointment?</AlertDialogTitle>

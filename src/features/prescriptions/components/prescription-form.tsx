@@ -151,7 +151,12 @@ export function PrescriptionForm({
   const listError = rowErrors.items ?? fieldError("items");
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6" noValidate>
+    <form
+      method="post"
+      onSubmit={handleSubmit}
+      className="grid gap-6"
+      noValidate
+    >
       <input type="hidden" name="appointmentId" value={appointmentId} />
       <input type="hidden" name="replacesId" value={existing?.id ?? ""} />
       <input

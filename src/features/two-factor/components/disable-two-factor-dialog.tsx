@@ -42,7 +42,7 @@ export function DisableTwoFactorDialog() {
             will stop working.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <form onSubmit={onSubmit}>
+        <form method="post" onSubmit={onSubmit}>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Keep it on</AlertDialogCancel>
             <Button

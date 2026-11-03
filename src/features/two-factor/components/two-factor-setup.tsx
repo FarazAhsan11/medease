@@ -22,7 +22,7 @@ export function TwoFactorSetup({ required, onPaired }: TwoFactorSetupProps) {
 
   if (!state.factorId || !state.qrCode) {
     return (
-      <form onSubmit={onSubmit} className="grid gap-3">
+      <form method="post" onSubmit={onSubmit} className="grid gap-3">
         <p className="text-sm text-muted-foreground">
           {required
             ? "Your account protects patient information, so it needs an authenticator app, such as Google Authenticator or Authy."

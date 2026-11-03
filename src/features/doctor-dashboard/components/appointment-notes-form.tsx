@@ -25,7 +25,7 @@ export function AppointmentNotesForm({
   const id = `notes-${appointmentId}`;
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-1.5">
+    <form method="post" onSubmit={onSubmit} className="grid gap-1.5">
       <input type="hidden" name="appointmentId" value={appointmentId} />
       <Label htmlFor={id}>Consultation notes</Label>
       <Textarea

@@ -58,6 +58,7 @@ export function BookingForm({ doctorId, fee, days }: BookingFormProps) {
 
   return (
     <form
+      method="post"
       onSubmit={onSubmit}
       className="min-w-0 space-y-6 rounded-2xl border bg-card p-6"
       noValidate
