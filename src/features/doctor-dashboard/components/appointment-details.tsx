@@ -15,6 +15,8 @@ import { AppointmentNotesForm } from "@/features/doctor-dashboard/components/app
 import { AppointmentOutcomeButtons } from "@/features/doctor-dashboard/components/appointment-outcome-buttons";
 import { AppointmentPrescription } from "@/features/doctor-dashboard/components/appointment-prescription";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
+import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
+import { DoctorVisitSummary } from "@/features/visit-summaries/components/doctor-visit-summary";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
@@ -41,6 +43,7 @@ type AppointmentDetailsProps = {
   // Completed visits with this patient, this one excluded.
   previousVisits: number;
   prescription: PrescriptionSummary | null;
+  summary: VisitSummary | null;
 };
 
 export function AppointmentDetails({
@@ -48,6 +51,7 @@ export function AppointmentDetails({
   notes,
   previousVisits,
   prescription,
+  summary,
 }: AppointmentDetailsProps) {
   const { timezone } = appointment;
   const call = describeCall(appointment);
@@ -127,6 +131,8 @@ export function AppointmentDetails({
           <AppointmentNotesForm appointmentId={appointment.id} notes={notes} />
         </div>
       )}
+
+      <DoctorVisitSummary appointment={appointment} summary={summary} />
 
       <AppointmentPrescription
         appointment={appointment}

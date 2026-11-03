@@ -9,17 +9,22 @@ import {
 import { patientRoutes } from "@/config/routes";
 import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
+import { PatientVisitSummary } from "@/features/visit-summaries/components/patient-visit-summary";
+import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDateTime } from "@/lib/datetime";
 
 type UpcomingAppointmentCardProps = {
   appointment: Appointment;
   // Set once the doctor prescribes, which can happen during the call.
   prescriptionId?: string;
+  // Also possible during the call.
+  summary?: VisitSummary;
 };
 
 export function UpcomingAppointmentCard({
   appointment,
   prescriptionId,
+  summary,
 }: UpcomingAppointmentCardProps) {
   return (
     <AppointmentCard
@@ -57,6 +62,7 @@ export function UpcomingAppointmentCard({
           )}
         </>
       }
+      footer={summary && <PatientVisitSummary summary={summary} />}
     />
   );
 }

@@ -11,6 +11,8 @@ import { CountBadge } from "@/features/appointments/components/count-badge";
 import { UpcomingAppointmentCard } from "@/features/appointments/components/upcoming-appointment-card";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
+import { PatientVisitSummary } from "@/features/visit-summaries/components/patient-visit-summary";
+import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 
 type AppointmentTabsProps = {
   upcoming: Appointment[];
@@ -18,6 +20,7 @@ type AppointmentTabsProps = {
   cancelled: Appointment[];
   // Appointment id -> prescription id, for appointments that have one.
   prescriptionIds: Record<string, string>;
+  summaries: Record<string, VisitSummary>;
 };
 
 function BookAgainLink({ doctorId }: { doctorId: string }) {
@@ -39,12 +42,15 @@ function BookAgainLink({ doctorId }: { doctorId: string }) {
 function HistoryList({
   appointments,
   prescriptionIds,
+  summaries,
 }: {
   appointments: Appointment[];
   prescriptionIds: Record<string, string>;
+  summaries: Record<string, VisitSummary>;
 }) {
   return appointments.map((appointment) => {
     const prescriptionId = prescriptionIds[appointment.id];
+    const summary = summaries[appointment.id];
 
     return (
       <AppointmentCard
@@ -63,6 +69,7 @@ function HistoryList({
             <BookAgainLink doctorId={appointment.doctorId} />
           </>
         }
+        footer={summary && <PatientVisitSummary summary={summary} />}
       />
     );
   });
@@ -73,6 +80,7 @@ export function AppointmentTabs({
   past,
   cancelled,
   prescriptionIds,
+  summaries,
 }: AppointmentTabsProps) {
   return (
     <Tabs defaultValue="upcoming" className="gap-6">
@@ -98,6 +106,7 @@ export function AppointmentTabs({
               key={appointment.id}
               appointment={appointment}
               prescriptionId={prescriptionIds[appointment.id]}
+              summary={summaries[appointment.id]}
             />
           ))
         ) : (
@@ -119,7 +128,11 @@ export function AppointmentTabs({
 
       <TabsContent value="past" className="grid gap-3">
         {past.length > 0 ? (
-          <HistoryList appointments={past} prescriptionIds={prescriptionIds} />
+          <HistoryList
+            appointments={past}
+            prescriptionIds={prescriptionIds}
+            summaries={summaries}
+          />
         ) : (
           <EmptyState
             icon={HistoryIcon}
@@ -134,6 +147,7 @@ export function AppointmentTabs({
           <HistoryList
             appointments={cancelled}
             prescriptionIds={prescriptionIds}
+            summaries={summaries}
           />
         ) : (
           <EmptyState

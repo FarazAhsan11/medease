@@ -27,7 +27,8 @@ Requirement status is in [srs.md](./srs.md).
 - MED-01, MED-02: live since `d43b21f`, and the scheduled job reaches the route (the 18:15 UTC run on 2026-11-02 answered `{"claimed":0,"emailed":0}`). Still to see: a due reminder in a real inbox, from a test patient with an active prescription and a reminder time just ahead. Then mark MED-01 Built, and MED-02 Partial for the other channels, and move to Milestone 2 item 2. In `net._http_response` read the body, not the status: cron calls carry an `Authorization` header, and with one a missing route answers 200 with the not-found page instead of 404.
 - The Phase 0 items below wait until close to launch (decided 2026-11-02), except ADM-04 before labs.
 - Upload safety is done for records (2026-11-03): SEC-05's upload limit and SEC-06's checks are built and live-tested through doctor verification (GPS stripped with rotation kept; HTML sent as a PDF and a PNG named `.jpg` both refused and deleted; the limit refuses the 21st batch). REC-02 must use `verifyUpload` and `rateLimits.uploadUser` the same way. SEC-06 stays Partial for malware scanning, needed before REC-03 shares files with doctors.
-- Next: Milestone 2 item 2, visit summaries and health records (REC-01, REC-02, REC-04, REC-05).
+- REC-01 visit summaries are built (2026-11-03) and live-tested on the dev server against the real database: the doctor writes, edits and is refused outside the 14-day window; the patient sees the summary on the visit card and gets an in-app notice (no email, since a summary carries a diagnosis). Needs `20261103120000_visit_summaries.sql`, already run.
+- Next: REC-02 documents. First decide whether doctors see patient documents before REC-03 sharing exists, and that sharing waits for SEC-06 malware scanning.
 - Done 2026-11-03 (PRV-01): every form submitted through `onSubmit` now has `method="post"`, so a click before hydration posts to the page (which just renders it again) instead of putting passwords, codes or clinical fields in the URL. Keep it on new forms. PRV-01 stays Partial: the doctor's patient search still puts a patient's name in the URL as `?q=`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
@@ -182,6 +183,9 @@ Remind patients at the times they choose (morning, afternoon, night), using the 
 - **Done when**: a patient who opted in gets one email at each dose time, never twice, and none after a course ends or a prescription is cancelled.
 
 ### 2. Visit summaries and health records
+
+Visit summaries are built (REC-01, 2026-11-03): `visit_summaries` with `save_visit_summary`, written in the doctor's appointment details in the same window as a prescription, shown on the patient's visit card, with an in-app notice and audit entries. Documents, the timeline and the doctor's patient chart are next.
+
 
 - **Database**: add a patient-visible summary next to the private notes (diagnosis, advice, follow-up date), e.g. a `visit_summaries` table, so private notes stay doctor-only. `patient_documents` table plus a private Storage bucket, with paths under the patient's id.
 - **Doctor UI**: summary fields in the appointment details sheet; per-patient history (past visits, summaries, prescriptions) from the patients list.

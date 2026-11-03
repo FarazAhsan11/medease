@@ -16,6 +16,7 @@ import {
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
+import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDate, formatTime } from "@/lib/datetime";
 
 type VisitsTableProps = {
@@ -23,6 +24,7 @@ type VisitsTableProps = {
   notes: Record<string, string>;
   previousVisits: Record<string, number>;
   prescriptions: Record<string, PrescriptionSummary>;
+  summaries: Record<string, VisitSummary>;
 };
 
 export function VisitsTable({
@@ -30,6 +32,7 @@ export function VisitsTable({
   notes,
   previousVisits,
   prescriptions,
+  summaries,
 }: VisitsTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border bg-card">
@@ -83,6 +86,7 @@ export function VisitsTable({
                     notes={notes[visit.id] ?? ""}
                     previousVisits={previousVisits[visit.id] ?? 0}
                     prescription={prescriptions[visit.id] ?? null}
+                    summary={summaries[visit.id] ?? null}
                   />
                 </div>
               </TableCell>

@@ -19,6 +19,8 @@ export const auditActions: Record<string, string> = {
   "prescription.issued": "Issued a prescription",
   "prescription.replaced": "Edited a prescription",
   "prescription.cancelled": "Cancelled a prescription",
+  "visit_summary.written": "Wrote a visit summary",
+  "visit_summary.edited": "Edited a visit summary",
   "consent.accepted": "Accepted a legal document",
   "consent.withdrawn": "Withdrew a consent",
 };

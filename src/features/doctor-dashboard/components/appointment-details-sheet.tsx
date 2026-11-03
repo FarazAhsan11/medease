@@ -12,6 +12,7 @@ import {
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetails } from "@/features/doctor-dashboard/components/appointment-details";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
+import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDateTime } from "@/lib/datetime";
 
 type AppointmentDetailsSheetProps = {
@@ -19,6 +20,7 @@ type AppointmentDetailsSheetProps = {
   notes: string;
   previousVisits: number;
   prescription: PrescriptionSummary | null;
+  summary: VisitSummary | null;
 };
 
 export function AppointmentDetailsSheet(props: AppointmentDetailsSheetProps) {

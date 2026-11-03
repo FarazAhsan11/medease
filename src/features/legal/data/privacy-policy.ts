@@ -26,7 +26,7 @@ export const privacyPolicy: LegalDocument = {
           "Medical profile: date of birth, gender, blood group, height, weight, allergies, long-term conditions and current medicines.",
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
-          "Clinical records: prescriptions your doctor issues and notes your doctor writes.",
+          "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date) and the private notes your doctor keeps.",
           "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
           "Call details: when each person joined and left a call. We do not record audio or video.",
           "Doctor and lab details: licence or registration numbers, specialty, clinic or lab address, verification documents and the outcome of our review.",
@@ -121,7 +121,7 @@ export const privacyPolicy: LegalDocument = {
               "Deleted",
             ],
             [
-              "Appointments, prescriptions and doctors' notes",
+              "Appointments, prescriptions, visit summaries and doctors' notes",
               "7 years after the last visit. For a minor, until they turn 25",
               "Kept, no longer linked to your identity",
             ],

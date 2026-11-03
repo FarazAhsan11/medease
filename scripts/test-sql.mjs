@@ -1121,6 +1121,222 @@ async function testPrescriptions({ patient, secondPatient }) {
   denied("another doctor can't attach a note to it", stray);
 }
 
+async function testVisitSummaries({ patient, secondPatient }) {
+  section("Visit summaries (REC-01)");
+
+  const doctor = await createDoctor();
+  const otherDoctor = await createDoctor();
+  const visit = await startedVisit(doctor, patient);
+  const save = (caller, appointmentId, fields = {}) =>
+    rpc(caller, "save_visit_summary", {
+      p_appointment_id: appointmentId,
+      p_diagnosis: "Viral fever",
+      ...fields,
+    });
+  const summaryOf = async (appointmentId) =>
+    (
+      await db.query(
+        `select *, follow_up_on::text as follow_up from public.visit_summaries
+         where appointment_id = $1`,
+        [appointmentId],
+      )
+    ).rows[0];
+  const kinds = async (userId) =>
+    (
+      await db.query(
+        `select kind from public.notifications
+         where user_id = $1 and kind like 'visit_summary%' order by created_at, id`,
+        [userId],
+      )
+    ).rows.map((row) => row.kind);
+  const audits = async (appointmentId) =>
+    (
+      await db.query(
+        `select action, actor_id from public.audit_log
+         where target_id = $1 and action like 'visit_summary%' order by id`,
+        [appointmentId],
+      )
+    ).rows;
+
+  denied("a guest can't write a summary", await save(null, visit));
+  refused(
+    "a patient can't write a summary",
+    await save(patient, visit),
+    "not_doctor",
+  );
+  refused(
+    "another doctor can't write one",
+    await save(otherDoctor, visit),
+    "appointment_not_found",
+  );
+  refused(
+    "an unknown appointment is refused",
+    await save(doctor, randomUUID()),
+    "appointment_not_found",
+  );
+  refused(
+    "a visit that hasn't started can't have one",
+    await save(doctor, await createAppointment(doctor, patient, { from: 120 })),
+    "summary_not_started",
+  );
+  refused(
+    "a cancelled visit can't have one",
+    await save(
+      doctor,
+      await createAppointment(doctor, patient, {
+        from: -300,
+        to: -270,
+        status: "cancelled",
+      }),
+    ),
+    "appointment_cancelled",
+  );
+  refused(
+    "a no-show can't have one",
+    await save(
+      doctor,
+      await createAppointment(doctor, patient, {
+        from: -400,
+        to: -370,
+        status: "no_show",
+      }),
+    ),
+    "appointment_no_show",
+  );
+  refused(
+    "the window closes 14 days after the visit",
+    await save(
+      doctor,
+      await createAppointment(doctor, patient, {
+        from: -15 * 24 * 60,
+        to: -15 * 24 * 60 + 30,
+      }),
+    ),
+    "summary_window_closed",
+  );
+
+  const visitDay = (
+    await db.query(
+      `select (starts_at at time zone timezone)::date::text as day
+       from public.appointments where id = $1`,
+      [visit],
+    )
+  ).rows[0].day;
+  const addDays = (days) =>
+    new Date(Date.parse(visitDay) + days * DAY).toISOString().slice(0, 10);
+  const invalid = {
+    "a summary with nothing in it": { p_diagnosis: "   ", p_advice: " " },
+    "an overlong diagnosis": { p_diagnosis: "d".repeat(201) },
+    "overlong advice": { p_advice: "a".repeat(2001) },
+    "a follow-up on the visit day": { p_follow_up_on: visitDay },
+    "a follow-up more than a year out": { p_follow_up_on: addDays(366) },
+  };
+  for (const [label, fields] of Object.entries(invalid)) {
+    refused(
+      `${label} is refused`,
+      await save(doctor, visit, fields),
+      "invalid_summary",
+    );
+  }
+  check("nothing was saved by refusals", !(await summaryOf(visit)));
+
+  succeeded(
+    "the doctor writes a summary",
+    await save(doctor, visit, {
+      p_diagnosis: "  Viral fever  ",
+      p_advice: "Rest and fluids.",
+      p_follow_up_on: addDays(7),
+    }),
+  );
+  const saved = await summaryOf(visit);
+  const { rows: appointmentRows } = await db.query(
+    `select care_recipient_id from public.appointments where id = $1`,
+    [visit],
+  );
+  check(
+    "blanks are trimmed and the visit's person is named",
+    saved?.diagnosis === "Viral fever" &&
+      saved?.advice === "Rest and fluids." &&
+      saved?.care_recipient_id === appointmentRows[0].care_recipient_id &&
+      saved?.follow_up === addDays(7) &&
+      saved?.patient_id === patient.id,
+  );
+  check(
+    "the patient is told it's ready",
+    (await kinds(patient.id)).join() === "visit_summary_ready",
+  );
+
+  succeeded(
+    "saving the same summary again works",
+    await save(doctor, visit, {
+      p_diagnosis: "Viral fever",
+      p_advice: "Rest and fluids.",
+      p_follow_up_on: addDays(7),
+    }),
+  );
+  check(
+    "but tells nobody",
+    (await kinds(patient.id)).length === 1 &&
+      (await audits(visit)).length === 1,
+  );
+
+  succeeded(
+    "the doctor edits it, down to a follow-up date alone",
+    await save(doctor, visit, {
+      p_diagnosis: null,
+      p_advice: "",
+      p_follow_up_on: addDays(365),
+    }),
+  );
+  const edited = await summaryOf(visit);
+  check(
+    "the edit replaces every field",
+    edited?.diagnosis === null &&
+      edited?.advice === null &&
+      edited?.follow_up === addDays(365),
+  );
+  check(
+    "the patient is told it changed",
+    (await kinds(patient.id)).join() ===
+      "visit_summary_ready,visit_summary_updated",
+  );
+  const trail = await audits(visit);
+  check(
+    "the audit log has both, by the doctor",
+    trail.map((row) => row.action).join() ===
+      "visit_summary.written,visit_summary.edited" &&
+      trail.every((row) => row.actor_id === doctor.id),
+  );
+
+  const read = async (caller) =>
+    (await as(caller, `select appointment_id from public.visit_summaries`)).data
+      ?.length ?? 0;
+  check("the patient reads their summary", (await read(patient)) === 1);
+  check("the doctor reads it", (await read(doctor)) === 1);
+  check("another patient reads nothing", (await read(secondPatient)) === 0);
+  check("another doctor reads nothing", (await read(otherDoctor)) === 0);
+  check(
+    "a doctor with only a password reads nothing",
+    (await read({ ...doctor, aal: "aal1" })) === 0,
+  );
+  refused(
+    "a doctor with only a password can't write one",
+    {
+      ...(await save({ ...doctor, aal: "aal1" }, visit)),
+      fn: "require_second_factor",
+    },
+    "second_factor_required",
+  );
+  denied(
+    "nobody writes the table directly",
+    await as(
+      doctor,
+      `update public.visit_summaries set diagnosis = 'x' where appointment_id = $1`,
+      [visit],
+    ),
+  );
+}
+
 async function testVerification({ patient }) {
   section("Doctors send documents (FIX-07, ADM-02)");
 
@@ -3546,6 +3762,7 @@ try {
   await testSchedule(await freshPatients());
   await testCalls(await freshPatients());
   await testPrescriptions(await freshPatients());
+  await testVisitSummaries(await freshPatients());
   await testVerification(await freshPatients());
   await testReview(await freshPatients());
   await testCareRecipients(await freshPatients());

@@ -28,6 +28,7 @@ import {
 import { VerificationBanner } from "@/features/doctor-verification/components/verification-banner";
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
+import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 import { formatTime } from "@/lib/datetime";
 
@@ -44,7 +45,11 @@ export default async function DoctorOverviewPage() {
   const activeToday = today.filter((item) => item.status !== "cancelled");
   const nextToday = upcoming.find((item) => isToday(item));
   const thisWeek = startingWithin(upcoming, 7);
-  const notes = await getAppointmentNotes(today.map((item) => item.id));
+  const todayIds = today.map((item) => item.id);
+  const [notes, summaries] = await Promise.all([
+    getAppointmentNotes(todayIds),
+    getVisitSummaries(todayIds),
+  ]);
 
   const stats: Stat[] = [
     {
@@ -101,6 +106,7 @@ export default async function DoctorOverviewPage() {
         notes={notes}
         previousVisits={countPreviousVisits(appointments)}
         prescriptions={prescriptions}
+        summaries={summaries}
         nextAppointment={upcoming[0] ?? null}
       />
       <RecentMessagesCard threads={messageThreads} />

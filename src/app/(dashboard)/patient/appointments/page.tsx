@@ -10,6 +10,7 @@ import { listPatientAppointments } from "@/features/appointments/data/appointmen
 import { groupAppointments } from "@/features/appointments/lib/appointments";
 import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
 import { prescriptionIdsByAppointment } from "@/features/prescriptions/lib/prescriptions";
+import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -22,6 +23,11 @@ export default async function PatientAppointmentsPage() {
     listPatientAppointments(user.id),
     listPatientPrescriptions(user.id),
   ]);
+  const summaries = await getVisitSummaries(
+    appointments
+      .filter((item) => item.status !== "cancelled")
+      .map((item) => item.id),
+  );
 
   return (
     <>
@@ -41,6 +47,7 @@ export default async function PatientAppointmentsPage() {
       <AppointmentTabs
         {...groupAppointments(appointments)}
         prescriptionIds={prescriptionIdsByAppointment(prescriptions)}
+        summaries={summaries}
       />
     </>
   );

@@ -12,6 +12,8 @@ const titles = {
   verification_approved: "Your profile is verified",
   verification_needs_info: "We need more information from you",
   verification_rejected: "Your verification has an update",
+  visit_summary_ready: "Your visit summary is ready",
+  visit_summary_updated: "Your visit summary was updated",
 } as const;
 
 export type NotificationKind = keyof typeof titles;

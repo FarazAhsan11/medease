@@ -7,6 +7,7 @@ import {
 } from "@/features/appointments/data/appointments";
 import { VisitsTabs } from "@/features/doctor-dashboard/components/visits-tabs";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
+import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -19,18 +20,23 @@ export default async function DoctorAppointmentsPage() {
     listDoctorAppointments(user.id),
     getDoctorPrescriptionSummaries(user.id),
   ]);
-  const notes = await getAppointmentNotes(appointments.map((item) => item.id));
+  const ids = appointments.map((item) => item.id);
+  const [notes, summaries] = await Promise.all([
+    getAppointmentNotes(ids),
+    getVisitSummaries(ids),
+  ]);
 
   return (
     <>
       <DashboardPageHeader
         title="Appointments"
-        description="Everything booked with you. Open an appointment for patient details, notes, prescriptions and actions."
+        description="Everything booked with you. Open an appointment for patient details, notes, visit summaries, prescriptions and actions."
       />
       <VisitsTabs
         appointments={appointments}
         notes={notes}
         prescriptions={prescriptions}
+        summaries={summaries}
       />
     </>
   );
