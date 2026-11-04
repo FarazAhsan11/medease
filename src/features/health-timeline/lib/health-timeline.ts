@@ -1,4 +1,7 @@
-import type { Appointment } from "@/features/appointments/lib/appointments";
+import {
+  hasTakenPlace,
+  type Appointment,
+} from "@/features/appointments/lib/appointments";
 import type { PatientDocumentKind } from "@/features/patient-documents/lib/document-rules";
 import type { PatientDocument } from "@/features/patient-documents/lib/patient-documents";
 import {
@@ -59,15 +62,6 @@ type TimelineSources = {
   documents: PatientDocument[];
 };
 
-// A visit counts once it has started and wasn't cancelled or missed; one
-// awaiting the doctor's outcome is still a visit that happened.
-export function isPastVisit(appointment: Appointment, now = Date.now()) {
-  return (
-    (appointment.status === "completed" || appointment.status === "booked") &&
-    new Date(appointment.startsAt).getTime() <= now
-  );
-}
-
 // Everything in one list, newest first. Replaced prescription versions are
 // already left out by the loader.
 export function buildTimeline(
@@ -75,7 +69,7 @@ export function buildTimeline(
   now = Date.now(),
 ): TimelineEntry[] {
   const visits = appointments
-    .filter((appointment) => isPastVisit(appointment, now))
+    .filter((appointment) => hasTakenPlace(appointment, now))
     .map((appointment): TimelineEntry => {
       const summary = summaries[appointment.id];
       return {

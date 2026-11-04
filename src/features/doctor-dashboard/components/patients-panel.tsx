@@ -1,8 +1,16 @@
-import { MailIcon, PhoneIcon, UsersIcon } from "lucide-react";
+import {
+  ClipboardListIcon,
+  MailIcon,
+  PhoneIcon,
+  UsersIcon,
+} from "lucide-react";
+import Link from "next/link";
 
 import { DetailList } from "@/components/shared/detail-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { buttonVariants } from "@/components/ui/button";
+import { doctorRoutes } from "@/config/routes";
 import type { PatientSummary } from "@/features/doctor-dashboard/lib/practice";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 
@@ -48,7 +56,7 @@ export function PatientsPanel({ patients, searching }: PatientsPanelProps) {
           <div className="mt-4 grid gap-1.5 text-sm">
             <a
               href={`mailto:${patient.email}`}
-              className="flex items-center gap-2 text-primary hover:underline"
+              className="flex min-w-0 items-center gap-2 text-primary hover:underline"
             >
               <MailIcon className="size-4 shrink-0" aria-hidden />
               <span className="truncate">{patient.email}</span>
@@ -56,7 +64,7 @@ export function PatientsPanel({ patients, searching }: PatientsPanelProps) {
             {patient.phone && (
               <a
                 href={`tel:${patient.phone.replace(/\s/g, "")}`}
-                className="flex items-center gap-2 text-primary hover:underline"
+                className="flex min-w-0 items-center gap-2 text-primary hover:underline"
               >
                 <PhoneIcon className="size-4 shrink-0" aria-hidden />
                 {patient.phone}
@@ -88,6 +96,19 @@ export function PatientsPanel({ patients, searching }: PatientsPanelProps) {
               ]}
             />
           </div>
+          {patient.seen && (
+            <Link
+              href={doctorRoutes.patientChart(patient.patientId)}
+              className={buttonVariants({
+                size: "sm",
+                variant: "outline",
+                className: "mt-4 w-full gap-1.5",
+              })}
+            >
+              <ClipboardListIcon aria-hidden />
+              Open chart
+            </Link>
+          )}
         </article>
       ))}
     </div>

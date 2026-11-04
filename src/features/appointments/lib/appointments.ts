@@ -106,6 +106,12 @@ export const isActive = (appointment: Appointment, now = Date.now()) =>
 export const isInProgress = (appointment: Appointment, now = Date.now()) =>
   isActive(appointment, now) && !isUpcoming(appointment, now);
 
+// A visit that took place: started, and not cancelled or missed. One still
+// waiting for the doctor's outcome counts.
+export const hasTakenPlace = (appointment: Appointment, now = Date.now()) =>
+  (appointment.status === "completed" || appointment.status === "booked") &&
+  Date.parse(appointment.startsAt) <= now;
+
 // Booked but already started: waiting for the doctor to record the outcome.
 export const needsOutcome = (appointment: Appointment, now = Date.now()) =>
   appointment.status === "booked" && Date.parse(appointment.startsAt) <= now;

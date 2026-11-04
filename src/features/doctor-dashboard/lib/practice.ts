@@ -1,4 +1,5 @@
 import {
+  hasTakenPlace,
   isActive,
   isUpcoming,
   type Appointment,
@@ -66,6 +67,8 @@ export type PatientSummary = {
   email: string;
   phone: string | null;
   completedVisits: number;
+  // At least one visit has taken place, which opens their chart.
+  seen: boolean;
   lastVisit: Appointment | null;
   nextVisit: Appointment | null;
 };
@@ -83,6 +86,7 @@ export function summarizePatients(appointments: Appointment[]) {
       email: appointment.patientEmail,
       phone: appointment.patientPhone,
       completedVisits: 0,
+      seen: false,
       lastVisit: null,
       nextVisit: null,
     };
@@ -90,6 +94,7 @@ export function summarizePatients(appointments: Appointment[]) {
     summary.name = appointment.patientName;
     summary.phone = appointment.patientPhone ?? summary.phone;
 
+    if (hasTakenPlace(appointment, now)) summary.seen = true;
     if (appointment.status === "completed") {
       summary.completedVisits += 1;
       summary.lastVisit = appointment;

@@ -55,6 +55,8 @@ export const doctorRoutes = {
   home: "/doctor",
   appointments: "/doctor/appointments",
   patients: "/doctor/patients",
+  // Everything this doctor has for one patient they have seen.
+  patientChart: (patientId: string) => `/doctor/patients/${patientId}`,
   availability: "/doctor/availability",
   profile: "/doctor/profile",
   verification: "/doctor/verification",

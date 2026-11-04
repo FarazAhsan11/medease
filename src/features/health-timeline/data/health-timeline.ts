@@ -1,10 +1,8 @@
 import "server-only";
 
 import { listPatientAppointments } from "@/features/appointments/data/appointments";
-import {
-  buildTimeline,
-  isPastVisit,
-} from "@/features/health-timeline/lib/health-timeline";
+import { hasTakenPlace } from "@/features/appointments/lib/appointments";
+import { buildTimeline } from "@/features/health-timeline/lib/health-timeline";
 import type { PatientDocument } from "@/features/patient-documents/lib/patient-documents";
 import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
@@ -24,7 +22,7 @@ export async function getHealthTimeline(
   ]);
   const summaries = await getVisitSummaries(
     appointments
-      .filter((appointment) => isPastVisit(appointment, now))
+      .filter((appointment) => hasTakenPlace(appointment, now))
       .map((appointment) => appointment.id),
   );
 

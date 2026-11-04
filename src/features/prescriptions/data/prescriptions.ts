@@ -83,15 +83,21 @@ type SummaryRow = {
 };
 
 // For a doctor's appointment lists, keyed by appointment id: the active
-// prescription, or else the latest cancelled one.
-export async function getDoctorPrescriptionSummaries(doctorId: string) {
+// prescription, or else the latest cancelled one. Optionally for one patient.
+export async function getDoctorPrescriptionSummaries(
+  doctorId: string,
+  { patientId }: { patientId?: string } = {},
+) {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("prescriptions")
     .select(
       "id, appointment_id, status, issued_at, prescription_items(medicine, sort_order)",
     )
-    .eq("doctor_id", doctorId)
+    .eq("doctor_id", doctorId);
+  if (patientId) query = query.eq("patient_id", patientId);
+
+  const { data, error } = await query
     .neq("status", "replaced")
     .order("issued_at", { ascending: false })
     .limit(1000)

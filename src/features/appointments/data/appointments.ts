@@ -48,6 +48,25 @@ export async function listDoctorAppointments(
   return data.map(toAppointment);
 }
 
+// A doctor's appointments with one patient, newest first.
+export async function listDoctorPatientAppointments(
+  doctorId: string,
+  patientId: string,
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(APPOINTMENT_COLUMNS)
+    .eq("doctor_id", doctorId)
+    .eq("patient_id", patientId)
+    .order("starts_at", { ascending: false })
+    .limit(500)
+    .returns<AppointmentRow[]>();
+
+  if (error) throw new Error(`appointments: ${error.message}`);
+  return data.map(toAppointment);
+}
+
 // One appointment, for its own patient or doctor only (row level security).
 export async function getAppointment(appointmentId: string) {
   if (!z.uuid().safeParse(appointmentId).success) return null;
