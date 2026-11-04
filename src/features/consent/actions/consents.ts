@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { dashboards } from "@/config/dashboards";
@@ -47,6 +48,10 @@ export const acceptConsents = withFormErrors(
       if (error) return consentError(error);
     }
 
+    // While this page was open the header's links were prefetched, and each
+    // answered with a redirect back here. Drop them, or the first clicks after
+    // accepting bounce between the page and /consent.
+    revalidatePath("/", "layout");
     redirect(dashboards[user.role].home);
   },
 );
