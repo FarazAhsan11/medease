@@ -30,6 +30,9 @@ export const patientRoutes = {
     `/patient/prescriptions/${prescriptionId}`,
   talkToAi: "/patient/talk-to-ai",
   records: "/patient/records",
+  // Opens the file on a short-lived signed link.
+  recordDocument: (documentId: string) =>
+    `/patient/records/documents/${documentId}`,
   settings: "/patient/settings",
   consultation: (appointmentId: string) =>
     `/patient/consultation/${appointmentId}`,

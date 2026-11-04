@@ -71,7 +71,8 @@ const SUPABASE_STUBS = /* sql */ `
   create table storage.objects (
     id uuid primary key default gen_random_uuid(),
     bucket_id text references storage.buckets (id),
-    name text
+    name text,
+    metadata jsonb
   );
   alter table storage.objects enable row level security;
   grant select on storage.objects to authenticated;

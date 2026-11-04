@@ -28,7 +28,8 @@ Requirement status is in [srs.md](./srs.md).
 - The Phase 0 items below wait until close to launch (decided 2026-11-02), except ADM-04 before labs.
 - Upload safety is done for records (2026-11-03): SEC-05's upload limit and SEC-06's checks are built and live-tested through doctor verification (GPS stripped with rotation kept; HTML sent as a PDF and a PNG named `.jpg` both refused and deleted; the limit refuses the 21st batch). REC-02 must use `verifyUpload` and `rateLimits.uploadUser` the same way. SEC-06 stays Partial for malware scanning, needed before REC-03 shares files with doctors.
 - REC-01 visit summaries are built (2026-11-03) and live-tested on the dev server against the real database: the doctor writes, edits and is refused outside the 14-day window; the patient sees the summary on the visit card and gets an in-app notice (no email, since a summary carries a diagnosis). Needs `20261103120000_visit_summaries.sql`, already run.
-- Next: REC-02 documents. First decide whether doctors see patient documents before REC-03 sharing exists, and that sharing waits for SEC-06 malware scanning.
+- REC-02 documents are built and live-tested (2026-11-04) on the dev server against the real database, with throwaway accounts: a PDF and a JPEG upload, HTML named `.pdf` is refused and deleted, files open on a 1-minute signed link that carries no name, a guest goes to login and another patient gets 404, delete removes the row and the file, the audit log has each add and delete, and the page fits 375px. `20261104120000_patient_documents.sql` is applied. Decided 2026-11-04: only the patient sees their documents until REC-03 sharing, which waits for SEC-06 malware scanning. Files left in `incoming/` by an upload that never finished aren't cleaned up yet, and deleting an account (AUTH-05) must remove the patient's files from Storage.
+- Then REC-04 timeline and REC-05 doctor chart.
 - Done 2026-11-03 (PRV-01): every form submitted through `onSubmit` now has `method="post"`, so a click before hydration posts to the page (which just renders it again) instead of putting passwords, codes or clinical fields in the URL. Keep it on new forms. PRV-01 stays Partial: the doctor's patient search still puts a patient's name in the URL as `?q=`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
@@ -45,7 +46,7 @@ Requirement status is in [srs.md](./srs.md).
 - The 72-hour breach target has no plan behind it yet (PRV-07).
 - Google receives email content: moving off Gmail (NTF-04) changes the provider table. A TURN relay (CALL-03) adds a provider too.
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## Reminder scheduler (REL-07, built 2026-11-02)
 
@@ -184,7 +185,9 @@ Remind patients at the times they choose (morning, afternoon, night), using the 
 
 ### 2. Visit summaries and health records
 
-Visit summaries are built (REC-01, 2026-11-03): `visit_summaries` with `save_visit_summary`, written in the doctor's appointment details in the same window as a prescription, shown on the patient's visit card, with an in-app notice and audit entries. Documents, the timeline and the doctor's patient chart are next.
+Visit summaries are built (REC-01, 2026-11-03): `visit_summaries` with `save_visit_summary`, written in the doctor's appointment details in the same window as a prescription, shown on the patient's visit card, with an in-app notice and audit entries.
+
+Documents are built (REC-02, 2026-11-04): `patient_documents` with `add_patient_document` and `delete_patient_document`, a private `patient-documents` bucket, and a real documents table on `/patient/records` (upload, open, delete). The browser uploads to `<patient id>/incoming/` on a signed link; the server runs `verifyUpload` and moves the file out, and the database records only files outside `incoming/`, so a direct call can't record an unchecked file. Files open through `/patient/records/documents/[id]`, which reads the row with the patient's session and redirects to a one-minute signed link. Only the patient sees them; doctors get access with REC-03. The timeline and the doctor's patient chart are next.
 
 
 - **Database**: add a patient-visible summary next to the private notes (diagnosis, advice, follow-up date), e.g. a `visit_summaries` table, so private notes stay doctor-only. `patient_documents` table plus a private Storage bucket, with paths under the patient's id.

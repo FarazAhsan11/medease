@@ -27,6 +27,7 @@ export const privacyPolicy: LegalDocument = {
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
           "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date) and the private notes your doctor keeps.",
+          "Documents you upload: the file (PDF, JPG or PNG), the name, type and date you give it, and its size. Only you can see them; doctors cannot.",
           "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
           "Call details: when each person joined and left a call. We do not record audio or video.",
           "Doctor and lab details: licence or registration numbers, specialty, clinic or lab address, verification documents and the outcome of our review.",
@@ -125,6 +126,7 @@ export const privacyPolicy: LegalDocument = {
               "7 years after the last visit. For a minor, until they turn 25",
               "Kept, no longer linked to your identity",
             ],
+            ["Documents you upload", "Until you delete them", "Deleted"],
             [
               "Doctor and lab verification documents",
               "While the account is active, then 1 year",

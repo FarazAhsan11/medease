@@ -1337,6 +1337,203 @@ async function testVisitSummaries({ patient, secondPatient }) {
   );
 }
 
+async function testPatientDocuments({ patient, secondPatient }) {
+  section("Patient documents (REC-02)");
+
+  const doctor = await createDoctor();
+  await startedVisit(doctor, patient);
+  // A file the server has checked and moved out of incoming/.
+  const storedFile = async (owner, extension = "pdf", folder = "") => {
+    const path = `${owner.id}/${folder}${randomUUID()}.${extension}`;
+    await db.query(
+      `insert into storage.objects (bucket_id, name, metadata)
+       values ('patient-documents', $1, $2)`,
+      [path, { size: 2048 }],
+    );
+    return path;
+  };
+  const add = (caller, path, fields = {}) =>
+    rpc(caller, "add_patient_document", {
+      p_path: path,
+      p_kind: "lab_report",
+      p_title: "  Blood test  ",
+      ...fields,
+    });
+  const remove = (caller, id) =>
+    rpc(caller, "delete_patient_document", { p_document_id: id });
+  const audits = async (documentId) =>
+    (
+      await db.query(
+        `select action, actor_id from public.audit_log
+         where target_id = $1 and action like 'patient_document%' order by id`,
+        [documentId],
+      )
+    ).rows;
+
+  const path = await storedFile(patient);
+  denied("a guest can't add a document", await add(null, path));
+  refused("a doctor can't add one", await add(doctor, path), "not_patient");
+  refused(
+    "a patient can't add a file in another account's folder",
+    await add(secondPatient, path),
+    "invalid_path",
+  );
+  refused(
+    "a file still in incoming/ can't be recorded",
+    await add(patient, await storedFile(patient, "pdf", "incoming/")),
+    "invalid_path",
+  );
+  refused(
+    "a path with another extension is refused",
+    await add(patient, await storedFile(patient, "html")),
+    "invalid_path",
+  );
+  refused(
+    "a path with no file behind it is refused",
+    await add(patient, `${patient.id}/${randomUUID()}.pdf`),
+    "file_not_found",
+  );
+  for (const [label, fields] of [
+    ["an unknown kind", { p_kind: "selfie" }],
+    ["a blank title", { p_title: "   " }],
+    ["a title over 120 characters", { p_title: "x".repeat(121) }],
+    ["a date in the future", { p_document_on: "2999-01-01" }],
+    ["a date before 1900", { p_document_on: "1899-12-31" }],
+  ]) {
+    refused(
+      `${label} is refused`,
+      await add(patient, path, fields),
+      "invalid_document",
+    );
+  }
+
+  const dependent = (
+    await db.query(
+      `insert into public.care_recipients (account_id, relation, first_name, last_name)
+       values ($1, 'child', 'Other', 'Child') returning id`,
+      [secondPatient.id],
+    )
+  ).rows[0].id;
+  refused(
+    "a patient can't file a document under another account's dependent",
+    await add(patient, path, { p_care_recipient_id: dependent }),
+    "care_recipient_not_found",
+  );
+
+  const added = await add(patient, path, { p_document_on: "2026-10-05" });
+  succeeded("a patient adds a checked file", added);
+  const documentId = added.data?.[0]?.add_patient_document;
+  const row = (
+    await db.query(
+      `select d.*, d.document_on::text as dated, c.relation
+       from public.patient_documents d
+       join public.care_recipients c on c.id = d.care_recipient_id
+       where d.id = $1`,
+      [documentId],
+    )
+  ).rows[0];
+  check(
+    "it's filed under the patient themself, trimmed, with its type and size",
+    row?.relation === "self" &&
+      row.title === "Blood test" &&
+      row.dated === "2026-10-05" &&
+      row.content_type === "application/pdf" &&
+      Number(row.size_bytes) === 2048,
+  );
+  refused(
+    "the same file can't be recorded twice",
+    await add(patient, path),
+    "document_exists",
+  );
+  succeeded(
+    "a photo is recorded as an image",
+    await add(patient, await storedFile(patient, "jpg"), { p_kind: "imaging" }),
+  );
+
+  const read = async (caller) =>
+    (await as(caller, `select id from public.patient_documents`)).data
+      ?.length ?? 0;
+  check("the patient reads their documents", (await read(patient)) === 2);
+  check("another patient reads nothing", (await read(secondPatient)) === 0);
+  check(
+    "their doctor reads nothing until sharing exists",
+    (await read(doctor)) === 0,
+  );
+  denied(
+    "nobody writes the table directly",
+    await as(
+      patient,
+      `update public.patient_documents set title = 'x' where id = $1`,
+      [documentId],
+    ),
+  );
+
+  const paired = await createPatient();
+  await db.query(
+    `insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`,
+    [paired.id],
+  );
+  refused(
+    "a patient who paired an app needs it to add a document",
+    {
+      ...(await add(paired, await storedFile(paired))),
+      fn: "require_second_factor",
+    },
+    "second_factor_required",
+  );
+  succeeded(
+    "with the app they can",
+    await add({ ...paired, aal: "aal2" }, await storedFile(paired)),
+  );
+  check(
+    "and with only a password they read nothing",
+    (await read(paired)) === 0 &&
+      (await read({ ...paired, aal: "aal2" })) === 1,
+  );
+
+  await db.query(
+    `insert into public.patient_documents
+       (patient_id, care_recipient_id, kind, title, storage_path, content_type)
+     select c.account_id, c.id, 'other', 'Filler', c.account_id || '/filler-' || n || '.pdf',
+       'application/pdf'
+     from public.care_recipients c, generate_series(1, 498) n
+     where c.account_id = $1::uuid and c.relation = 'self'`,
+    [patient.id],
+  );
+  refused(
+    "an account holds at most 500 documents",
+    await add(patient, await storedFile(patient)),
+    "document_limit",
+  );
+  await db.query(
+    `delete from public.patient_documents where patient_id = $1 and title = 'Filler'`,
+    [patient.id],
+  );
+
+  refused(
+    "another patient can't delete it",
+    await remove(secondPatient, documentId),
+    "document_not_found",
+  );
+  refused(
+    "a doctor can't delete it",
+    await remove(doctor, documentId),
+    "not_patient",
+  );
+  const deleted = await remove(patient, documentId);
+  check(
+    "the patient deletes it and gets the file's path back",
+    deleted.data?.[0]?.delete_patient_document === path,
+    deleted.error?.message ?? "",
+  );
+  check(
+    "adding and deleting are audited, by the patient, ids only",
+    (await audits(documentId))
+      .map((entry) => `${entry.action}:${entry.actor_id === patient.id}`)
+      .join() === "patient_document.added:true,patient_document.deleted:true",
+  );
+}
+
 async function testVerification({ patient }) {
   section("Doctors send documents (FIX-07, ADM-02)");
 
@@ -3763,6 +3960,7 @@ try {
   await testCalls(await freshPatients());
   await testPrescriptions(await freshPatients());
   await testVisitSummaries(await freshPatients());
+  await testPatientDocuments(await freshPatients());
   await testVerification(await freshPatients());
   await testReview(await freshPatients());
   await testCareRecipients(await freshPatients());

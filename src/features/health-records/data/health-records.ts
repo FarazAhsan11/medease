@@ -18,14 +18,6 @@ export type Vital = {
   icon: LucideIcon;
 };
 
-export type HealthDocument = {
-  id: string;
-  name: string;
-  type: "Lab report" | "Prescription" | "Visit summary" | "Imaging";
-  date: string;
-  source: string;
-};
-
 export const vitals: Vital[] = [
   {
     label: "Blood pressure",
@@ -62,36 +54,5 @@ export const vitals: Vital[] = [
     tone: "info",
     recordedOn: "Oct 5, 2026",
     icon: ScaleIcon,
-  },
-];
-
-export const healthDocuments: HealthDocument[] = [
-  {
-    id: "doc-1",
-    name: "Complete Blood Count",
-    type: "Lab report",
-    date: "Oct 5, 2026",
-    source: "CityCare Diagnostics",
-  },
-  {
-    id: "doc-2",
-    name: "General consultation",
-    type: "Visit summary",
-    date: "Sep 21, 2026",
-    source: "Dr. Nida Ali",
-  },
-  {
-    id: "doc-3",
-    name: "Atorvastatin 20 mg",
-    type: "Prescription",
-    date: "Aug 2, 2026",
-    source: "Dr. Ayesha Khan",
-  },
-  {
-    id: "doc-4",
-    name: "Chest X-ray",
-    type: "Imaging",
-    date: "Mar 2, 2025",
-    source: "Prime Lab Services",
   },
 ];
