@@ -1,6 +1,9 @@
 // Appointment times are shown in the doctor's timezone (clinic time), so
 // everyone sees the same wall-clock time whatever their device is set to.
 
+// For times that belong to no doctor, such as when a patient uploaded a file.
+export const CLINIC_TIMEZONE = "Asia/Karachi";
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timeZone: string, options: Intl.DateTimeFormatOptions) {
@@ -85,6 +88,13 @@ export function formatDateKey(dateKey: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(dateKeyToUtc(dateKey)));
+}
+
+// "October 2026" for the month of a "YYYY-MM-DD" calendar day.
+export function formatMonthOfDateKey(dateKey: string) {
+  return formatter("UTC", { month: "long", year: "numeric" }).format(
+    new Date(dateKeyToUtc(dateKey)),
+  );
 }
 
 // Parts for a date chip: { weekday: "Mon", day: "19", month: "Oct" }.

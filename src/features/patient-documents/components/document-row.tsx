@@ -13,7 +13,7 @@ import {
   formatFileSize,
   type PatientDocument,
 } from "@/features/patient-documents/lib/patient-documents";
-import { formatDateKey, toDateKey } from "@/lib/datetime";
+import { CLINIC_TIMEZONE, formatDateKey, toDateKey } from "@/lib/datetime";
 
 const kindTones: Record<PatientDocumentKind, StatusTone> = {
   lab_report: "success",
@@ -22,9 +22,6 @@ const kindTones: Record<PatientDocumentKind, StatusTone> = {
   discharge_summary: "info",
   other: "muted",
 };
-
-// Upload dates are shown on clinic time, like the rest of the app.
-const CLINIC_TIMEZONE = "Asia/Karachi";
 
 export function DocumentRow({ document }: { document: PatientDocument }) {
   const Icon = document.contentType.startsWith("image/")
