@@ -12,6 +12,12 @@ export const bookAppointmentSchema = z.object({
   doctorId: z.uuid("Pick a doctor first."),
   startsAt: z.iso.datetime({ offset: true, message: "Pick a time slot." }),
   reason: optionalNote(500, "Keep the reason under 500 characters."),
+  // Empty means the account holder; otherwise one of their family members.
+  careRecipientId: z
+    .string()
+    .optional()
+    .transform((value) => value || null)
+    .pipe(z.uuid("Choose who the visit is for.").nullable()),
 });
 
 export const cancelAppointmentSchema = z.object({

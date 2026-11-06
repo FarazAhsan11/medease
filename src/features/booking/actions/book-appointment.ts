@@ -38,6 +38,7 @@ export const bookAppointment = withFormErrors(
       p_doctor_id: parsed.data.doctorId,
       p_starts_at: parsed.data.startsAt,
       p_reason: parsed.data.reason,
+      p_care_recipient_id: parsed.data.careRecipientId,
     });
     if (error) return appointmentErrorState(error);
 

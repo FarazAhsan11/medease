@@ -19,6 +19,16 @@ export type MedicalProfile = {
   updatedAt: string;
 };
 
+// The editable medical fields, as a profile form fills them in.
+export type MedicalProfileValues = {
+  bloodGroup: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  allergies: string[];
+  chronicConditions: string[];
+  currentMedicines: string[];
+};
+
 export type MedicalProfileRow = {
   id: string;
   relation: string;

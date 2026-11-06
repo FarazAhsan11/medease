@@ -10,6 +10,7 @@ import { CallRoom } from "@/features/video-call/components/call-room";
 import { getCallAppointment } from "@/features/video-call/data/call-appointment";
 import type { CallRole } from "@/features/video-call/lib/call-connection";
 import { getIceServers } from "@/features/video-call/lib/ice-servers";
+import { bookedByLabel } from "@/features/family/lib/relations";
 
 type ConsultationViewProps = {
   appointmentId: string;
@@ -38,7 +39,10 @@ export async function ConsultationView({
           name: appointment.doctorName,
           subtitle: appointment.doctorSpecialization,
         }
-      : { name: appointment.patientName, subtitle: "Patient" };
+      : {
+          name: appointment.careRecipientName,
+          subtitle: bookedByLabel(appointment) ?? "Patient",
+        };
 
   return (
     <>

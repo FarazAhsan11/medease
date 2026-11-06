@@ -1,42 +1,25 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 
 import { FormField, fieldErrorProps } from "@/components/shared/form-field";
+import { FormSection } from "@/components/shared/form-section";
 import { PanelCard } from "@/components/shared/panel-card";
+import { SelectField } from "@/components/shared/select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { genders } from "@/features/auth/data/registration-options";
+import { MedicalProfileFields } from "@/features/medical-profile/components/medical-profile-fields";
 import { savePatientProfile } from "@/features/settings/actions/save-patient-profile";
 import type { PatientProfile } from "@/features/settings/data/patient-profile";
-import { bloodGroups } from "@/features/settings/schemas/patient-profile";
 import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
 
 type PersonalInfoFormProps = {
   profile: PatientProfile;
 };
-
-function FormSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <fieldset className="grid items-start gap-4 sm:grid-cols-2">
-      <legend className="mb-3 text-sm font-semibold">{title}</legend>
-      {children}
-    </fieldset>
-  );
-}
 
 export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
   const { pending, onSubmit, fieldError } = useFormAction(
@@ -58,56 +41,6 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
           defaultValue={String(profile[name] ?? "")}
           {...fieldErrorProps(id, fieldError(name))}
           {...props}
-        />
-      </FormField>
-    );
-  };
-
-  const select = (
-    name: "gender" | "bloodGroup",
-    label: string,
-    options: readonly string[],
-  ) => {
-    const id = `patient-${name}`;
-    return (
-      <FormField id={id} label={label} error={fieldError(name)}>
-        <NativeSelect
-          id={id}
-          name={name}
-          defaultValue={profile[name] ?? ""}
-          className="w-full"
-        >
-          <NativeSelectOption value="">Not specified</NativeSelectOption>
-          {options.map((option) => (
-            <NativeSelectOption key={option} value={option}>
-              {option}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </FormField>
-    );
-  };
-
-  const list = (
-    name: "allergies" | "chronicConditions" | "currentMedicines",
-    label: string,
-    hint: string,
-  ) => {
-    const id = `patient-${name}`;
-    return (
-      <FormField
-        id={id}
-        label={label}
-        hint={hint}
-        error={fieldError(name)}
-        className="sm:col-span-2"
-      >
-        <Textarea
-          id={id}
-          name={name}
-          rows={2}
-          defaultValue={profile[name].join(", ")}
-          {...fieldErrorProps(id, fieldError(name))}
         />
       </FormField>
     );
@@ -146,7 +79,14 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
             type: "date",
             autoComplete: "bday",
           })}
-          {select("gender", "Gender", genders)}
+          <SelectField
+            id="patient-gender"
+            name="gender"
+            label="Gender"
+            options={genders}
+            defaultValue={profile.gender}
+            error={fieldError("gender")}
+          />
           <FormField
             id="patient-homeAddress"
             label="Home address"
@@ -169,39 +109,12 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
         </FormSection>
 
         <div className="border-t pt-5">
-          <FormSection title="Medical profile">
-            {select("bloodGroup", "Blood group", bloodGroups)}
-            <div className="grid grid-cols-2 gap-4">
-              {input("heightCm", "Height (cm)", {
-                type: "number",
-                inputMode: "numeric",
-                min: 30,
-                max: 272,
-              })}
-              {input("weightKg", "Weight (kg)", {
-                type: "number",
-                inputMode: "decimal",
-                step: "0.1",
-                min: 0.5,
-                max: 500,
-              })}
-            </div>
-            {list(
-              "allergies",
-              "Allergies",
-              "Separate with commas, for example: penicillin, peanuts.",
-            )}
-            {list(
-              "chronicConditions",
-              "Ongoing conditions",
-              "Separate with commas, for example: diabetes, asthma.",
-            )}
-            {list(
-              "currentMedicines",
-              "Medicines you take now",
-              "Include any your MedEase doctors didn't prescribe.",
-            )}
-          </FormSection>
+          <MedicalProfileFields
+            idPrefix="patient"
+            values={profile}
+            fieldError={fieldError}
+            medicinesLabel="Medicines you take now"
+          />
         </div>
 
         <div className="border-t pt-5">

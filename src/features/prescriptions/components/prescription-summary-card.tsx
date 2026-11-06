@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { IconTile } from "@/components/shared/icon-tile";
 import { buttonVariants } from "@/components/ui/button";
+import { BookedForBadge } from "@/features/family/components/booked-for-badge";
 import { PrescriptionStatusBadge } from "@/features/prescriptions/components/prescription-status-badge";
 import {
   getDisplayStatus,
@@ -29,6 +30,7 @@ export function PrescriptionSummaryCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold">{prescription.doctorName}</h3>
             <PrescriptionStatusBadge status={getDisplayStatus(prescription)} />
+            <BookedForBadge {...prescription} />
           </div>
           <p className="text-xs text-muted-foreground">
             {prescription.doctorSpecialization} ·{" "}

@@ -56,9 +56,12 @@ export function VisitsTable({
             <TableRow key={visit.id}>
               <TableCell className="pl-5">
                 <div className="flex items-center gap-3">
-                  <UserAvatar name={visit.patientName} className="size-8" />
+                  <UserAvatar
+                    name={visit.careRecipientName}
+                    className="size-8"
+                  />
                   <div className="min-w-0">
-                    <p className="font-medium">{visit.patientName}</p>
+                    <p className="font-medium">{visit.careRecipientName}</p>
                     <p className="max-w-56 truncate text-xs text-muted-foreground">
                       {visit.reason ?? "No reason given"}
                     </p>

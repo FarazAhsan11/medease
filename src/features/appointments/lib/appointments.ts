@@ -1,6 +1,8 @@
 // Appointment shape shared by the patient and doctor dashboards, plus small
 // pure helpers. Safe to import from client components.
 
+import type { CareRecipientRelation } from "@/features/family/lib/relations";
+
 export type AppointmentStatus =
   "booked" | "completed" | "cancelled" | "no_show";
 
@@ -10,6 +12,10 @@ export type Appointment = {
   patientId: string;
   // Who the visit is for: the account holder or a family member.
   careRecipientId: string;
+  // Snapshot of that person's name and relation when booked. patientName is
+  // always the account holder, who books and gets the emails.
+  careRecipientName: string;
+  careRecipientRelation: CareRecipientRelation;
   startsAt: string;
   endsAt: string;
   status: AppointmentStatus;
@@ -33,6 +39,8 @@ export type AppointmentRow = {
   doctor_id: string;
   patient_id: string;
   care_recipient_id: string;
+  care_recipient_name: string;
+  care_recipient_relation: CareRecipientRelation;
   starts_at: string;
   ends_at: string;
   status: AppointmentStatus;
@@ -57,6 +65,8 @@ export function toAppointment(row: AppointmentRow): Appointment {
     doctorId: row.doctor_id,
     patientId: row.patient_id,
     careRecipientId: row.care_recipient_id,
+    careRecipientName: row.care_recipient_name,
+    careRecipientRelation: row.care_recipient_relation,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,

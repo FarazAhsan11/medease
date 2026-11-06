@@ -80,6 +80,12 @@ export function CurrentMedicineCard({ medicine }: CurrentMedicineCardProps) {
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
         <p className="text-xs text-muted-foreground">
+          {prescription.careRecipientRelation !== "self" && (
+            <>
+              For {prescription.careRecipientName}
+              <br />
+            </>
+          )}
           {prescription.doctorName}
           <br />
           {formatDate(prescription.issuedAt, prescription.timezone)}

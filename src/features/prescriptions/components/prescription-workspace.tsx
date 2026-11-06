@@ -53,7 +53,7 @@ export function PrescriptionWorkspace({
               <PrintButton />
               <CancelPrescriptionDialog
                 prescriptionId={active.id}
-                patientName={appointment.patientName}
+                patientName={appointment.careRecipientName}
               />
             </>
           }

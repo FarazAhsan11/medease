@@ -2,6 +2,7 @@
 // pure helpers. Safe to import from client components.
 
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import type { CareRecipientRelation } from "@/features/family/lib/relations";
 import {
   addDaysToDateKey,
   daysBetweenDateKeys,
@@ -99,6 +100,9 @@ export type Prescription = {
   doctorLicense: string;
   clinicAddress: string;
   patientName: string;
+  // The person treated; patientName is the account holder.
+  careRecipientName: string;
+  careRecipientRelation: CareRecipientRelation;
   timezone: string;
   replacesId: string | null;
   issuedAt: string;
@@ -134,6 +138,8 @@ export type PrescriptionRow = {
   doctor_license: string;
   clinic_address: string;
   patient_name: string;
+  care_recipient_name: string;
+  care_recipient_relation: CareRecipientRelation;
   timezone: string;
   replaces_id: string | null;
   issued_at: string;
@@ -157,6 +163,8 @@ export function toPrescription(row: PrescriptionRow): Prescription {
     doctorLicense: row.doctor_license,
     clinicAddress: row.clinic_address,
     patientName: row.patient_name,
+    careRecipientName: row.care_recipient_name,
+    careRecipientRelation: row.care_recipient_relation,
     timezone: row.timezone,
     replacesId: row.replaces_id,
     issuedAt: row.issued_at,

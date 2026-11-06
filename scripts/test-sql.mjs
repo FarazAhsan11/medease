@@ -1999,6 +1999,239 @@ async function testDoctorMedicalProfiles({ patient, secondPatient }) {
   );
 }
 
+async function testFamilyMembers({ patient, secondPatient }) {
+  section("Adding family members (PRO-03)");
+
+  const doctor = await createDoctor();
+  const member = (fields = {}) => ({
+    p_id: null,
+    p_first_name: " Ali ",
+    p_last_name: "Patient",
+    p_relation: "child",
+    p_date_of_birth: "2019-04-02",
+    p_allergies: ["Peanuts", " Peanuts ", "", "Dust"],
+    ...fields,
+  });
+  const save = (caller, fields) =>
+    rpc(caller, "save_family_member", member(fields));
+  const recipient = async (id) =>
+    (await db.query(`select * from public.care_recipients where id = $1`, [id]))
+      .rows[0];
+
+  const added = await save(patient);
+  const childId = added.data?.[0]?.save_family_member;
+  const child = childId && (await recipient(childId));
+  check(
+    "a patient adds a family member",
+    child?.account_id === patient.id &&
+      child?.relation === "child" &&
+      child?.first_name === "Ali",
+    added.error?.message,
+  );
+  check(
+    "their lists are cleaned like the patient's own",
+    child?.allergies?.join("|") === "Peanuts|Dust",
+    JSON.stringify(child?.allergies),
+  );
+
+  succeeded(
+    "the patient edits them",
+    await save(patient, {
+      p_id: childId,
+      p_first_name: "Aliya",
+      p_relation: "child",
+      p_blood_group: "B+",
+    }),
+  );
+  check(
+    "the edit is saved",
+    (await recipient(childId))?.first_name === "Aliya" &&
+      (await recipient(childId))?.blood_group === "B+",
+  );
+
+  refused("a doctor can't add one", await save(doctor), "not_patient");
+  refused(
+    "nobody is added as a second self",
+    await save(patient, { p_relation: "self" }),
+    "invalid_relation",
+  );
+  refused(
+    "a date of birth is required",
+    await save(patient, { p_date_of_birth: null }),
+    "invalid_date_of_birth",
+  );
+  refused(
+    "a birth date in the future is refused",
+    await save(patient, { p_date_of_birth: "2999-01-01" }),
+    "invalid_date_of_birth",
+  );
+  refused(
+    "a blank name is refused",
+    await save(patient, { p_first_name: "  " }),
+    "invalid_profile",
+  );
+  refused(
+    "an unknown blood group is refused",
+    await save(patient, { p_blood_group: "C+" }),
+    "invalid_profile",
+  );
+  refused(
+    "a list item over 100 characters is refused",
+    await save(patient, { p_allergies: ["x".repeat(101)] }),
+    "invalid_profile",
+  );
+
+  const selfId = (
+    await db.query(
+      `select id from public.care_recipients where account_id = $1 and relation = 'self'`,
+      [patient.id],
+    )
+  ).rows[0].id;
+  refused(
+    "the account holder's own row isn't edited here",
+    await save(patient, { p_id: selfId }),
+    "family_member_not_found",
+  );
+  refused(
+    "another account's family member can't be edited",
+    await save(secondPatient, { p_id: childId }),
+    "family_member_not_found",
+  );
+  check(
+    "another patient doesn't see them",
+    (
+      await as(
+        secondPatient,
+        `select id from public.care_recipients where id = $1`,
+        [childId],
+      )
+    ).data?.length === 0,
+  );
+
+  const crowded = await createPatient();
+  for (let i = 0; i < 10; i++) await save(crowded, { p_first_name: `Kid${i}` });
+  refused(
+    "an account holds ten family members at most",
+    await save(crowded),
+    "too_many_family_members",
+  );
+
+  section("Booking for a family member (APT-09, FIX-15)");
+
+  const slots = await slotsOf(doctor.id);
+  const book = (caller, slot, recipientId) =>
+    rpc(caller, "book_appointment", {
+      p_doctor_id: doctor.id,
+      p_starts_at: slot.starts_at,
+      p_care_recipient_id: recipientId,
+    });
+
+  const own = await book(patient, slots[0], null);
+  const ownRow = own.data?.[0]?.book_appointment;
+  check(
+    "a booking without a person is for the account holder",
+    ownRow?.care_recipient_id === selfId &&
+      ownRow?.care_recipient_relation === "self" &&
+      ownRow?.care_recipient_name === ownRow?.patient_name,
+    own.error?.message,
+  );
+
+  const forChild = await book(patient, slots[2], childId);
+  const childRow = forChild.data?.[0]?.book_appointment;
+  check(
+    "a parent books their child with the same doctor",
+    childRow?.care_recipient_id === childId,
+    forChild.error?.message,
+  );
+  check(
+    "the booking names the child and keeps the parent as contact",
+    childRow?.care_recipient_name === "Aliya Patient" &&
+      childRow?.care_recipient_relation === "child" &&
+      childRow?.patient_name === ownRow?.patient_name,
+  );
+  refused(
+    "the child can't hold two upcoming visits with one doctor",
+    await book(patient, slots[4], childId),
+    "already_booked_with_doctor",
+  );
+  // Same time, another doctor: the account holder can't be on two calls.
+  const otherDoctor = await createDoctor();
+  const sara = (await save(patient, { p_first_name: "Sara" })).data?.[0]
+    ?.save_family_member;
+  refused(
+    "two visits on one account can't overlap",
+    await rpc(patient, "book_appointment", {
+      p_doctor_id: otherDoctor.id,
+      p_starts_at: slots[0].starts_at,
+      p_care_recipient_id: sara,
+    }),
+    "patient_time_conflict",
+  );
+  refused(
+    "nobody books for another account's family member",
+    await book(secondPatient, slots[6], childId),
+    "invalid_care_recipient",
+  );
+
+  check(
+    "the doctor reads the child's medical profile",
+    (
+      await as(doctor, `select id from public.care_recipients where id = $1`, [
+        childId,
+      ])
+    ).data?.length === 1,
+  );
+
+  const childVisit = await createAppointment(doctor, patient, {
+    from: -30,
+    to: 0,
+  });
+  await db.query(
+    `update public.appointments
+     set care_recipient_id = $1, care_recipient_name = 'Aliya Patient', care_recipient_relation = 'child'
+     where id = $2`,
+    [childId, childVisit],
+  );
+  const rx = issued(await issue(doctor, childVisit));
+  check(
+    "the prescription names the child",
+    rx?.care_recipient_name === "Aliya Patient" &&
+      rx?.care_recipient_relation === "child" &&
+      rx?.care_recipient_id === childId,
+  );
+
+  section("Removing family members (PRO-03)");
+
+  refused(
+    "someone with records can't be removed",
+    await rpc(patient, "delete_family_member", { p_id: childId }),
+    "family_member_has_records",
+  );
+  refused(
+    "a doctor can't remove one",
+    await rpc(doctor, "delete_family_member", { p_id: childId }),
+    "not_patient",
+  );
+  refused(
+    "another account can't remove them",
+    await rpc(secondPatient, "delete_family_member", { p_id: childId }),
+    "family_member_not_found",
+  );
+  refused(
+    "the account holder's own row can't be removed",
+    await rpc(patient, "delete_family_member", { p_id: selfId }),
+    "family_member_not_found",
+  );
+
+  const spare = (await save(patient, { p_first_name: "Spare" })).data?.[0]
+    ?.save_family_member;
+  succeeded(
+    "someone with no records is removed",
+    await rpc(patient, "delete_family_member", { p_id: spare }),
+  );
+  check("they're gone", (await recipient(spare)) === undefined);
+}
+
 async function testPatientProfile({ patient, secondPatient }) {
   section("Saving the medical profile (PRO-01)");
 
@@ -4043,6 +4276,7 @@ try {
   await testReview(await freshPatients());
   await testCareRecipients(await freshPatients());
   await testDoctorMedicalProfiles(await freshPatients());
+  await testFamilyMembers(await freshPatients());
   await testPatientProfile(await freshPatients());
   await testSecondFactor(await freshPatients());
   await testRecoveryCodes(await freshPatients());

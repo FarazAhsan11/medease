@@ -14,6 +14,10 @@ import {
   getDirectoryDoctor,
   getWeeklyHours,
 } from "@/features/doctors/data/doctor-directory";
+import { getFamilyMembers } from "@/features/family/data/family-members";
+import { familyMemberName } from "@/features/family/lib/family-members";
+import { relationLabels } from "@/features/family/lib/relations";
+import { requireRole } from "@/lib/auth/session";
 
 export async function generateMetadata({
   params,
@@ -28,14 +32,18 @@ export default async function PatientBookDoctorPage({
   params,
 }: PageProps<"/patient/find-doctor/[doctorId]">) {
   const { doctorId } = await params;
-  const doctor = await getDirectoryDoctor(doctorId);
+  const [user, doctor] = await Promise.all([
+    requireRole("patient"),
+    getDirectoryDoctor(doctorId),
+  ]);
   if (!doctor) notFound();
 
-  const [hours, days] = await Promise.all([
+  const [hours, days, familyMembers] = await Promise.all([
     getWeeklyHours(doctor.id),
     doctor.acceptingAppointments
       ? getBookingDays(doctor.id, doctor.timezone)
       : [],
+    getFamilyMembers(user.id),
   ]);
 
   return (
@@ -48,6 +56,10 @@ export default async function PatientBookDoctorPage({
             doctorId={doctor.id}
             fee={doctor.consultationFee}
             days={days}
+            recipients={familyMembers.map((member) => ({
+              value: member.id,
+              label: `${familyMemberName(member)} (${relationLabels[member.relation].toLowerCase()})`,
+            }))}
           />
         ) : (
           <EmptyState

@@ -35,6 +35,9 @@ export function ChartVisitCard(props: ChartVisitCardProps) {
           <p className="text-xs text-muted-foreground">
             {formatTime(appointment.startsAt, timezone)} –{" "}
             {formatTime(appointment.endsAt, timezone)}
+            {/* The chart is the account's; name a family member's visits. */}
+            {appointment.careRecipientRelation !== "self" &&
+              ` · For ${appointment.careRecipientName} (${appointment.careRecipientRelation})`}
           </p>
         </div>
         <div className="flex items-center gap-2">

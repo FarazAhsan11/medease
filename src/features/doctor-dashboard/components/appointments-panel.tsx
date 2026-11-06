@@ -69,10 +69,10 @@ export function AppointmentsPanel({
                       appointment.status === "cancelled" && "opacity-60",
                     )}
                   >
-                    <UserAvatar name={appointment.patientName} />
+                    <UserAvatar name={appointment.careRecipientName} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium">
-                        {appointment.patientName}
+                        {appointment.careRecipientName}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
                         {appointment.status === "cancelled"
@@ -92,7 +92,7 @@ export function AppointmentsPanel({
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">
             No appointments today.
             {nextAppointment &&
-              ` Next: ${nextAppointment.patientName}, ${formatDateTime(nextAppointment.startsAt, nextAppointment.timezone)}.`}
+              ` Next: ${nextAppointment.careRecipientName}, ${formatDateTime(nextAppointment.startsAt, nextAppointment.timezone)}.`}
           </p>
         )}
       </PanelCard>

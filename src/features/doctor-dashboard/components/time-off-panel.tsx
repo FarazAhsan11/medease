@@ -63,13 +63,13 @@ export function TimeOffPanel({ today, entries, affected }: TimeOffPanelProps) {
                   >
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
-                        {appointment.patientName}
+                        {appointment.careRecipientName}
                       </span>
                       <span className="text-muted-foreground">{when}</span>
                     </span>
                     <CancelAppointmentDialog
                       appointmentId={appointment.id}
-                      summary={`${appointment.patientName} on ${when}`}
+                      summary={`${appointment.careRecipientName} on ${when}`}
                       notify="patient"
                     />
                   </li>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { DatePickerChips } from "@/components/shared/date-picker-chips";
 import { FormField, fieldErrorProps } from "@/components/shared/form-field";
+import { SelectField } from "@/components/shared/select-field";
 import { TimeSlotPicker } from "@/components/shared/time-slot-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { bookAppointment } from "@/features/booking/actions/book-appointment";
@@ -19,12 +20,19 @@ type BookingFormProps = {
   doctorId: string;
   fee: number;
   days: BookingDay[];
+  // Family members the visit can be for, besides the account holder.
+  recipients: { value: string; label: string }[];
 };
 
 // Codes meaning our copy of the slots is stale: fetch fresh ones.
 const staleSlotCodes = new Set(["slot_taken", "slot_unavailable"]);
 
-export function BookingForm({ doctorId, fee, days }: BookingFormProps) {
+export function BookingForm({
+  doctorId,
+  fee,
+  days,
+  recipients,
+}: BookingFormProps) {
   const router = useRouter();
   const [dateKey, setDateKey] = useState(
     () => days.find((day) => day.openCount > 0)?.value ?? days[0]?.value,
@@ -92,6 +100,18 @@ export function BookingForm({ doctorId, fee, days }: BookingFormProps) {
             : fieldError("startsAt")
         }
       />
+
+      {recipients.length > 0 && (
+        <SelectField
+          id="booking-careRecipientId"
+          name="careRecipientId"
+          label="Who is this visit for?"
+          emptyLabel="Myself"
+          options={recipients}
+          hint="The doctor sees this person's medical profile."
+          error={fieldError("careRecipientId")}
+        />
+      )}
 
       <FormField
         id="booking-reason"

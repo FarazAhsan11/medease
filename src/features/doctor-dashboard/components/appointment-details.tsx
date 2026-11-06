@@ -14,6 +14,7 @@ import {
 import { AppointmentNotesForm } from "@/features/doctor-dashboard/components/appointment-notes-form";
 import { AppointmentOutcomeButtons } from "@/features/doctor-dashboard/components/appointment-outcome-buttons";
 import { AppointmentPrescription } from "@/features/doctor-dashboard/components/appointment-prescription";
+import { bookedByLabel } from "@/features/family/lib/relations";
 import { MedicalProfileDetails } from "@/features/medical-profile/components/medical-profile-details";
 import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
@@ -60,13 +61,19 @@ export function AppointmentDetails({
 }: AppointmentDetailsProps) {
   const { timezone } = appointment;
   const call = describeCall(appointment);
+  const bookedBy = bookedByLabel(appointment);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <UserAvatar name={appointment.patientName} className="size-11" />
+        <UserAvatar name={appointment.careRecipientName} className="size-11" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold">{appointment.patientName}</p>
+          <p className="text-sm font-semibold">
+            {appointment.careRecipientName}
+          </p>
+          {bookedBy && (
+            <p className="text-xs text-muted-foreground">{bookedBy}</p>
+          )}
           <AppointmentStatusBadge appointment={appointment} viewer="doctor" />
         </div>
       </div>
@@ -168,7 +175,7 @@ export function AppointmentDetails({
         <div className="border-t pt-4">
           <CancelAppointmentDialog
             appointmentId={appointment.id}
-            summary={`${appointment.patientName} on ${formatDateTime(appointment.startsAt, timezone)}`}
+            summary={`${appointment.careRecipientName} on ${formatDateTime(appointment.startsAt, timezone)}`}
             notify="patient"
             triggerLabel="Cancel appointment"
           />

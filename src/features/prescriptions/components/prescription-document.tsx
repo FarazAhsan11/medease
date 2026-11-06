@@ -97,7 +97,7 @@ export function PrescriptionDocument({
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-muted-foreground">Patient</dt>
-            <dd className="font-medium">{prescription.patientName}</dd>
+            <dd className="font-medium">{prescription.careRecipientName}</dd>
           </div>
           {prescription.diagnosis && (
             <div>

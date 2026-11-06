@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import { BookedForBadge } from "@/features/family/components/booked-for-badge";
 import { formatDate, formatTime } from "@/lib/datetime";
 import { formatFee } from "@/lib/format";
 
@@ -33,6 +34,7 @@ export function AppointmentCard({
                 {appointment.doctorName}
               </h3>
               {status}
+              <BookedForBadge {...appointment} />
             </div>
             <p className="text-sm text-muted-foreground">
               {appointment.doctorSpecialization}

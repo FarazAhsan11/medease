@@ -10,7 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 const PRESCRIPTION_COLUMNS =
-  "id, appointment_id, doctor_id, patient_id, status, diagnosis, advice, doctor_name, doctor_specialization, doctor_license, clinic_address, patient_name, timezone, replaces_id, issued_at, cancelled_at, cancellation_reason, prescription_items(id, sort_order, medicine, strength, form, dose, frequency, dose_times, meal, duration_days, instructions)";
+  "id, appointment_id, doctor_id, patient_id, status, diagnosis, advice, doctor_name, doctor_specialization, doctor_license, clinic_address, patient_name, care_recipient_name, care_recipient_relation, timezone, replaces_id, issued_at, cancelled_at, cancellation_reason, prescription_items(id, sort_order, medicine, strength, form, dose, frequency, dose_times, meal, duration_days, instructions)";
 
 // Row level security already limits rows to the prescription's own patient
 // and doctor; the explicit filters keep queries on the right index.

@@ -12,8 +12,11 @@ const messages: Record<string, string> = {
     "That time is no longer available. Please pick another slot.",
   slot_taken: "Someone just booked that time. Please pick another slot.",
   already_booked_with_doctor:
-    "You already have an upcoming appointment with this doctor. Cancel it first if you'd like a different time.",
-  patient_time_conflict: "You already have another appointment at that time.",
+    "This person already has an upcoming appointment with this doctor. Cancel it first if you'd like a different time.",
+  patient_time_conflict:
+    "Your account already has another appointment at that time.",
+  invalid_care_recipient:
+    "That family member is no longer on your account. Choose someone else.",
   appointment_not_found: "We couldn't find that appointment.",
   not_cancellable: "This appointment can't be cancelled anymore.",
   already_started:
