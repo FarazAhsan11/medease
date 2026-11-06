@@ -2,6 +2,8 @@ import { ClockIcon, FileXIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import { MedicalProfileCard } from "@/features/medical-profile/components/medical-profile-card";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import { CancelPrescriptionDialog } from "@/features/prescriptions/components/cancel-prescription-dialog";
 import { PrescriptionAppointmentCard } from "@/features/prescriptions/components/prescription-appointment-card";
 import { PrescriptionDocument } from "@/features/prescriptions/components/prescription-document";
@@ -19,6 +21,8 @@ type PrescriptionWorkspaceProps = {
   appointment: Appointment;
   // The appointment's active and cancelled prescriptions, newest first.
   prescriptions: Prescription[];
+  // Allergies and current medicines, to check while prescribing.
+  profile: MedicalProfile | null;
 };
 
 // The doctor's prescription page for one appointment: write a new one, or
@@ -26,6 +30,7 @@ type PrescriptionWorkspaceProps = {
 export function PrescriptionWorkspace({
   appointment,
   prescriptions,
+  profile,
 }: PrescriptionWorkspaceProps) {
   const active = prescriptions.find((item) => item.status === "active");
   const cancelled = prescriptions.filter((item) => item.status === "cancelled");
@@ -34,6 +39,10 @@ export function PrescriptionWorkspace({
   return (
     <>
       <PrescriptionAppointmentCard appointment={appointment} />
+
+      {profile && appointment.status !== "cancelled" && (
+        <MedicalProfileCard profile={profile} className="print:hidden" />
+      )}
 
       {active ? (
         <PrescriptionEditor

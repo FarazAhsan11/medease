@@ -1,6 +1,7 @@
 import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import { ChartSection } from "@/features/patient-chart/components/chart-section";
 import { PrescriptionStatusBadge } from "@/features/prescriptions/components/prescription-status-badge";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
@@ -14,6 +15,7 @@ type ChartVisitCardProps = {
   previousVisits: number;
   prescription: PrescriptionSummary | null;
   summary: VisitSummary | null;
+  profile: MedicalProfile | null;
 };
 
 // One visit in the chart, read at a glance. Details opens the same sheet as

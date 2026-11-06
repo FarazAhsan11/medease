@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetails } from "@/features/doctor-dashboard/components/appointment-details";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDateTime } from "@/lib/datetime";
@@ -21,6 +22,7 @@ type AppointmentDetailsSheetProps = {
   previousVisits: number;
   prescription: PrescriptionSummary | null;
   summary: VisitSummary | null;
+  profile: MedicalProfile | null;
 };
 
 export function AppointmentDetailsSheet(props: AppointmentDetailsSheetProps) {

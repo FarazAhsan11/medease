@@ -15,6 +15,7 @@ import {
 } from "@/features/appointments/lib/appointments";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDate, formatTime } from "@/lib/datetime";
@@ -25,6 +26,8 @@ type VisitsTableProps = {
   previousVisits: Record<string, number>;
   prescriptions: Record<string, PrescriptionSummary>;
   summaries: Record<string, VisitSummary>;
+  // By care recipient id.
+  profiles: Record<string, MedicalProfile>;
 };
 
 export function VisitsTable({
@@ -33,6 +36,7 @@ export function VisitsTable({
   previousVisits,
   prescriptions,
   summaries,
+  profiles,
 }: VisitsTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border bg-card">
@@ -87,6 +91,7 @@ export function VisitsTable({
                     previousVisits={previousVisits[visit.id] ?? 0}
                     prescription={prescriptions[visit.id] ?? null}
                     summary={summaries[visit.id] ?? null}
+                    profile={profiles[visit.careRecipientId] ?? null}
                   />
                 </div>
               </TableCell>

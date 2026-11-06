@@ -6,6 +6,7 @@ import {
   listDoctorAppointments,
 } from "@/features/appointments/data/appointments";
 import { VisitsTabs } from "@/features/doctor-dashboard/components/visits-tabs";
+import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
@@ -21,9 +22,10 @@ export default async function DoctorAppointmentsPage() {
     getDoctorPrescriptionSummaries(user.id),
   ]);
   const ids = appointments.map((item) => item.id);
-  const [notes, summaries] = await Promise.all([
+  const [notes, summaries, profiles] = await Promise.all([
     getAppointmentNotes(ids),
     getVisitSummaries(ids),
+    getMedicalProfiles(appointments.map((item) => item.careRecipientId)),
   ]);
 
   return (
@@ -37,6 +39,7 @@ export default async function DoctorAppointmentsPage() {
         notes={notes}
         prescriptions={prescriptions}
         summaries={summaries}
+        profiles={profiles}
       />
     </>
   );

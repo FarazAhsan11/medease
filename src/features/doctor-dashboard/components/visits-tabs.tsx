@@ -9,6 +9,7 @@ import {
   countPreviousVisits,
   groupDoctorAppointments,
 } from "@/features/doctor-dashboard/lib/practice";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 
@@ -17,6 +18,8 @@ type VisitsTabsProps = {
   notes: Record<string, string>;
   prescriptions: Record<string, PrescriptionSummary>;
   summaries: Record<string, VisitSummary>;
+  // By care recipient id.
+  profiles: Record<string, MedicalProfile>;
 };
 
 const tabs = [
@@ -48,6 +51,7 @@ export function VisitsTabs({
   notes,
   prescriptions,
   summaries,
+  profiles,
 }: VisitsTabsProps) {
   const groups = groupDoctorAppointments(appointments);
   const previousVisits = countPreviousVisits(appointments);
@@ -71,6 +75,7 @@ export function VisitsTabs({
               previousVisits={previousVisits}
               prescriptions={prescriptions}
               summaries={summaries}
+              profiles={profiles}
             />
           ) : (
             <EmptyState

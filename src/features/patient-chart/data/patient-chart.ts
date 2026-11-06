@@ -11,6 +11,7 @@ import {
   isUpcoming,
 } from "@/features/appointments/lib/appointments";
 import { countPreviousVisits } from "@/features/doctor-dashboard/lib/practice";
+import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 
@@ -32,13 +33,19 @@ export async function getPatientChart(doctorId: string, patientId: string) {
   if (seen.length === 0) return null;
 
   const ids = appointments.map((appointment) => appointment.id);
-  const [notes, summaries] = await Promise.all([
+  const [notes, summaries, profiles] = await Promise.all([
     getAppointmentNotes(ids),
     getVisitSummaries(ids),
+    getMedicalProfiles(appointments.map((item) => item.careRecipientId)),
   ]);
 
   // The newest booking has the freshest contact details.
   const [latest] = appointments;
+  // The account holder's own profile heads the chart. Family members' profiles
+  // show on their visits (PRO-03).
+  const ownProfile =
+    Object.values(profiles).find((profile) => profile.relation === "self") ??
+    null;
   return {
     patient: {
       name: latest.patientName,
@@ -54,6 +61,8 @@ export async function getPatientChart(doctorId: string, patientId: string) {
     notes,
     prescriptions,
     summaries,
+    profiles,
+    ownProfile,
     previousVisits: countPreviousVisits(appointments),
   };
 }

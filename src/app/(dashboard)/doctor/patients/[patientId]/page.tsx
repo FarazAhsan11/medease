@@ -6,6 +6,7 @@ import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { doctorRoutes } from "@/config/routes";
 import { ChartHeader } from "@/features/patient-chart/components/chart-header";
 import { ChartVisitCard } from "@/features/patient-chart/components/chart-visit-card";
+import { MedicalProfileCard } from "@/features/medical-profile/components/medical-profile-card";
 import { getPatientChart } from "@/features/patient-chart/data/patient-chart";
 import { requireRole } from "@/lib/auth/session";
 
@@ -30,6 +31,7 @@ export default async function DoctorPatientChartPage({
         description="Your visits with this patient, newest first, with your notes, the summaries you wrote and your prescriptions."
       />
       <ChartHeader chart={chart} />
+      {chart.ownProfile && <MedicalProfileCard profile={chart.ownProfile} />}
       <div className="grid gap-4">
         {chart.appointments.map((appointment) => (
           <ChartVisitCard
@@ -39,6 +41,7 @@ export default async function DoctorPatientChartPage({
             previousVisits={chart.previousVisits[appointment.id] ?? 0}
             prescription={chart.prescriptions[appointment.id] ?? null}
             summary={chart.summaries[appointment.id] ?? null}
+            profile={chart.profiles[appointment.careRecipientId] ?? null}
           />
         ))}
       </div>

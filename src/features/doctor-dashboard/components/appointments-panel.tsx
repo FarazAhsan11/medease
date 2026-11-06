@@ -7,6 +7,7 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetails } from "@/features/doctor-dashboard/components/appointment-details";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDateTime, formatTime } from "@/lib/datetime";
@@ -18,6 +19,8 @@ type AppointmentsPanelProps = {
   previousVisits: Record<string, number>;
   prescriptions: Record<string, PrescriptionSummary>;
   summaries: Record<string, VisitSummary>;
+  // By care recipient id.
+  profiles: Record<string, MedicalProfile>;
   // Shown when nothing is booked today.
   nextAppointment: Appointment | null;
 };
@@ -28,6 +31,7 @@ export function AppointmentsPanel({
   previousVisits,
   prescriptions,
   summaries,
+  profiles,
   nextAppointment,
 }: AppointmentsPanelProps) {
   const [selectedId, setSelectedId] = useState(appointments[0]?.id);
@@ -101,6 +105,7 @@ export function AppointmentsPanel({
               previousVisits={previousVisits[selected.id] ?? 0}
               prescription={prescriptions[selected.id] ?? null}
               summary={summaries[selected.id] ?? null}
+              profile={profiles[selected.careRecipientId] ?? null}
             />
           </div>
         </PanelCard>

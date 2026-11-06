@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { z } from "zod";
 
 import {
@@ -9,7 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 export const APPOINTMENT_COLUMNS =
-  "id, doctor_id, patient_id, starts_at, ends_at, status, reason, doctor_name, doctor_specialization, consultation_fee, timezone, patient_name, patient_email, patient_phone, cancelled_by, cancellation_reason, call_started_at, call_ended_at, created_at";
+  "id, doctor_id, patient_id, care_recipient_id, starts_at, ends_at, status, reason, doctor_name, doctor_specialization, consultation_fee, timezone, patient_name, patient_email, patient_phone, cancelled_by, cancellation_reason, call_started_at, call_ended_at, created_at";
 
 // Row level security already limits rows to the signed-in user; the explicit
 // filters keep queries on the right index.
@@ -68,7 +69,8 @@ export async function listDoctorPatientAppointments(
 }
 
 // One appointment, for its own patient or doctor only (row level security).
-export async function getAppointment(appointmentId: string) {
+// Cached per request: a page and the view inside it may both need it.
+export const getAppointment = cache(async (appointmentId: string) => {
   if (!z.uuid().safeParse(appointmentId).success) return null;
 
   const supabase = await createClient();
@@ -80,7 +82,7 @@ export async function getAppointment(appointmentId: string) {
 
   if (error) throw new Error(`appointments: ${error.message}`);
   return data ? toAppointment(data) : null;
-}
+});
 
 // Private notes for a doctor's appointments, keyed by appointment id.
 export async function getAppointmentNotes(appointmentIds: string[]) {

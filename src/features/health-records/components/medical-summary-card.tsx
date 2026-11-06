@@ -1,39 +1,12 @@
 import Link from "next/link";
 
+import { BadgeList } from "@/components/shared/badge-list";
 import { DetailList } from "@/components/shared/detail-list";
 import { PanelCard } from "@/components/shared/panel-card";
-import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import { patientRoutes } from "@/config/routes";
 import type { PatientProfile } from "@/features/settings/data/patient-profile";
 
 const NOT_ADDED = "Not added";
-
-function BadgeList({
-  label,
-  items,
-  tone,
-}: {
-  label: string;
-  items: string[];
-  tone: StatusTone;
-}) {
-  return (
-    <div>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      {items.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {items.map((item) => (
-            <StatusBadge key={item} tone={tone}>
-              {item}
-            </StatusBadge>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-1 text-sm font-medium">{NOT_ADDED}</p>
-      )}
-    </div>
-  );
-}
 
 export function MedicalSummaryCard({ profile }: { profile: PatientProfile }) {
   const emergencyContact =
@@ -66,11 +39,13 @@ export function MedicalSummaryCard({ profile }: { profile: PatientProfile }) {
             label="Allergies"
             items={profile.allergies}
             tone="danger"
+            empty={NOT_ADDED}
           />
           <BadgeList
             label="Ongoing conditions"
             items={profile.chronicConditions}
             tone="info"
+            empty={NOT_ADDED}
           />
         </div>
       </div>

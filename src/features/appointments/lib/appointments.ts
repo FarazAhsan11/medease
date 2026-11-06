@@ -8,6 +8,8 @@ export type Appointment = {
   id: string;
   doctorId: string;
   patientId: string;
+  // Who the visit is for: the account holder or a family member.
+  careRecipientId: string;
   startsAt: string;
   endsAt: string;
   status: AppointmentStatus;
@@ -30,6 +32,7 @@ export type AppointmentRow = {
   id: string;
   doctor_id: string;
   patient_id: string;
+  care_recipient_id: string;
   starts_at: string;
   ends_at: string;
   status: AppointmentStatus;
@@ -53,6 +56,7 @@ export function toAppointment(row: AppointmentRow): Appointment {
     id: row.id,
     doctorId: row.doctor_id,
     patientId: row.patient_id,
+    careRecipientId: row.care_recipient_id,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,

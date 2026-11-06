@@ -28,6 +28,7 @@ import {
 import { VerificationBanner } from "@/features/doctor-verification/components/verification-banner";
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
+import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 import { formatTime } from "@/lib/datetime";
@@ -46,9 +47,10 @@ export default async function DoctorOverviewPage() {
   const nextToday = upcoming.find((item) => isToday(item));
   const thisWeek = startingWithin(upcoming, 7);
   const todayIds = today.map((item) => item.id);
-  const [notes, summaries] = await Promise.all([
+  const [notes, summaries, profiles] = await Promise.all([
     getAppointmentNotes(todayIds),
     getVisitSummaries(todayIds),
+    getMedicalProfiles(today.map((item) => item.careRecipientId)),
   ]);
 
   const stats: Stat[] = [
@@ -107,6 +109,7 @@ export default async function DoctorOverviewPage() {
         previousVisits={countPreviousVisits(appointments)}
         prescriptions={prescriptions}
         summaries={summaries}
+        profiles={profiles}
         nextAppointment={upcoming[0] ?? null}
       />
       <RecentMessagesCard threads={messageThreads} />

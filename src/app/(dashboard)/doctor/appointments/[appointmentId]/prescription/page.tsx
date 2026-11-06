@@ -6,6 +6,7 @@ import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { doctorRoutes } from "@/config/routes";
 import { getAppointment } from "@/features/appointments/data/appointments";
 import { PrescriptionWorkspace } from "@/features/prescriptions/components/prescription-workspace";
+import { getMedicalProfile } from "@/features/medical-profile/data/medical-profiles";
 import { listAppointmentPrescriptions } from "@/features/prescriptions/data/prescriptions";
 import { requireRole } from "@/lib/auth/session";
 
@@ -21,7 +22,10 @@ export default async function DoctorPrescriptionPage({
 
   const appointment = await getAppointment(appointmentId);
   if (!appointment || appointment.doctorId !== user.id) notFound();
-  const prescriptions = await listAppointmentPrescriptions(appointment.id);
+  const [prescriptions, profile] = await Promise.all([
+    listAppointmentPrescriptions(appointment.id),
+    getMedicalProfile(appointment.careRecipientId),
+  ]);
 
   return (
     <>
@@ -37,6 +41,7 @@ export default async function DoctorPrescriptionPage({
       <PrescriptionWorkspace
         appointment={appointment}
         prescriptions={prescriptions}
+        profile={profile}
       />
     </>
   );

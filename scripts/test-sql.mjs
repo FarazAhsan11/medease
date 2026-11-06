@@ -1881,8 +1881,8 @@ async function testCareRecipients({ patient, secondPatient }) {
     ),
   );
   check(
-    "a doctor doesn't read them yet",
-    (await as(doctor, recipients)).data?.length === 0,
+    "a doctor doesn't read someone never booked with them",
+    !(await as(doctor, recipients)).data?.some((row) => row.id === mother),
   );
   denied("guests read nothing", await as(null, recipients));
   denied(
@@ -1919,6 +1919,84 @@ async function testCareRecipients({ patient, secondPatient }) {
     deleted.error?.message,
   );
   check("its recipients go with it", (await selfRow(leaving.id)) === undefined);
+}
+
+async function testDoctorMedicalProfiles({ patient, secondPatient }) {
+  section("Doctors read medical profiles (PRO-02)");
+
+  const doctor = await createDoctor();
+  const otherDoctor = await createDoctor();
+  const cancelledOnly = await createDoctor();
+  const selfOf = async (accountId) =>
+    (
+      await db.query(
+        `select id from public.care_recipients
+         where account_id = $1 and relation = 'self'`,
+        [accountId],
+      )
+    ).rows[0].id;
+
+  await createAppointment(doctor, patient, { from: 600 });
+  await createAppointment(cancelledOnly, patient, { status: "cancelled" });
+  await createAppointment(otherDoctor, secondPatient);
+  await db.query(
+    `update public.care_recipients set allergies = '{Penicillin}' where id = $1`,
+    [await selfOf(patient.id)],
+  );
+
+  const self = await selfOf(patient.id);
+  const profile = `select id, allergies from public.care_recipients where id = $1`;
+  const read = await as(doctor, profile, [self]);
+  check(
+    "a doctor reads the profile of someone booked with them",
+    read.data?.[0]?.allergies?.[0] === "Penicillin",
+    read.error?.message,
+  );
+  check(
+    "a doctor with only a cancelled booking reads nothing",
+    (await as(cancelledOnly, profile, [self])).data?.length === 0,
+  );
+  check(
+    "a doctor doesn't read another doctor's patient",
+    (await as(otherDoctor, profile, [self])).data?.length === 0,
+  );
+  check(
+    "a doctor reads only their own patients",
+    (
+      await as(doctor, `select account_id from public.care_recipients`)
+    ).data?.every((row) => row.account_id === patient.id),
+  );
+  check(
+    "a doctor without a second factor reads nothing",
+    (await as({ ...doctor, aal: "aal1" }, profile, [self])).data?.length === 0,
+  );
+
+  const { rows: dependents } = await db.query(
+    `insert into public.care_recipients (account_id, relation, first_name, last_name)
+     values ($1, 'child', 'Child', 'Patient') returning id`,
+    [patient.id],
+  );
+  check(
+    "booking the account holder doesn't open their family's profiles",
+    (await as(doctor, profile, [dependents[0].id])).data?.length === 0,
+  );
+
+  denied(
+    "a doctor can't change a profile",
+    await as(
+      doctor,
+      `update public.care_recipients set allergies = '{}' where id = $1`,
+      [self],
+    ),
+  );
+  const unchanged = await db.query(
+    `select allergies from public.care_recipients where id = $1`,
+    [self],
+  );
+  check(
+    "the profile is unchanged",
+    unchanged.rows[0].allergies[0] === "Penicillin",
+  );
 }
 
 async function testPatientProfile({ patient, secondPatient }) {
@@ -3964,6 +4042,7 @@ try {
   await testVerification(await freshPatients());
   await testReview(await freshPatients());
   await testCareRecipients(await freshPatients());
+  await testDoctorMedicalProfiles(await freshPatients());
   await testPatientProfile(await freshPatients());
   await testSecondFactor(await freshPatients());
   await testRecoveryCodes(await freshPatients());

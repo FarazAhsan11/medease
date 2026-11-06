@@ -14,6 +14,8 @@ import {
 import { AppointmentNotesForm } from "@/features/doctor-dashboard/components/appointment-notes-form";
 import { AppointmentOutcomeButtons } from "@/features/doctor-dashboard/components/appointment-outcome-buttons";
 import { AppointmentPrescription } from "@/features/doctor-dashboard/components/appointment-prescription";
+import { MedicalProfileDetails } from "@/features/medical-profile/components/medical-profile-details";
+import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { DoctorVisitSummary } from "@/features/visit-summaries/components/doctor-visit-summary";
@@ -44,6 +46,8 @@ type AppointmentDetailsProps = {
   previousVisits: number;
   prescription: PrescriptionSummary | null;
   summary: VisitSummary | null;
+  // Missing when the booking was cancelled and nothing else is booked.
+  profile: MedicalProfile | null;
 };
 
 export function AppointmentDetails({
@@ -52,6 +56,7 @@ export function AppointmentDetails({
   previousVisits,
   prescription,
   summary,
+  profile,
 }: AppointmentDetailsProps) {
   const { timezone } = appointment;
   const call = describeCall(appointment);
@@ -125,6 +130,13 @@ export function AppointmentDetails({
             : appointment.reason) ?? "Not provided"}
         </p>
       </div>
+
+      {appointment.status !== "cancelled" && profile && (
+        <div className="grid gap-3 border-t pt-5">
+          <p className="text-sm font-medium">Medical profile</p>
+          <MedicalProfileDetails profile={profile} />
+        </div>
+      )}
 
       {appointment.status !== "cancelled" && (
         <div className="border-t pt-5">

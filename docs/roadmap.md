@@ -31,7 +31,8 @@ Requirement status is in [srs.md](./srs.md).
 - REC-02 documents are built and live-tested (2026-11-04) on the dev server against the real database, with throwaway accounts: a PDF and a JPEG upload, HTML named `.pdf` is refused and deleted, files open on a 1-minute signed link that carries no name, a guest goes to login and another patient gets 404, delete removes the row and the file, the audit log has each add and delete, and the page fits 375px. `20261104120000_patient_documents.sql` is applied. Decided 2026-11-04: only the patient sees their documents until REC-03 sharing, which waits for SEC-06 malware scanning. Files left in `incoming/` by an upload that never finished aren't cleaned up yet, and deleting an account (AUTH-05) must remove the patient's files from Storage.
 - REC-04 timeline is built (2026-11-04) and live-tested with a throwaway patient and doctor: past visits (with their summary's diagnosis and follow-up), prescriptions and documents in one list on `/patient/records`, newest first, grouped by month, filtered by `?type=`. Cancelled, missed and upcoming visits stay out. It stays Partial: lab reports join with labs (Milestone 2 item 5), and choosing whose timeline (care recipients) comes with dependents (APT-09). No migration.
 - REC-05 patient chart is built (2026-11-04) and live-tested with throwaway doctors and patients: `/doctor/patients/[patientId]` shows one doctor's visits with a patient (newest first, including cancelled and upcoming), each with the reason, the summary, the prescription and the private notes, and Details opens the usual appointment sheet. It opens only for a patient the doctor has seen (a visit that has taken place); a patient with only a booking, another doctor's patient and a bad id all get the not-found page, and another doctor's visits and notes never appear. The patients list has an "Open chart" link for seen patients. It stays Partial: shared documents join with REC-03 and lab results with labs. No migration. Also fixed: long emails no longer widen the patients list and chart on phones.
-- Next in Milestone 2 item 2: REC-03 sharing and PRO-08 wait for SEC-06 malware scanning, which needs a decision on the scanner. Otherwise move to item 3 (patient profile and family).
+- Next in Milestone 2 item 2: REC-03 sharing and PRO-08 wait for SEC-06 malware scanning, which needs a decision on the scanner.
+- PRO-02 is built (2026-11-06) and tested end to end on the dev server against the real database, with throwaway accounts. A patient saves allergies, conditions and medicines in settings. Their doctor then sees them in the appointment details, in a sheet on the call screen, on the prescription page (left out of the printout) and on the patient chart. A later edit shows up on the doctor's next page load. A doctor whose only booking with someone was cancelled sees nothing. Pages fit 375px. `20261106120000_doctor_medical_profiles.sql` is applied. Next in item 3: PRO-03 family screens with APT-09, then PRO-05 and PRO-07.
 - Done 2026-11-03 (PRV-01): every form submitted through `onSubmit` now has `method="post"`, so a click before hydration posts to the page (which just renders it again) instead of putting passwords, codes or clinical fields in the URL. Keep it on new forms. PRV-01 stays Partial: the doctor's patient search still puts a patient's name in the URL as `?q=`.
 - SUP-02: the contact form is still not wired (Send does nothing). Needs `support_tickets`, the mailer and `rateLimits.contactIp`. Then ADM-11.
 - SUP-07: re-read the patient and doctor overviews for leftover mock cards (lab results card, recent messages), and remove the unused `src/components/icons/social-icons.tsx`.
@@ -48,7 +49,7 @@ Requirement status is in [srs.md](./srs.md).
 - The 72-hour breach target has no plan behind it yet (PRV-07).
 - Google receives email content: moving off Gmail (NTF-04) changes the provider table. A TURN relay (CALL-03) adds a provider too.
 
-Last updated: 2026-11-04
+Last updated: 2026-11-06
 
 ## Reminder scheduler (REL-07, built 2026-11-02)
 
@@ -195,13 +196,14 @@ The timeline is built (REC-04, 2026-11-04) from the existing loaders, under the 
 
 The doctor's patient chart is built (REC-05, 2026-11-04) at `/doctor/patients/[patientId]`, from the same loaders filtered to one patient, so row level security keeps it to the doctor's own records. Shared documents join it with REC-03.
 
-
 - **Database**: add a patient-visible summary next to the private notes (diagnosis, advice, follow-up date), e.g. a `visit_summaries` table, so private notes stay doctor-only. `patient_documents` table plus a private Storage bucket, with paths under the patient's id.
 - **Doctor UI**: summary fields in the appointment details sheet; per-patient history (past visits, summaries, prescriptions) from the patients list.
 - **Patient UI**: real `/patient/records` with visit history and document upload/download (`documents-table`). Downloads use short-lived signed URLs.
 - **Done when**: the patient sees a summary for each completed visit and can upload a report that their doctor can open.
 
 ### 3. Patient profile and settings
+
+The profile saves for real (PRO-01), and doctors see it (PRO-02, 2026-11-06): a policy on `care_recipients` lets a doctor read the profile of anyone with a booking with them that wasn't cancelled. The doctor-side view lives in `src/features/medical-profile/`.
 
 - **Database**: extend `patient_profiles` with date of birth, gender, blood group, allergies, chronic conditions, emergency contact.
 - **UI**: `personal-info-form` saves for real; `medical-summary-card` on records reads it; doctors see allergies and conditions in the appointment details and during a call.

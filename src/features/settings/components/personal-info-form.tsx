@@ -116,7 +116,7 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
   return (
     <PanelCard
       title="Personal information"
-      description="Your name and phone number are shared with doctors you book."
+      description="Your name, phone number and medical profile are shared with doctors you book."
     >
       <form
         method="post"
