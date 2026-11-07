@@ -23,6 +23,7 @@ export type DoctorReview = {
   city: string | null;
   status: VerificationStatus;
   note: string | null;
+  submittedAt: string | null;
   verifiedAt: string | null;
   createdAt: string;
   documents: DoctorDocuments;
@@ -51,6 +52,7 @@ type ReviewRow = {
   degree_path: string | null;
   verification_status: VerificationStatus;
   verification_note: string | null;
+  submitted_at: string | null;
   verified_at: string | null;
   created_at: string;
 };
@@ -70,6 +72,7 @@ function toReview(row: ReviewRow): DoctorReview {
     city: row.city,
     status: row.verification_status,
     note: row.verification_note,
+    submittedAt: row.submitted_at,
     verifiedAt: row.verified_at,
     createdAt: row.created_at,
     documents: {

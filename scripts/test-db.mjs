@@ -471,17 +471,47 @@ async function testCalls({ patient, patientUser, secondPatient }) {
   }
 }
 
+// What the server does after verifyUpload passes a doctor's file.
+const markDoctorFile = (who, path, ownerId) =>
+  who.rpc("mark_upload_checked", {
+    p_bucket: "doctor-documents",
+    p_path: path,
+    p_owner_id: ownerId,
+  });
+
+async function checkedDoctorFile(doctorId, kind) {
+  const path = `${doctorId}/${kind}-${randomUUID()}.pdf`;
+  const { error } = await markDoctorFile(admin, path, doctorId);
+  if (error) throw new Error(`mark_upload_checked: ${error.message}`);
+  return path;
+}
+
 async function testDocuments({ patient }) {
   section("Doctors send documents (FIX-07)");
 
   const doctor = await createDoctor({ status: "pending" });
   const client = await signIn(doctor);
   const save = (who, paths) => who.rpc("save_verification_documents", paths);
-  const licensePath = `${doctor.id}/license.pdf`;
+  const licensePath = await checkedDoctorFile(doctor.id, "license");
 
   succeeded(
-    "a doctor saves a document",
+    "a doctor saves a checked document",
     await save(client, { p_license_path: licensePath }),
+  );
+  refused(
+    "a file the server didn't check is refused",
+    await save(client, {
+      p_license_path: `${doctor.id}/license-${randomUUID()}.pdf`,
+    }),
+    "upload_not_checked",
+  );
+  denied(
+    "a doctor can't mark their own file checked",
+    await markDoctorFile(
+      client,
+      `${doctor.id}/license-${randomUUID()}.pdf`,
+      doctor.id,
+    ),
   );
   refused(
     "a patient can't use it",
@@ -494,7 +524,9 @@ async function testDocuments({ patient }) {
   );
   refused(
     "a path in someone else's folder is refused",
-    await save(client, { p_license_path: `${randomUUID()}/license.pdf` }),
+    await save(client, {
+      p_license_path: `${randomUUID()}/license-${randomUUID()}.pdf`,
+    }),
     "invalid_path",
   );
 
@@ -518,7 +550,9 @@ async function testDocuments({ patient }) {
   const askedClient = await signIn(asked);
   succeeded(
     "new documents answer a request",
-    await save(askedClient, { p_degree_path: `${asked.id}/degree.pdf` }),
+    await save(askedClient, {
+      p_degree_path: await checkedDoctorFile(asked.id, "degree"),
+    }),
   );
   const answered = await statusOf(asked.id);
   check(
@@ -549,10 +583,20 @@ async function testReview({ patient, thirdUser }) {
 
   const doctor = await createDoctor({ status: "pending", documents: true });
   const doctorClient = await signIn(doctor);
-  const review = (client, doctorId, decision, note) =>
+  // The submission the review page showed.
+  const submittedAt = async (doctorId) =>
+    (
+      await admin
+        .from("doctor_profiles")
+        .select("submitted_at")
+        .eq("id", doctorId)
+        .single()
+    ).data?.submitted_at ?? null;
+  const review = async (client, doctorId, decision, note, seen) =>
     client.rpc("admin_review_doctor", {
       p_doctor_id: doctorId,
       p_decision: decision,
+      p_submitted_at: seen === undefined ? await submittedAt(doctorId) : seen,
       p_note: note,
     });
 
@@ -580,6 +624,25 @@ async function testReview({ patient, thirdUser }) {
   check(
     "after all that the doctor is still pending",
     (await statusOf(doctor.id)).verification_status === "pending",
+  );
+
+  const resent = await createDoctor({ status: "pending", documents: true });
+  const resentClient = await signIn(resent);
+  await resentClient.rpc("save_verification_documents", {
+    p_degree_path: await checkedDoctorFile(resent.id, "degree"),
+  });
+  const seenFirst = await submittedAt(resent.id);
+  await resentClient.rpc("save_verification_documents", {
+    p_license_path: await checkedDoctorFile(resent.id, "license"),
+  });
+  refused(
+    "a decision on documents the doctor has since changed is refused",
+    await review(verified, resent.id, "rejected", TAG, seenFirst),
+    "details_changed",
+  );
+  succeeded(
+    "the submission time survives the round trip through the API",
+    await review(verified, resent.id, "rejected", TAG),
   );
 
   refused(

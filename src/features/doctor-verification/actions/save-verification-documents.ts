@@ -14,11 +14,16 @@ import { formError, type FormState } from "@/lib/form-state";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+const UPLOAD_FAILED_MESSAGE =
+  "One of your files didn't upload correctly. Please try again.";
+
 const CLOSED_MESSAGE =
   "Your documents have been reviewed, so they can't be changed here. Please contact support.";
 
-// Runs after the browser has uploaded the files: checks them, records them
-// through save_verification_documents, and removes any files they replace.
+// Runs after the browser has uploaded the files: checks each one and records
+// it as checked, saves them through save_verification_documents (which takes
+// only checked files), and removes any files they replace. New files are
+// deleted if the save fails.
 export const saveVerificationDocuments = withFormErrors<FormState, unknown>(
   async (_previousState, input) => {
     const parsed = uploadedDocumentsSchema.safeParse(input);
@@ -40,16 +45,36 @@ export const saveVerificationDocuments = withFormErrors<FormState, unknown>(
     }
 
     const admin = createAdminClient();
+    // Only ever delete inside the doctor's own folder.
+    const discardUploads = () =>
+      admin.storage
+        .from(DOCUMENTS_BUCKET)
+        .remove(
+          parsed.data
+            .map(({ path }) => path)
+            .filter((path) => path.startsWith(`${user.id}/`)),
+        );
+
     const checks = await Promise.all(
       parsed.data.map(({ kind, path }) =>
         isAcceptableUpload(admin, user.id, kind, path),
       ),
     );
     if (!checks.every(Boolean)) {
-      return formError(
-        "One of your files didn't upload correctly. Please try again.",
-        "invalid_upload",
-      );
+      await discardUploads();
+      return formError(UPLOAD_FAILED_MESSAGE, "invalid_upload");
+    }
+
+    for (const { path } of parsed.data) {
+      const { error } = await admin.rpc("mark_upload_checked", {
+        p_bucket: DOCUMENTS_BUCKET,
+        p_path: path,
+        p_owner_id: user.id,
+      });
+      if (error) {
+        await discardUploads();
+        return databaseErrorState(error, {}, "Recording a checked document");
+      }
     }
 
     const pathOf = (kind: string) =>
@@ -62,9 +87,14 @@ export const saveVerificationDocuments = withFormErrors<FormState, unknown>(
       p_degree_path: pathOf("degree"),
     });
     if (error) {
+      await discardUploads();
       return databaseErrorState(
         error,
-        { verification_closed: CLOSED_MESSAGE },
+        {
+          verification_closed: CLOSED_MESSAGE,
+          invalid_path: UPLOAD_FAILED_MESSAGE,
+          upload_not_checked: UPLOAD_FAILED_MESSAGE,
+        },
         "Saving verification documents",
       );
     }

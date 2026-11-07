@@ -1534,18 +1534,84 @@ async function testPatientDocuments({ patient, secondPatient }) {
   );
 }
 
+// A doctor's file at the path the app makes, recorded as checked the way the
+// server does after verifyUpload passes it.
+async function checkedDoctorFile(doctorId, kind, extension = "pdf") {
+  const path = `${doctorId}/${kind}-${randomUUID()}.${extension}`;
+  await rpc({ role: "service_role" }, "mark_upload_checked", {
+    p_bucket: "doctor-documents",
+    p_path: path,
+    p_owner_id: doctorId,
+  });
+  return path;
+}
+
+// The submission an admin's page showed, as PostgREST would send it.
+const doctorSubmittedAt = async (doctorId) =>
+  (
+    await db.query(
+      `select submitted_at::text as at from public.doctor_profiles where id = $1`,
+      [doctorId],
+    )
+  ).rows[0]?.at ?? null;
+
 async function testVerification({ patient }) {
   section("Doctors send documents (FIX-07, ADM-02)");
 
   const doctor = await createDoctor({ status: "pending" });
   const save = (caller, paths) =>
     rpc(caller, "save_verification_documents", paths);
-  const licensePath = `${doctor.id}/license.pdf`;
+  const licensePath = await checkedDoctorFile(doctor.id, "license");
 
   succeeded(
-    "a doctor saves a document",
+    "a doctor saves a checked document",
     await save(doctor, { p_license_path: licensePath }),
   );
+  const savedRow = await doctorRow(doctor.id);
+  check(
+    "it's stored with the submission time",
+    savedRow.license_document_path === licensePath &&
+      savedRow.submitted_at !== null,
+  );
+  refused(
+    "a checked file is taken once",
+    await save(doctor, { p_license_path: licensePath }),
+    "upload_not_checked",
+  );
+  refused(
+    "a file the server didn't check is refused",
+    await save(doctor, {
+      p_license_path: `${doctor.id}/license-${randomUUID()}.pdf`,
+    }),
+    "upload_not_checked",
+  );
+  const photo = await checkedDoctorFile(doctor.id, "photo", "png");
+  const unchecked = `${doctor.id}/degree-${randomUUID()}.pdf`;
+  refused(
+    "one unchecked file refuses the whole save",
+    await save(doctor, { p_photo_path: photo, p_degree_path: unchecked }),
+    "upload_not_checked",
+  );
+  check(
+    "and nothing changed",
+    (await doctorRow(doctor.id)).photo_path === savedRow.photo_path,
+  );
+  for (const [label, paths] of [
+    [
+      "a path the app didn't make",
+      { p_license_path: `${doctor.id}/license.pdf` },
+    ],
+    [
+      "a type the kind doesn't take",
+      { p_degree_path: `${doctor.id}/degree-${randomUUID()}.png` },
+    ],
+    [
+      "a file of another kind",
+      { p_photo_path: `${doctor.id}/license-${randomUUID()}.jpg` },
+    ],
+  ]) {
+    refused(`${label} is refused`, await save(doctor, paths), "invalid_path");
+  }
   refused(
     "a patient can't use it",
     await save(patient, { p_license_path: licensePath }),
@@ -1562,7 +1628,9 @@ async function testVerification({ patient }) {
   );
   refused(
     "a path in someone else's folder is refused",
-    await save(doctor, { p_license_path: `${randomUUID()}/license.pdf` }),
+    await save(doctor, {
+      p_license_path: `${randomUUID()}/license-${randomUUID()}.pdf`,
+    }),
     "invalid_path",
   );
   denied(
@@ -1585,7 +1653,9 @@ async function testVerification({ patient }) {
   );
   succeeded(
     "new documents answer a request",
-    await save(asked, { p_degree_path: `${asked.id}/degree.pdf` }),
+    await save(asked, {
+      p_degree_path: await checkedDoctorFile(asked.id, "degree"),
+    }),
   );
   const answered = await doctorRow(asked.id);
   check(
@@ -1611,10 +1681,12 @@ async function testReview({ patient }) {
   const verified = { ...adminUser, aal: "aal2" };
   const passwordOnly = { ...adminUser, aal: "aal1" };
   const doctor = await createDoctor({ status: "pending", documents: true });
-  const review = (caller, doctorId, decision, note) =>
+  const review = async (caller, doctorId, decision, note, seen) =>
     rpc(caller, "admin_review_doctor", {
       p_doctor_id: doctorId,
       p_decision: decision,
+      p_submitted_at:
+        seen === undefined ? await doctorSubmittedAt(doctorId) : seen,
       p_note: note,
     });
 
@@ -1678,6 +1750,24 @@ async function testReview({ patient }) {
       "approved",
     ),
     "email_not_confirmed",
+  );
+
+  const resent = await createDoctor({ status: "pending", documents: true });
+  await rpc(resent, "save_verification_documents", {
+    p_degree_path: await checkedDoctorFile(resent.id, "degree"),
+  });
+  const seenFirst = await doctorSubmittedAt(resent.id);
+  await rpc(resent, "save_verification_documents", {
+    p_license_path: await checkedDoctorFile(resent.id, "license"),
+  });
+  refused(
+    "a decision on documents the doctor has since changed is refused",
+    await review(verified, resent.id, "approved", undefined, seenFirst),
+    "details_changed",
+  );
+  succeeded(
+    "a decision on the latest documents goes through",
+    await review(verified, resent.id, "approved"),
   );
 
   check("before approval they aren't listed", !(await isListed(doctor.id)));
@@ -3060,7 +3150,7 @@ async function testSecondFactor({ patient, secondPatient }) {
   succeeded(
     "a new doctor's documents aren't clinical data, so they aren't blocked",
     await rpc({ ...newDoctor, aal: "aal1" }, "save_verification_documents", {
-      p_license_path: `${newDoctor.id}/license.pdf`,
+      p_license_path: await checkedDoctorFile(newDoctor.id, "license"),
     }),
   );
 
@@ -3407,6 +3497,7 @@ async function testNotifications({ patient, secondPatient }) {
     await rpc(adminUser, "admin_review_doctor", {
       p_doctor_id: reviewed.id,
       p_decision: decision,
+      p_submitted_at: null,
       p_note: TAG,
     });
     check(

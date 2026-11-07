@@ -7,7 +7,7 @@ import {
 } from "@/features/lab-verification/lib/lab-verification";
 import type { FormState } from "@/lib/form-state";
 import { MB } from "@/lib/uploads/file-size";
-import { reviewDecisions } from "@/lib/verification";
+import { reviewDecisions, submittedAtField } from "@/lib/verification";
 
 const details = {
   registrationNumber: z
@@ -66,11 +66,7 @@ export type PreparedLicenseUploadState = FormState & {
 export const reviewLabSchema = z
   .object({
     labId: z.uuid(),
-    // The submission the admin looked at; empty if the lab never sent one.
-    submittedAt: z
-      .string()
-      .max(40)
-      .transform((value) => value || null),
+    submittedAt: submittedAtField,
     decision: z.enum(reviewDecisions),
     note: z.string().trim().max(500, "Use 500 characters or fewer.").optional(),
   })

@@ -8,6 +8,7 @@ import {
 } from "@/features/doctor-verification/lib/document-rules";
 import type { FormState } from "@/lib/form-state";
 import { MB } from "@/lib/uploads/file-size";
+import { reviewDecisions, submittedAtField } from "@/lib/verification";
 
 // An empty file input still submits a nameless, zero-byte File.
 function documentFile(kind: DocumentKind) {
@@ -66,7 +67,8 @@ export type PreparedUploadsState = FormState & { uploads?: DocumentUpload[] };
 export const reviewDoctorSchema = z
   .object({
     doctorId: z.uuid(),
-    decision: z.enum(["approved", "needs_info", "rejected"]),
+    submittedAt: submittedAtField,
+    decision: z.enum(reviewDecisions),
     note: z.string().trim().max(500, "Use 500 characters or fewer.").optional(),
   })
   .refine(({ decision, note }) => decision === "approved" || note, {

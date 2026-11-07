@@ -17,15 +17,17 @@ Phase 0 of [srs.md](./srs.md): ADM-01 to ADM-03, ADM-05, AUTH-04, DIR-02, PRC-08
 
 ## Rules
 
-| Case                                                | What happens                                                                                                |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Approving without all three documents               | Refused by the database (`documents_missing`); the button is disabled.                                      |
-| Approving a doctor who hasn't confirmed their email | Refused by the database (`email_not_confirmed`).                                                            |
-| Doctor tries to change their own status             | Their column grants on `doctor_profiles` don't include it, and `admin_review_doctor` refuses them.          |
-| Replacing files after a decision                    | Refused (`verification_closed`), and no new upload link is issued, so the files stay as the admin saw them. |
-| Two admins review the same doctor                   | The second is refused (`already_reviewed`).                                                                 |
-| Doctor changes a verified field later               | Not handled yet (ADM-06).                                                                                   |
-| Approved doctor without hours                       | Listed as "Not taking bookings", with no slots.                                                             |
+| Case                                                                                | What happens                                                                                                            |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Approving without all three documents                                               | Refused by the database (`documents_missing`); the button is disabled.                                                  |
+| Approving a doctor who hasn't confirmed their email                                 | Refused by the database (`email_not_confirmed`).                                                                        |
+| Doctor tries to change their own status                                             | Their column grants on `doctor_profiles` don't include it, and `admin_review_doctor` refuses them.                      |
+| Replacing files after a decision                                                    | Refused (`verification_closed`), and no new upload link is issued, so the files stay as the admin saw them.             |
+| Two admins review the same doctor                                                   | The second is refused (`already_reviewed`).                                                                             |
+| Doctor sends new documents while an admin has the old ones open                     | The decision is refused (`details_changed`): the review page sends the `submitted_at` it showed, and the admin reloads. |
+| Calling `save_verification_documents` directly with a file the server never checked | Refused (`upload_not_checked`), and a path the app didn't make is refused (`invalid_path`).                             |
+| Doctor changes a verified field later                                               | Not handled yet (ADM-06).                                                                                               |
+| Approved doctor without hours                                                       | Listed as "Not taking bookings", with no slots.                                                                         |
 
 ## Uploads
 
@@ -33,7 +35,7 @@ Documents go straight from the browser to Supabase Storage, never through a Serv
 
 1. The browser checks each file's type and size, then asks `prepareDocumentUploads` for signed upload links. That action checks the doctor and that their documents can still change.
 2. The browser uploads each file on its link. The bucket enforces 5 MB and the allowed file types on its own.
-3. `saveVerificationDocuments` checks what actually arrived (path, size, type), records it through `save_verification_documents`, and deletes any file it replaces.
+3. `saveVerificationDocuments` checks what actually arrived (path, size, type) and records each file that passes in `private.checked_uploads` through `mark_upload_checked` (secret key only). `save_verification_documents` takes a file only with that record, used once, at the path format the app makes. If anything fails, the new files are deleted; on success, the files they replace are.
 
 Every upload gets a new path (`<doctor id>/<kind>-<uuid>.<ext>`) and no upsert, so a path takes one file and an old link can't swap a file after review. Storage has no insert policy on this bucket: a signed link is the only way in. Sign-up takes no files because the account doesn't exist yet, which also keeps anonymous visitors out of the bucket.
 
@@ -68,7 +70,7 @@ Existing doctors stay `pending` when the migration runs. `npm run db:seed` marks
 
 ## Labs (ADM-04)
 
-Labs go through the same review as doctors, with the same statuses and rules. Migration: `supabase/migrations/20261107180000_lab_verification.sql`. Code: `src/features/lab-verification/`.
+Labs go through the same review as doctors, with the same statuses and rules. Migration: `supabase/migrations/20261107180000_lab_verification.sql`; the same upload and stale-decision checks came to doctors in `20261107200000_doctor_verification_checks.sql`. Code: `src/features/lab-verification/`.
 
 1. A lab signs up with its name, registration number and address. It starts as `pending`: it can sign in and use its dashboard, but it isn't in `lab_directory`, so patients can't find or book it. The overview shows a banner, and `/lab/verification` shows the status and checklist.
 2. On that page the lab chooses who licensed it, confirms the licence number and the address on the licence, and uploads the licence (PDF, JPG or PNG, up to 5 MB). Sending puts it back in the queue as `pending`.
@@ -94,6 +96,5 @@ Anything that shows labs to patients (LAB-02, LAB-03) must read through `lab_dir
 - **Who licenses labs.** Private clinical labs need a licence from the provincial healthcare commission where they operate: Punjab Healthcare Commission, Sindh Healthcare Commission, Khyber Pakhtunkhwa Health Care Commission, Islamabad Healthcare Regulatory Authority or Balochistan Healthcare Commission. Labs pick one, or "Another authority". The review page links to the Punjab commission's public licence lookup ([os.phc.org.pk/verify.aspx](https://os.phc.org.pk/verify.aspx)). The other commissions publish no lookup we could find, so the admin checks with them directly. Unlicensed labs are being sealed and fined in Punjab ([Dawn](https://www.dawn.com/news/1439333), [The News](https://thenews.com.pk/amp/1274012-23-labs-diagnostic-centres-sealed)), and Sindh registration and licensing are online but slow ([Dawn](https://www.dawn.com/news/1926771)).
 - **Accreditation is not licensing.** ISO 15189 accreditation from PNAC ([pnac.gov.pk](https://www.pnac.gov.pk/Medical-Laboratories/Withdrawal)) covers only some labs, so it isn't required. It can become an optional badge later.
 - **Licence expiry** isn't tracked yet (ADM-14).
-- **Doctors** don't have the checked-upload record or the `details_changed` check yet: `save_verification_documents` still trusts the app for the file check, and a doctor's decision isn't tied to the version the admin saw. Worth adding the same way.
 - **Files** follow the doctor pattern: a private `lab-documents` bucket that takes PDF, JPEG and PNG up to 5 MB, with paths `<lab id>/license-<uuid>.<ext>`. A signed upload link is issued only while the lab is under review, and `verifyUpload` checks every file. There is no insert policy, and admins read through a 5-minute signed link under `private.is_admin()`. Upload links count toward `rateLimits.uploadUser`, and each save counts toward `rateLimits.verificationUser`.
 - **Shared parts.** The status types are in `src/lib/verification.ts`, the update email and `notifyReviewed` in `src/lib/verification-notifications.server.ts`, and `createSignedUpload` and `MB` in `src/lib/uploads/`. The status badge, decision dialog, banner, checklist and document link are in `src/components/shared/`, so doctor and lab reviews look and behave the same.

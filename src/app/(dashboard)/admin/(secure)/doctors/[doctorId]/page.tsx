@@ -123,7 +123,10 @@ export default async function AdminDoctorReviewPage({
               <ReviewDecisionDialog
                 key={decision}
                 action={reviewDoctor}
-                target={{ doctorId: review.id }}
+                target={{
+                  doctorId: review.id,
+                  submittedAt: review.submittedAt ?? "",
+                }}
                 decision={decision}
                 copy={doctorReviewCopy[decision]}
                 disabled={decision === "approved" && !canApprove}

@@ -19,10 +19,13 @@ const messages: Record<string, string> = {
   email_not_confirmed: "This doctor hasn't confirmed their email yet.",
   documents_missing: "This doctor hasn't uploaded all their documents yet.",
   note_required: "Tell the doctor what's needed.",
+  details_changed:
+    "The doctor has sent new documents since you opened this page. Reload to see them.",
 };
 
-// admin_review_doctor re-checks the admin, the status and the documents, and
-// writes the audit log entry in the same transaction.
+// admin_review_doctor re-checks the admin, the status and the documents,
+// refuses the decision if the doctor has sent new documents since the admin
+// loaded them, and writes the audit log entry in the same transaction.
 export const reviewDoctor = withFormErrors(
   async (_previousState: FormState, formData: FormData) => {
     const parsed = reviewDoctorSchema.safeParse(Object.fromEntries(formData));
@@ -33,11 +36,12 @@ export const reviewDoctor = withFormErrors(
       return formError("Only admins can review doctors.", "not_admin");
     }
 
-    const { doctorId, decision, note } = parsed.data;
+    const { doctorId, submittedAt, decision, note } = parsed.data;
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("admin_review_doctor", {
       p_doctor_id: doctorId,
       p_decision: decision,
+      p_submitted_at: submittedAt,
       p_note: note,
     });
     if (error) return databaseErrorState(error, messages, "Reviewing a doctor");
