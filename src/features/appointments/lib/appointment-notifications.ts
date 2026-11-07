@@ -7,8 +7,14 @@ import {
   newBookingEmail,
 } from "@/features/appointments/emails/appointment-email-templates";
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import { wantsEmail } from "@/features/notifications/lib/email-preferences.server";
 import { getSiteUrl } from "@/lib/env.server";
 import { sendMailAfterResponse } from "@/lib/mailer.server";
+
+// The patient's booking and cancellation emails always go; the doctor can turn
+// theirs off.
+const doctorWants = (appointment: Appointment) => () =>
+  wantsEmail(appointment.doctorId, "doctor_bookings");
 
 export function notifyAppointmentBooked(
   appointment: Appointment,
@@ -29,6 +35,7 @@ export function notifyAppointmentBooked(
         appointment,
         new URL(doctorRoutes.appointments, siteUrl).toString(),
       ),
+      wanted: doctorWants(appointment),
     },
   ]);
 }
@@ -56,6 +63,7 @@ export function notifyAppointmentCancelled(
             "doctor",
             new URL(doctorRoutes.appointments, siteUrl).toString(),
           ),
+          wanted: doctorWants(appointment),
         },
   ]);
 }

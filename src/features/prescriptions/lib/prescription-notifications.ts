@@ -5,6 +5,7 @@ import {
   prescriptionCancelledEmail,
   prescriptionIssuedEmail,
 } from "@/features/prescriptions/emails/prescription-email-templates";
+import { wantsEmail } from "@/features/notifications/lib/email-preferences.server";
 import type { Prescription } from "@/features/prescriptions/lib/prescriptions";
 import { getSiteUrl } from "@/lib/env.server";
 import { sendMailAfterResponse } from "@/lib/mailer.server";
@@ -15,6 +16,10 @@ function prescriptionUrl(prescription: Prescription) {
     getSiteUrl(),
   ).toString();
 }
+
+// The bell always has it; the email is the patient's choice.
+const patientWants = (prescription: Prescription) => () =>
+  wantsEmail(prescription.patientId, "prescriptions");
 
 export function notifyPrescriptionIssued(
   prescription: Prescription,
@@ -29,6 +34,7 @@ export function notifyPrescriptionIssued(
         replaced,
         prescriptionUrl(prescription),
       ),
+      wanted: patientWants(prescription),
     },
   ]);
 }
@@ -44,6 +50,7 @@ export function notifyPrescriptionCancelled(
         prescription,
         prescriptionUrl(prescription),
       ),
+      wanted: patientWants(prescription),
     },
   ]);
 }

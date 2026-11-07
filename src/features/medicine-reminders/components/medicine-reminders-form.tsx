@@ -4,6 +4,7 @@ import { Loader2Icon } from "lucide-react";
 import { useState } from "react";
 
 import { FormField, fieldErrorProps } from "@/components/shared/form-field";
+import { SettingRow } from "@/components/shared/setting-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,24 +48,17 @@ export function MedicineRemindersForm({
       className="grid gap-4 p-5"
       noValidate
     >
-      <div className="flex items-start justify-between gap-4 rounded-xl bg-muted p-3">
-        <div>
-          <label
-            htmlFor="medicine-reminders-enabled"
-            className="text-sm font-medium"
-          >
-            Email me at dose times
-          </label>
-          <p className="text-xs text-muted-foreground">
-            Only on days you have a dose due.
-          </p>
-        </div>
+      <SettingRow
+        label="Email me at dose times"
+        description="Only on days you have a dose due."
+        htmlFor="medicine-reminders-enabled"
+      >
         <Switch
           id="medicine-reminders-enabled"
           name="enabled"
           defaultChecked={initial.enabled}
         />
-      </div>
+      </SettingRow>
 
       <div className="grid items-start gap-4 sm:grid-cols-3">
         {doseTimes.map(({ name, label }) => {

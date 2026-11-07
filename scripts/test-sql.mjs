@@ -3592,6 +3592,218 @@ async function testMedicineReminderSettings() {
   check("and nobody else's", (await rowOf(other))?.enabled === true);
 }
 
+async function testNotificationPreferences() {
+  section("Email settings (PRO-05, NTF-07)");
+
+  const patient = await createPatient();
+  const other = await createPatient();
+  const doctor = await createDoctor();
+  const lab = await createUser("lab");
+  const server = { role: "service_role" };
+  const save = (caller, enabled, channel = "email") =>
+    rpc(caller, "save_notification_preferences", {
+      p_channel: channel,
+      p_enabled: enabled,
+    });
+  const settingsOf = async ({ id }) =>
+    Object.fromEntries(
+      (
+        await db.query(
+          `select category, enabled from public.notification_preferences
+           where user_id = $1 and channel = 'email'`,
+          [id],
+        )
+      ).rows.map((row) => [row.category, row.enabled]),
+    );
+  const wanted = async (caller, { id }, category) =>
+    rpc(caller, "email_wanted", { p_user_id: id, p_category: category });
+  const isWanted = async (user, category) =>
+    (await wanted(server, user, category)).data?.[0]?.email_wanted;
+
+  denied("a guest can't save", await save(null, []));
+  refused(
+    "a lab has nothing to choose yet",
+    await save(lab, []),
+    "no_notification_settings",
+  );
+  refused(
+    "only email can be set",
+    await save(patient, [], "sms"),
+    "invalid_channel",
+  );
+  refused(
+    "a patient can't set a doctor's category",
+    await save(patient, ["doctor_bookings"]),
+    "invalid_category",
+  );
+  refused(
+    "a missing list is refused",
+    await save(patient, null),
+    "invalid_category",
+  );
+  check(
+    "nothing was saved by those",
+    Object.keys(await settingsOf(patient)).length === 0,
+  );
+  check(
+    "with nothing saved, every email is on",
+    (await isWanted(patient, "appointment_reminders")) === true &&
+      (await isWanted(patient, "prescriptions")) === true,
+  );
+
+  succeeded(
+    "a patient turns reminder emails off",
+    await save(patient, ["prescriptions"]),
+  );
+  const saved = await settingsOf(patient);
+  check(
+    "each of their categories is stored",
+    saved.appointment_reminders === false &&
+      saved.prescriptions === true &&
+      !("doctor_bookings" in saved),
+  );
+  check(
+    "the secret key sees which emails they want",
+    (await isWanted(patient, "appointment_reminders")) === false &&
+      (await isWanted(patient, "prescriptions")) === true,
+  );
+
+  succeeded(
+    "saving again changes the same rows",
+    await save(patient, ["appointment_reminders"]),
+  );
+  const changed = await settingsOf(patient);
+  check(
+    "the change holds",
+    changed.appointment_reminders === true && changed.prescriptions === false,
+  );
+
+  succeeded("a doctor turns booking emails off", await save(doctor, []));
+  check(
+    "and only their own",
+    (await isWanted(doctor, "doctor_bookings")) === false &&
+      (await isWanted(other, "prescriptions")) === true,
+  );
+
+  denied(
+    "a guest can't ask who wants email",
+    await wanted(null, patient, "prescriptions"),
+  );
+  denied("nor can a patient", await wanted(other, patient, "prescriptions"));
+
+  await save(other, []);
+  const rows = async (caller) =>
+    (
+      await as(
+        caller,
+        `select distinct user_id from public.notification_preferences`,
+      )
+    ).data ?? [];
+  const seen = await rows(patient);
+  check(
+    "a user reads only their own",
+    seen.length === 1 && seen[0].user_id === patient.id,
+  );
+  const doctorSees = await rows(doctor);
+  check(
+    "a doctor reads no patient's",
+    doctorSees.length === 1 && doctorSees[0].user_id === doctor.id,
+  );
+  denied(
+    "a guest reads nothing",
+    await as(null, `select 1 from public.notification_preferences`),
+  );
+  denied(
+    "a user can't write the table directly",
+    await as(
+      patient,
+      `update public.notification_preferences set enabled = true`,
+    ),
+  );
+  denied(
+    "nor can the secret key",
+    await as(server, `select 1 from public.notification_preferences`),
+  );
+  refused(
+    "a doctor with only a password can't change them",
+    {
+      ...(await save({ ...doctor, aal: "aal1" }, ["doctor_bookings"])),
+      fn: "require_second_factor",
+    },
+    "second_factor_required",
+  );
+  check(
+    "and nothing changed",
+    (await isWanted(doctor, "doctor_bookings")) === false,
+  );
+
+  section("Reminder emails that were turned off (PRO-05)");
+
+  const claimFor = async ({ id }) =>
+    (await rpc(server, "claim_appointment_reminders")).data?.filter(
+      (row) => row.appointment_id === id,
+    ) ?? [];
+  const retryLater = ({ id }) =>
+    db.query(
+      `update public.appointment_reminders
+       set last_attempt_at = now() - interval '11 minutes'
+       where appointment_id = $1 and last_attempt_at is not null`,
+      [id],
+    );
+
+  const quiet = await reminderVisit(await createDoctor(), 23 * 60, 48);
+  await save(quiet.patient, ["prescriptions"]);
+  check("no email is claimed", (await claimFor(quiet)).length === 0);
+  const { rows: bell } = await db.query(
+    `select 1 from public.notifications
+     where user_id = $1 and kind = 'appointment_reminder'`,
+    [quiet.patient.id],
+  );
+  check("the bell still gets it", bell.length === 1);
+
+  // What 20261102090000_reminder_schedule.sql does when it's run again.
+  await db.query(
+    `update public.appointment_reminders set emailed_at = sent_at
+     where emailed_at is null and attempts = 0`,
+  );
+  const { rows: skipped } = await db.query(
+    `select emailed_at, email_skipped from public.appointment_reminders
+     where appointment_id = $1`,
+    [quiet.id],
+  );
+  check(
+    "it's marked skipped, and re-running the older migration doesn't mark it sent",
+    skipped.length === 1 &&
+      skipped[0].email_skipped === true &&
+      skipped[0].emailed_at === null,
+  );
+
+  await save(quiet.patient, ["appointment_reminders", "prescriptions"]);
+  await retryLater(quiet);
+  check(
+    "turning emails back on doesn't send a reminder that was skipped",
+    (await claimFor(quiet)).length === 0,
+  );
+
+  const failed = await reminderVisit(await createDoctor(), 23 * 60, 48);
+  check(
+    "a reminder is claimed while on",
+    (await claimFor(failed)).length === 1,
+  );
+  await save(failed.patient, []);
+  await retryLater(failed);
+  check(
+    "a failed one isn't retried once turned off",
+    (await claimFor(failed)).length === 0,
+  );
+  await save(failed.patient, ["appointment_reminders"]);
+  await retryLater(failed);
+  check(
+    "and is retried if turned on again",
+    (await claimFor(failed)).length === 1,
+  );
+}
+
 async function testMedicineReminders() {
   section("Medicine reminders (MED-01)");
 
@@ -4288,6 +4500,7 @@ try {
   await testReminderRetries();
   await testReminderSchedule();
   await testMedicineReminderSettings();
+  await testNotificationPreferences();
   await testMedicineReminders();
   await testConsents();
   await testUpgrade();

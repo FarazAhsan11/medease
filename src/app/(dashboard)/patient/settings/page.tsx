@@ -8,6 +8,8 @@ import { FamilyMembersCard } from "@/features/family/components/family-members-c
 import { getFamilyMembers } from "@/features/family/data/family-members";
 import { MedicineRemindersCard } from "@/features/medicine-reminders/components/medicine-reminders-card";
 import { getMedicineReminders } from "@/features/medicine-reminders/data/medicine-reminders";
+import { EmailPreferencesCard } from "@/features/notifications/components/email-preferences-card";
+import { getEmailPreferences } from "@/features/notifications/data/notification-preferences";
 import { MissingPatientProfileNotice } from "@/features/settings/components/missing-patient-profile-notice";
 import { PersonalInfoForm } from "@/features/settings/components/personal-info-form";
 import { getPatientProfile } from "@/features/settings/data/patient-profile";
@@ -21,20 +23,27 @@ export const metadata: Metadata = {
 
 export default async function PatientSettingsPage() {
   const user = await requireRole("patient");
-  const [profile, familyMembers, factorId, consentGiven, medicineReminders] =
-    await Promise.all([
-      getPatientProfile(user.id, user.email),
-      getFamilyMembers(user.id),
-      getVerifiedFactorId(),
-      hasTelemedicineConsent(),
-      getMedicineReminders(user.id),
-    ]);
+  const [
+    profile,
+    familyMembers,
+    factorId,
+    consentGiven,
+    medicineReminders,
+    emailPreferences,
+  ] = await Promise.all([
+    getPatientProfile(user.id, user.email),
+    getFamilyMembers(user.id),
+    getVerifiedFactorId(),
+    hasTelemedicineConsent(),
+    getMedicineReminders(user.id),
+    getEmailPreferences(user.id),
+  ]);
 
   return (
     <>
       <DashboardPageHeader
         title="Settings"
-        description="Manage your profile, family, reminders and how you sign in."
+        description="Manage your profile, family, reminders, emails and how you sign in."
       />
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         {profile ? (
@@ -45,6 +54,7 @@ export default async function PatientSettingsPage() {
         <div className="grid h-fit gap-6">
           <FamilyMembersCard members={familyMembers} />
           <MedicineRemindersCard settings={medicineReminders} />
+          <EmailPreferencesCard role="patient" preferences={emailPreferences} />
           <TwoFactorCard enabled={Boolean(factorId)} />
           <ChangePasswordCard />
           <TelemedicineConsentCard given={consentGiven} />

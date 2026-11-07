@@ -9,7 +9,7 @@ export const privacyPolicy: LegalDocument = {
   title: "Privacy Policy",
   summary: `What personal data ${name} holds, why we hold it, who can see it and how long we keep it.`,
   version: "1.0",
-  updated: "2 November 2026",
+  updated: "7 November 2026",
   sections: [
     {
       title: "Who we are",
@@ -29,6 +29,7 @@ export const privacyPolicy: LegalDocument = {
           "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date) and the private notes your doctor keeps.",
           "Documents you upload: the file (PDF, JPG or PNG), the name, type and date you give it, and its size. Only you can see them; doctors cannot.",
           "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
+          "Email settings: which optional emails you have turned off.",
           "Call details: when each person joined and left a call. We do not record audio or video.",
           "Doctor and lab details: licence or registration numbers, specialty, clinic or lab address, verification documents and the outcome of our review.",
           "Security details: sign-in events, two-factor settings and hashed IP addresses.",
@@ -102,6 +103,7 @@ export const privacyPolicy: LegalDocument = {
       title: "Emails",
       body: [
         "Emails are not a private channel, so ours stay brief. They never carry your doctor's name or specialty, a reason for a visit or cancellation, a diagnosis or a medicine. They link to the app, where the details sit behind sign-in.",
+        "You can turn off appointment reminder and prescription emails in your settings, and doctors can turn off booking and cancellation emails. Account, security and booking confirmation emails always go out. Every update still appears in the app.",
       ],
     },
     {
@@ -117,7 +119,7 @@ export const privacyPolicy: LegalDocument = {
           headers: ["Data", "Kept for", "If you delete your account"],
           rows: [
             [
-              "Account and medical profile",
+              "Account, medical profile and settings",
               "While your account is open",
               "Deleted",
             ],

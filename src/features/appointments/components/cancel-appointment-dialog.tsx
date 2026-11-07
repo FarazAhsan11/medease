@@ -80,7 +80,7 @@ export function CancelAppointmentDialog({
               }
             />
             <p className="text-xs text-muted-foreground">
-              We&apos;ll email the {notify} to let them know.
+              We&apos;ll let the {notify} know.
             </p>
           </div>
           <AlertDialogFooter>

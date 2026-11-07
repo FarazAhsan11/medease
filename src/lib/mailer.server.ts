@@ -50,18 +50,26 @@ export async function sendMail({ to, subject, html, text }: Message) {
   }
 }
 
-type Mail = { to: string | null; content: EmailContent };
+type Mail = {
+  to: string | null;
+  content: EmailContent;
+  // For an email the recipient can turn off: asked after the response, and the
+  // mail is skipped when it answers false.
+  wanted?: () => Promise<boolean>;
+};
+
+async function deliver(mail: Mail) {
+  if (!mail.to) return;
+  if (mail.wanted && !(await mail.wanted())) return;
+  await sendMail({ to: mail.to, ...mail.content });
+}
 
 // Sends after the response, so a slow SMTP server never delays the action
 // that triggered the email. A failed email is logged (by sendMail) and never
 // undoes that action. Mails without a recipient are skipped.
 export function sendMailAfterResponse(mails: Mail[]) {
   after(async () => {
-    await Promise.allSettled(
-      mails
-        .filter((mail): mail is Mail & { to: string } => Boolean(mail.to))
-        .map((mail) => sendMail({ to: mail.to, ...mail.content })),
-    );
+    await Promise.allSettled(mails.map(deliver));
   });
 }
 
