@@ -9,6 +9,7 @@ import {
   MAX_DOCUMENT_BYTES,
   PATIENT_DOCUMENTS_BUCKET,
 } from "@/features/patient-documents/lib/document-rules";
+import { createSignedUpload } from "@/lib/uploads/signed-upload.server";
 import { verifyUpload } from "@/lib/uploads/verify-upload.server";
 
 export const DOCUMENT_LINK_SECONDS = 60;
@@ -24,12 +25,7 @@ export async function createIncomingUpload(
   type: string,
 ) {
   const path = `${patientId}/incoming/${randomUUID()}.${documentFileTypes[type]}`;
-  const { data, error } = await admin.storage
-    .from(PATIENT_DOCUMENTS_BUCKET)
-    .createSignedUploadUrl(path);
-  if (error) throw new Error(`${PATIENT_DOCUMENTS_BUCKET}: ${error.message}`);
-
-  return { path: data.path, token: data.token };
+  return createSignedUpload(admin, PATIENT_DOCUMENTS_BUCKET, path);
 }
 
 // Checks what the browser uploaded and moves it into place. Returns the stored

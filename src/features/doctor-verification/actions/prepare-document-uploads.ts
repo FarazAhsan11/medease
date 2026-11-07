@@ -2,7 +2,7 @@
 
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
 import { createDocumentUpload } from "@/features/doctor-verification/lib/doctor-documents";
-import { isOpenForReview } from "@/features/doctor-verification/lib/verification";
+import { isOpenForReview } from "@/lib/verification";
 import {
   requestedUploadsSchema,
   type PreparedUploadsState,

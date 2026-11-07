@@ -145,6 +145,10 @@ const accounts = [
       phone: "+92 51 2345678",
       address: "Plot 7, Jinnah Avenue, Blue Area, Islamabad",
       services: ["Home sample collection", "Online reports"],
+      // Like the demo doctors, skips the review queue.
+      licensing_authority: "islamabad",
+      verification_status: "approved",
+      verified_at: new Date().toISOString(),
     },
   },
 ];

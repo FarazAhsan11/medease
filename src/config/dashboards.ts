@@ -128,7 +128,8 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     home: "/admin",
     loginHref: "/login/admin",
     nav: [
-      { title: "Verification", href: "/admin", icon: ShieldCheckIcon },
+      { title: "Doctors", href: "/admin", icon: ShieldCheckIcon },
+      { title: "Labs", href: "/admin/labs", icon: FlaskConicalIcon },
       { title: "Audit log", href: "/admin/audit-log", icon: ScrollTextIcon },
     ],
     moreNav: [],

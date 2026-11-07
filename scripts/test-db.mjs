@@ -45,6 +45,7 @@ if (!isLocal && process.env.SEED_PROJECT_REF !== projectRef) {
 const MINUTE = 60_000;
 const TAG = "DB-TEST";
 const BUCKET = "doctor-documents";
+const LAB_BUCKET = "lab-documents";
 
 // fetch has no timeout of its own, so one dropped connection would otherwise
 // hang the whole run. A retried write can only fail a test, not corrupt data.
@@ -71,6 +72,7 @@ const guest = createClient(url, publishableKey, session);
 
 const createdUsers = [];
 const uploadedFiles = [];
+const labFiles = [];
 let failures = 0;
 let passes = 0;
 
@@ -846,11 +848,68 @@ async function testDirectUploads() {
   );
 }
 
+async function testLabUploads() {
+  section("Lab licence uploads (ADM-04)");
+
+  const lab = await createUser("lab");
+  const labClient = await signIn(lab);
+  const storageOf = (client) => client.storage.from(LAB_BUCKET);
+  const pdf = Buffer.from("%PDF-1.4 db test");
+
+  async function signedLink() {
+    const path = `${lab.id}/license-${randomUUID()}.pdf`;
+    const { data, error } = await storageOf(admin).createSignedUploadUrl(path);
+    if (error) throw new Error(`signed link: ${error.message}`);
+    labFiles.push(path);
+    return data;
+  }
+
+  const upload = (link, body = pdf, contentType = "application/pdf") =>
+    storageOf(guest).uploadToSignedUrl(link.path, link.token, body, {
+      contentType,
+    });
+
+  const link = await signedLink();
+  succeeded("a signed link accepts a licence", await upload(link));
+  const own = await storageOf(labClient).createSignedUrl(link.path, 60);
+  check("the lab can open its own licence", Boolean(own.data?.signedUrl));
+  check(
+    "the bucket refuses other file types",
+    Boolean(
+      (await upload(await signedLink(), Buffer.from("<script>"), "text/html"))
+        .error,
+    ),
+  );
+  check(
+    "the bucket refuses files over 5 MB",
+    Boolean(
+      (await upload(await signedLink(), Buffer.alloc(5 * 1024 * 1024 + 1)))
+        .error,
+    ),
+  );
+
+  const stray = `${lab.id}/license-${randomUUID()}.pdf`;
+  labFiles.push(stray);
+  const uploadDirectly = (client) =>
+    storageOf(client).upload(stray, pdf, { contentType: "application/pdf" });
+  check(
+    "guests can't upload without a link",
+    Boolean((await uploadDirectly(guest)).error),
+  );
+  check(
+    "signed-in labs can't upload without a link",
+    Boolean((await uploadDirectly(labClient)).error),
+  );
+}
+
 async function cleanUp() {
   section("Clean up");
 
   if (uploadedFiles.length > 0) {
     await admin.storage.from(BUCKET).remove(uploadedFiles);
+  }
+  if (labFiles.length > 0) {
+    await admin.storage.from(LAB_BUCKET).remove(labFiles);
   }
   await Promise.all(createdUsers.map((id) => admin.auth.admin.deleteUser(id)));
 
@@ -879,6 +938,7 @@ try {
   await testDocuments(context);
   await testReview(context);
   await testDirectUploads();
+  await testLabUploads();
 } catch (error) {
   failures++;
   console.log(`ABORTED: ${error.message}`);

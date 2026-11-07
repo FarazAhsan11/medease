@@ -6,7 +6,7 @@ import { VerificationChecklist } from "@/features/doctor-verification/components
 import { VerificationDocumentsForm } from "@/features/doctor-verification/components/verification-documents-form";
 import { VerificationStatusCard } from "@/features/doctor-verification/components/verification-status-card";
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
-import { isOpenForReview } from "@/features/doctor-verification/lib/verification";
+import { isOpenForReview } from "@/lib/verification";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {

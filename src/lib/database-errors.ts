@@ -3,6 +3,9 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { NETWORK_ERROR_MESSAGE, UNEXPECTED_ERROR_MESSAGE } from "@/lib/errors";
 import { formError, type FormState } from "@/lib/form-state";
 
+export const SECOND_FACTOR_MESSAGE =
+  "Please pass your two-factor check, then try again.";
+
 // Our database functions raise short codes (e.g. "slot_taken"); `messages`
 // turns the ones a feature expects into friendly text. Anything else is
 // logged by code only, never with the request's data.
@@ -15,10 +18,7 @@ export function databaseErrorState(
   if (known) return formError(known, error.message);
 
   if (error.message === "second_factor_required") {
-    return formError(
-      "Please pass your two-factor check, then try again.",
-      error.message,
-    );
+    return formError(SECOND_FACTOR_MESSAGE, error.message);
   }
 
   if (/fetch failed|network/i.test(error.message)) {

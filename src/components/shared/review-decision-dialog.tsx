@@ -16,66 +16,32 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { reviewDoctor } from "@/features/doctor-verification/actions/review-doctor";
-import type { ReviewDecision } from "@/features/doctor-verification/lib/verification";
 import { useFormAction } from "@/hooks/use-form-action";
-import { initialFormState } from "@/lib/form-state";
-
-const copy: Record<
-  ReviewDecision,
-  {
-    trigger: string;
-    title: string;
-    description: string;
-    confirm: string;
-    pending: string;
-    noteLabel?: string;
-  }
-> = {
-  approved: {
-    trigger: "Approve",
-    title: "Approve this doctor?",
-    description:
-      "Only approve after checking their license against the PMDC register. They'll appear in search, and patients can book them.",
-    confirm: "Approve doctor",
-    pending: "Approving…",
-  },
-  needs_info: {
-    trigger: "Ask for more information",
-    title: "Ask for more information?",
-    description:
-      "They stay hidden from patients and go back into this queue when they send new documents.",
-    confirm: "Send request",
-    pending: "Sending…",
-    noteLabel: "What do you need from them?",
-  },
-  rejected: {
-    trigger: "Reject",
-    title: "Reject this doctor?",
-    description: "This is final. They stay hidden from patients.",
-    confirm: "Reject doctor",
-    pending: "Rejecting…",
-    noteLabel: "Reason, shown to the doctor",
-  },
-};
+import { initialFormState, type FormState } from "@/lib/form-state";
+import type { ReviewDecision, ReviewDecisionCopy } from "@/lib/verification";
 
 type ReviewDecisionDialogProps = {
-  doctorId: string;
+  action: (state: FormState, formData: FormData) => Promise<FormState>;
+  // The hidden field naming who is reviewed, e.g. { doctorId: "…" }.
+  target: Record<string, string>;
   decision: ReviewDecision;
+  copy: ReviewDecisionCopy;
   disabled?: boolean;
 };
 
+// An admin's verification decision, for doctors and labs alike.
 export function ReviewDecisionDialog({
-  doctorId,
+  action,
+  target,
   decision,
+  copy,
   disabled = false,
 }: ReviewDecisionDialogProps) {
   const [open, setOpen] = useState(false);
   const { pending, onSubmit, fieldError } = useFormAction(
-    reviewDoctor,
+    action,
     initialFormState,
   );
-  const text = copy[decision];
   const noteId = `review-note-${decision}`;
   const noteError = fieldError("note");
 
@@ -95,7 +61,7 @@ export function ReviewDecisionDialog({
           />
         }
       >
-        {text.trigger}
+        {copy.trigger}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <form
@@ -104,14 +70,16 @@ export function ReviewDecisionDialog({
           className="grid gap-4"
           noValidate
         >
-          <input type="hidden" name="doctorId" value={doctorId} />
+          {Object.entries(target).map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
           <input type="hidden" name="decision" value={decision} />
           <AlertDialogHeader>
-            <AlertDialogTitle>{text.title}</AlertDialogTitle>
-            <AlertDialogDescription>{text.description}</AlertDialogDescription>
+            <AlertDialogTitle>{copy.title}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.description}</AlertDialogDescription>
           </AlertDialogHeader>
-          {text.noteLabel && (
-            <FormField id={noteId} label={text.noteLabel} error={noteError}>
+          {copy.noteLabel && (
+            <FormField id={noteId} label={copy.noteLabel} error={noteError}>
               <Textarea
                 id={noteId}
                 name="note"
@@ -131,7 +99,7 @@ export function ReviewDecisionDialog({
               className="gap-2"
             >
               {pending && <Loader2Icon className="animate-spin" aria-hidden />}
-              {pending ? text.pending : text.confirm}
+              {pending ? copy.pending : copy.confirm}
             </Button>
           </AlertDialogFooter>
         </form>

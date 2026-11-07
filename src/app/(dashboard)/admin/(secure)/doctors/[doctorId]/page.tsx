@@ -1,44 +1,31 @@
-import { ExternalLinkIcon, FileTextIcon } from "lucide-react";
+import { ExternalLinkIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/shared/back-link";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { DetailList } from "@/components/shared/detail-list";
+import { DocumentLink } from "@/components/shared/document-link";
 import { PanelCard } from "@/components/shared/panel-card";
+import { ReviewDecisionDialog } from "@/components/shared/review-decision-dialog";
+import { VerificationStatusBadge } from "@/components/shared/verification-status-badge";
 import { adminRoutes } from "@/config/routes";
-import { ReviewDecisionDialog } from "@/features/doctor-verification/components/review-decision-dialog";
-import { VerificationStatusBadge } from "@/features/doctor-verification/components/verification-status-badge";
+import { reviewDoctor } from "@/features/doctor-verification/actions/review-doctor";
 import {
   getDocumentLinks,
   getDoctorReview,
 } from "@/features/doctor-verification/data/doctor-reviews";
 import {
+  doctorReviewCopy,
   hasAllDocuments,
-  isOpenForReview,
   PMDC_REGISTER_URL,
 } from "@/features/doctor-verification/lib/verification";
 import { requireAdmin } from "@/lib/auth/session";
+import { isOpenForReview, reviewDecisions } from "@/lib/verification";
 
 export const metadata: Metadata = {
   title: "Review doctor",
 };
-
-function DocumentLink({ url }: { url: string | null }) {
-  if (!url) return <span className="text-destructive">Missing</span>;
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 text-primary hover:underline"
-    >
-      <FileTextIcon className="size-3.5" aria-hidden />
-      View file
-    </a>
-  );
-}
 
 export default async function AdminDoctorReviewPage({
   params,
@@ -132,13 +119,16 @@ export default async function AdminDoctorReviewPage({
           }
         >
           <div className="flex flex-wrap gap-2 p-5">
-            <ReviewDecisionDialog
-              doctorId={review.id}
-              decision="approved"
-              disabled={!canApprove}
-            />
-            <ReviewDecisionDialog doctorId={review.id} decision="needs_info" />
-            <ReviewDecisionDialog doctorId={review.id} decision="rejected" />
+            {reviewDecisions.map((decision) => (
+              <ReviewDecisionDialog
+                key={decision}
+                action={reviewDoctor}
+                target={{ doctorId: review.id }}
+                decision={decision}
+                copy={doctorReviewCopy[decision]}
+                disabled={decision === "approved" && !canApprove}
+              />
+            ))}
           </div>
         </PanelCard>
       )}

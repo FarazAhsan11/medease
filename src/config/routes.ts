@@ -72,8 +72,15 @@ export const doctorRoutes = {
     `/doctor/appointments/${appointmentId}/prescription`,
 } as const;
 
+export const labRoutes = {
+  home: "/lab",
+  verification: "/lab/verification",
+} as const;
+
 export const adminRoutes = {
   home: "/admin",
   doctor: (doctorId: string) => `/admin/doctors/${doctorId}`,
+  labs: "/admin/labs",
+  lab: (labId: string) => `/admin/labs/${labId}`,
   auditLog: "/admin/audit-log",
 } as const;

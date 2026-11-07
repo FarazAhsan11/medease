@@ -1,5 +1,5 @@
 import { PanelCard } from "@/components/shared/panel-card";
-import { VerificationStatusBadge } from "@/features/doctor-verification/components/verification-status-badge";
+import { VerificationStatusBadge } from "@/components/shared/verification-status-badge";
 import type { DoctorVerification } from "@/features/doctor-verification/data/verification";
 import { hasAllDocuments } from "@/features/doctor-verification/lib/verification";
 

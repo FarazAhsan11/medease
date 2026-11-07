@@ -7,8 +7,7 @@ import {
   type DocumentKind,
 } from "@/features/doctor-verification/lib/document-rules";
 import type { FormState } from "@/lib/form-state";
-
-const MB = 1024 * 1024;
+import { MB } from "@/lib/uploads/file-size";
 
 // An empty file input still submits a nameless, zero-byte File.
 function documentFile(kind: DocumentKind) {

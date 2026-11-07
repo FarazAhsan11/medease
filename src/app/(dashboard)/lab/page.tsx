@@ -3,7 +3,9 @@ import Link from "next/link";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { StatGrid } from "@/components/shared/stat-grid";
+import { VerificationBanner } from "@/components/shared/verification-banner";
 import { buttonVariants } from "@/components/ui/button";
+import { labRoutes } from "@/config/routes";
 import { HomeCollectionsCard } from "@/features/lab-dashboard/components/home-collections-card";
 import { PipelineCard } from "@/features/lab-dashboard/components/pipeline-card";
 import { PopularTestsCard } from "@/features/lab-dashboard/components/popular-tests-card";
@@ -11,10 +13,14 @@ import {
   labBookings,
   labStats,
 } from "@/features/lab-dashboard/data/lab-dashboard";
+import { getLabVerification } from "@/features/lab-verification/data/lab-verification";
+import { labBannerText } from "@/features/lab-verification/lib/lab-verification";
 import { requireRole } from "@/lib/auth/session";
 
 export default async function LabOverviewPage() {
   const user = await requireRole("lab");
+  const verification = await getLabVerification(user.id);
+
   return (
     <>
       <DashboardPageHeader
@@ -33,6 +39,14 @@ export default async function LabOverviewPage() {
           </Link>
         }
       />
+      {verification && (
+        <VerificationBanner
+          status={verification.status}
+          title="Your lab isn't live"
+          descriptions={labBannerText}
+          href={labRoutes.verification}
+        />
+      )}
       <StatGrid stats={labStats} />
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <HomeCollectionsCard bookings={labBookings} />

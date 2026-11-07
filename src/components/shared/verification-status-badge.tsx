@@ -2,7 +2,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import {
   verificationBadges,
   type VerificationStatus,
-} from "@/features/doctor-verification/lib/verification";
+} from "@/lib/verification";
 
 export function VerificationStatusBadge({
   status,

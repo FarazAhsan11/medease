@@ -1,6 +1,6 @@
-export const DOCUMENTS_BUCKET = "doctor-documents";
+import { MB } from "@/lib/uploads/file-size";
 
-export const MB = 1024 * 1024;
+export const DOCUMENTS_BUCKET = "doctor-documents";
 
 export const documentKinds = ["photo", "license", "degree"] as const;
 

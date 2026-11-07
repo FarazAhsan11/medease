@@ -5,7 +5,7 @@ import { refresh } from "next/cache";
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
 import { DOCUMENTS_BUCKET } from "@/features/doctor-verification/lib/document-rules";
 import { isAcceptableUpload } from "@/features/doctor-verification/lib/doctor-documents";
-import { isOpenForReview } from "@/features/doctor-verification/lib/verification";
+import { isOpenForReview } from "@/lib/verification";
 import { uploadedDocumentsSchema } from "@/features/doctor-verification/schemas/verification";
 import { getSessionUser } from "@/lib/auth/session";
 import { databaseErrorState } from "@/lib/database-errors";

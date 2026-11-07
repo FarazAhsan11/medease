@@ -1,10 +1,10 @@
+import { MB } from "@/lib/uploads/file-size";
+
 export const PATIENT_DOCUMENTS_BUCKET = "patient-documents";
 
 export const MAX_DOCUMENT_MB = 10;
 
 export const MAX_DOCUMENT_TITLE = 120;
-
-const MB = 1024 * 1024;
 
 export const MAX_DOCUMENT_BYTES = MAX_DOCUMENT_MB * MB;
 

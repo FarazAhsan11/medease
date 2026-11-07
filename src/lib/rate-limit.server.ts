@@ -38,6 +38,12 @@ export const rateLimits = {
   // Each call hands out signed upload links for one batch of files; counted
   // per account, which is always signed in.
   uploadUser: { name: "upload-user", limit: 20, windowSeconds: ONE_HOUR },
+  // A lab sending its verification details, with or without a new file.
+  verificationUser: {
+    name: "verification-user",
+    limit: 20,
+    windowSeconds: ONE_HOUR,
+  },
   // Per account: generous for a real conversation, a stop for a script.
   messageUser: { name: "message-user", limit: 200, windowSeconds: ONE_HOUR },
   // Marking read follows the messages that arrive, which the limit above caps.

@@ -9,6 +9,7 @@ import Link from "next/link";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import type { Stat } from "@/components/shared/stat-card";
 import { StatGrid } from "@/components/shared/stat-grid";
+import { VerificationBanner } from "@/components/shared/verification-banner";
 import { buttonVariants } from "@/components/ui/button";
 import { doctorRoutes } from "@/config/routes";
 import {
@@ -23,8 +24,8 @@ import {
   startingWithin,
   summarizePatients,
 } from "@/features/doctor-dashboard/lib/practice";
-import { VerificationBanner } from "@/features/doctor-verification/components/verification-banner";
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
+import { doctorBannerText } from "@/features/doctor-verification/lib/verification";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
 import {
   RECENT_MESSAGES_SHOWN,
@@ -106,7 +107,14 @@ export default async function DoctorOverviewPage() {
           </Link>
         }
       />
-      {verification && <VerificationBanner verification={verification} />}
+      {verification && (
+        <VerificationBanner
+          status={verification.status}
+          title="Your profile isn't live"
+          descriptions={doctorBannerText}
+          href={doctorRoutes.verification}
+        />
+      )}
       <StatGrid stats={stats} />
       <AppointmentsPanel
         appointments={today}

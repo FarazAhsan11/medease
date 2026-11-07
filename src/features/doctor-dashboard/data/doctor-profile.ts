@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import { DOCUMENTS_BUCKET } from "@/features/doctor-verification/lib/document-rules";
 import { DOCUMENT_LINK_SECONDS } from "@/features/doctor-verification/lib/doctor-documents";
-import type { VerificationStatus } from "@/features/doctor-verification/lib/verification";
+import type { VerificationStatus } from "@/lib/verification";
 import { createClient } from "@/lib/supabase/server";
 
 export type DoctorProfile = {

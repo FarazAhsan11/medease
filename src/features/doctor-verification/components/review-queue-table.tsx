@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { VerificationStatusBadge } from "@/components/shared/verification-status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -11,7 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { adminRoutes } from "@/config/routes";
-import { VerificationStatusBadge } from "@/features/doctor-verification/components/verification-status-badge";
 import type { DoctorReview } from "@/features/doctor-verification/data/doctor-reviews";
 import { hasAllDocuments } from "@/features/doctor-verification/lib/verification";
 

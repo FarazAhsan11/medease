@@ -7,17 +7,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   documentRules,
   DOCUMENTS_BUCKET,
-  MB,
   type DocumentKind,
 } from "@/features/doctor-verification/lib/document-rules";
+import { MB } from "@/lib/uploads/file-size";
+import { createSignedUpload } from "@/lib/uploads/signed-upload.server";
 import { verifyUpload } from "@/lib/uploads/verify-upload.server";
 
 export const DOCUMENT_LINK_SECONDS = 5 * 60;
 
-// Files go straight from the browser to Storage on a signed upload link, so
-// they never pass through a Server Action (Vercel limits request bodies to
-// 4.5 MB). Every upload gets a new path and no upsert: a path takes one file,
-// so a leftover link can't swap a file after an admin has reviewed it.
+// Every upload gets a new path (see createSignedUpload).
 export async function createDocumentUpload(
   admin: SupabaseClient,
   doctorId: string,
@@ -26,12 +24,7 @@ export async function createDocumentUpload(
 ) {
   const extension = documentRules[kind].types[type];
   const path = `${doctorId}/${kind}-${randomUUID()}.${extension}`;
-  const { data, error } = await admin.storage
-    .from(DOCUMENTS_BUCKET)
-    .createSignedUploadUrl(path);
-  if (error) throw new Error(`${DOCUMENTS_BUCKET}: ${error.message}`);
-
-  return { kind, path: data.path, token: data.token };
+  return { kind, ...(await createSignedUpload(admin, DOCUMENTS_BUCKET, path)) };
 }
 
 // The browser did the upload, so check what actually arrived.

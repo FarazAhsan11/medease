@@ -1774,6 +1774,449 @@ async function testReview({ patient }) {
   check("a patient doesn't", (await seenFiles(patient)) === 0);
 }
 
+async function createLab({
+  status = "pending",
+  confirmed = true,
+  license = false,
+  authority = license ? "punjab" : null,
+} = {}) {
+  const user = await createUser("lab", { confirmed });
+  await db.query(
+    `insert into public.lab_profiles (
+       id, lab_name, registration_number, contact_person, phone, address,
+       verification_status, licensing_authority, license_document_path
+     ) values ($1, 'Sql Lab', 'PHC-1', 'Sql Person', '+92 300 0000000', 'Lahore', $2, $3, $4)`,
+    [user.id, status, authority, license ? `${user.id}/license-1.pdf` : null],
+  );
+  return user;
+}
+
+const labRow = async (id) =>
+  (await db.query(`select * from public.lab_profiles where id = $1`, [id]))
+    .rows[0];
+
+const isLabListed = async (labId) =>
+  ((
+    await as(null, `select id from public.lab_directory where id = $1`, [labId])
+  ).data?.length ?? 0) === 1;
+
+async function testLabVerification({ patient }) {
+  section("Labs send their details (ADM-04, AUTH-04)");
+
+  const lab = await createLab();
+  const newPath = (labId, extension = "pdf") =>
+    `${labId}/license-${randomUUID()}.${extension}`;
+  // What the server does after verifyUpload passes a file.
+  const markChecked = (caller, path, ownerId) =>
+    rpc(caller, "mark_upload_checked", {
+      p_bucket: "lab-documents",
+      p_path: path,
+      p_owner_id: ownerId,
+    });
+  const checkedLicense = async (labId) => {
+    const path = newPath(labId);
+    await markChecked({ role: "service_role" }, path, labId);
+    return path;
+  };
+  const details = (fields = {}) => ({
+    p_registration_number: "  PHC-2024-77  ",
+    p_licensing_authority: "punjab",
+    p_address: " 12 Mall Road, Lahore ",
+    p_license_path: null,
+    ...fields,
+  });
+  const save = (caller, args) => rpc(caller, "save_lab_verification", args);
+
+  const firstPath = await checkedLicense(lab.id);
+  const first = await save(lab, details({ p_license_path: firstPath }));
+  check(
+    "a lab sends its details and a checked licence; nothing was replaced",
+    !first.error && first.data?.[0]?.save_lab_verification === null,
+    first.error?.message ?? "",
+  );
+  const saved = await labRow(lab.id);
+  check(
+    "the details are stored, trimmed, with the submission time",
+    saved.registration_number === "PHC-2024-77" &&
+      saved.address === "12 Mall Road, Lahore" &&
+      saved.licensing_authority === "punjab" &&
+      saved.license_document_path === firstPath &&
+      saved.submitted_at !== null,
+  );
+  refused(
+    "a checked file is taken once",
+    await save(lab, details({ p_license_path: firstPath })),
+    "upload_not_checked",
+  );
+
+  const secondPath = await checkedLicense(lab.id);
+  const replaced = await save(lab, details({ p_license_path: secondPath }));
+  check(
+    "a new licence returns the one it replaced, for deleting",
+    replaced.data?.[0]?.save_lab_verification === firstPath,
+  );
+  const kept = await save(lab, details());
+  check(
+    "details alone keep the licence",
+    kept.data?.[0]?.save_lab_verification === null &&
+      (await labRow(lab.id)).license_document_path === secondPath,
+  );
+
+  refused(
+    "a file the server didn't check is refused",
+    await save(lab, details({ p_license_path: newPath(lab.id) })),
+    "upload_not_checked",
+  );
+  const otherOwner = newPath(lab.id);
+  await markChecked({ role: "service_role" }, otherOwner, patient.id);
+  refused(
+    "a file checked for someone else is refused",
+    await save(lab, details({ p_license_path: otherOwner })),
+    "upload_not_checked",
+  );
+  refused(
+    "a path in someone else's folder is refused",
+    await save(lab, details({ p_license_path: newPath(randomUUID()) })),
+    "invalid_path",
+  );
+  for (const path of [
+    `${lab.id}/license-2.pdf`,
+    newPath(lab.id, "html"),
+    `${lab.id}/photo-${randomUUID()}.pdf`,
+  ]) {
+    refused(
+      `a path the app didn't make is refused (${path.split("/")[1]})`,
+      await save(lab, details({ p_license_path: path })),
+      "invalid_path",
+    );
+  }
+  refused(
+    "a lab without two-factor is refused",
+    await save({ ...lab, aal: "aal1" }, details()),
+    "second_factor_required",
+  );
+
+  for (const [label, caller] of [
+    ["a lab", lab],
+    ["a patient", patient],
+    ["a guest", null],
+  ]) {
+    denied(
+      `${label} can't mark an upload checked`,
+      await markChecked(caller, newPath(lab.id), lab.id),
+    );
+  }
+  await db.query(
+    `insert into private.checked_uploads (bucket, path, owner_id, checked_at)
+     values ('lab-documents', $1, $2, now() - interval '2 days')`,
+    [newPath(lab.id), lab.id],
+  );
+  await checkedLicense(lab.id);
+  check(
+    "old checked-upload records are cleared",
+    (
+      await db.query(
+        `select count(*)::int as n from private.checked_uploads
+         where owner_id = $1 and checked_at < now() - interval '1 day'`,
+        [lab.id],
+      )
+    ).rows[0].n === 0,
+  );
+
+  refused("a patient can't use it", await save(patient, details()), "not_lab");
+  denied("a guest can't use it", await save(null, details()));
+  const noProfile = await createUser("lab");
+  refused(
+    "a lab account with no profile is refused",
+    await save(noProfile, details()),
+    "lab_not_found",
+  );
+  check(
+    "an unknown authority is refused by the table",
+    Boolean(
+      (await save(lab, details({ p_licensing_authority: "mars" }))).error,
+    ),
+  );
+  check(
+    "a blank registration number is refused by the table",
+    Boolean((await save(lab, details({ p_registration_number: "   " }))).error),
+  );
+
+  for (const column of [
+    "verification_status = 'approved'",
+    "registration_number = 'X'",
+    "address = 'X'",
+    "license_document_path = 'x'",
+  ]) {
+    denied(
+      `a lab can't set ${column.split(" ")[0]} itself`,
+      await as(lab, `update public.lab_profiles set ${column} where id = $1`, [
+        lab.id,
+      ]),
+    );
+  }
+  succeeded(
+    "a lab still edits its phone",
+    await as(
+      lab,
+      `update public.lab_profiles set phone = '+92 300 1111111' where id = $1`,
+      [lab.id],
+    ),
+  );
+  check(
+    "the status didn't change",
+    (await labRow(lab.id)).verification_status === "pending",
+  );
+
+  const asked = await createLab({ status: "needs_info", license: true });
+  await db.query(
+    `update public.lab_profiles set verification_note = $1 where id = $2`,
+    [TAG, asked.id],
+  );
+  succeeded("new details answer a request", await save(asked, details()));
+  const answered = await labRow(asked.id);
+  check(
+    "the lab goes back in the queue, note cleared",
+    answered.verification_status === "pending" &&
+      answered.verification_note === null,
+  );
+
+  for (const status of ["approved", "rejected"]) {
+    const closed = await createLab({ status, license: true });
+    refused(
+      `${status} labs can't change their details`,
+      await save(closed, details()),
+      "verification_closed",
+    );
+  }
+
+  section("Admins review labs (ADM-04)");
+
+  const adminUser = await createUser("admin");
+  const verified = { ...adminUser, aal: "aal2" };
+  const passwordOnly = { ...adminUser, aal: "aal1" };
+  const ready = await createLab({ license: true });
+  // The submission the admin's page showed, as PostgREST would send it.
+  const submittedAt = async (labId) =>
+    (
+      await db.query(
+        `select submitted_at::text as at from public.lab_profiles where id = $1`,
+        [labId],
+      )
+    ).rows[0]?.at ?? null;
+  const review = async (caller, labId, decision, note, seen) =>
+    rpc(caller, "admin_review_lab", {
+      p_lab_id: labId,
+      p_decision: decision,
+      p_submitted_at: seen === undefined ? await submittedAt(labId) : seen,
+      p_note: note,
+    });
+
+  refused(
+    "a patient can't review",
+    await review(patient, ready.id, "approved"),
+    "not_admin",
+  );
+  refused(
+    "a lab can't approve itself",
+    await review(ready, ready.id, "approved"),
+    "not_admin",
+  );
+  refused(
+    "an admin without two-factor can't review",
+    await review(passwordOnly, ready.id, "approved"),
+    "not_admin",
+  );
+  refused(
+    "the secret key alone can't review",
+    await review({ role: "service_role" }, ready.id, "approved"),
+    "not_admin",
+  );
+  denied("a guest can't review", await review(null, ready.id, "approved"));
+  refused(
+    "an unknown decision is refused",
+    await review(verified, ready.id, "maybe"),
+    "invalid_decision",
+  );
+  refused(
+    "asking for information needs a note",
+    await review(verified, ready.id, "needs_info", "  "),
+    "note_required",
+  );
+  refused(
+    "an unknown lab is refused",
+    await review(verified, randomUUID(), "approved"),
+    "lab_not_found",
+  );
+  refused(
+    "approval needs the licence",
+    await review(verified, (await createLab()).id, "approved"),
+    "documents_missing",
+  );
+  const noAuthority = await createLab({ license: true, authority: null });
+  refused(
+    "approval needs the licensing authority",
+    await review(verified, noAuthority.id, "approved"),
+    "documents_missing",
+  );
+  refused(
+    "approval needs a confirmed email",
+    await review(
+      verified,
+      (await createLab({ license: true, confirmed: false })).id,
+      "approved",
+    ),
+    "email_not_confirmed",
+  );
+
+  const resent = await createLab();
+  await save(
+    resent,
+    details({ p_license_path: await checkedLicense(resent.id) }),
+  );
+  const seenFirst = await submittedAt(resent.id);
+  await save(resent, details({ p_registration_number: "PHC-NEW" }));
+  refused(
+    "a decision on details the lab has since changed is refused",
+    await review(verified, resent.id, "approved", undefined, seenFirst),
+    "details_changed",
+  );
+  succeeded(
+    "a decision on the latest details goes through",
+    await review(verified, resent.id, "approved"),
+  );
+
+  check("before approval the lab isn't listed", !(await isLabListed(ready.id)));
+  const approval = await review(verified, ready.id, "approved");
+  check(
+    "an admin approves and gets the lab's email",
+    approval.data?.[0]?.admin_review_lab === ready.email,
+  );
+  check("after approval the lab is listed", await isLabListed(ready.id));
+  const approved = await labRow(ready.id);
+  check(
+    "who approved and when are stored",
+    approved.verified_by === adminUser.id && approved.verified_at !== null,
+  );
+  refused(
+    "a lab can't be reviewed twice",
+    await review(verified, ready.id, "rejected", TAG),
+    "already_reviewed",
+  );
+  check(
+    "an approved lab with an unconfirmed email stays unlisted",
+    !(await isLabListed(
+      (await createLab({ status: "approved", license: true, confirmed: false }))
+        .id,
+    )),
+  );
+
+  const notices = async (userId) =>
+    (
+      await db.query(
+        `select kind, href from public.notifications where user_id = $1`,
+        [userId],
+      )
+    ).rows;
+  check(
+    "the bell tells the lab, linking to its verification page",
+    (await notices(ready.id)).some(
+      (row) =>
+        row.kind === "verification_approved" &&
+        row.href === "/lab/verification",
+    ),
+  );
+  const rejected = await createLab({ license: true });
+  await review(verified, rejected.id, "rejected", TAG);
+  const rejectedRow = await labRow(rejected.id);
+  check(
+    "a rejection keeps the note and isn't listed",
+    rejectedRow.verification_note === TAG &&
+      rejectedRow.verified_at === null &&
+      !(await isLabListed(rejected.id)) &&
+      (await notices(rejected.id)).some(
+        (row) => row.kind === "verification_rejected",
+      ),
+  );
+
+  section("Admin reads for labs (ADM-04, SEC-04)");
+
+  refused(
+    "a lab can't list the queue",
+    await rpc(lab, "admin_lab_reviews"),
+    "not_admin",
+  );
+  denied("a guest can't list the queue", await rpc(null, "admin_lab_reviews"));
+  const queue = (await rpc(verified, "admin_lab_reviews")).data ?? [];
+  const firstDone = queue.findIndex(
+    (row) => row.verification_status !== "pending",
+  );
+  const pending = queue.slice(0, firstDone);
+  check(
+    "the queue lists pending labs first, oldest first",
+    firstDone > 0 &&
+      queue
+        .slice(firstDone)
+        .every((row) => row.verification_status !== "pending") &&
+      pending.every(
+        (row, index) =>
+          index === 0 || pending[index - 1].created_at <= row.created_at,
+      ),
+  );
+  check(
+    "p_limit bounds each half of the queue",
+    (await rpc(verified, "admin_lab_reviews", { p_limit: 1 })).data?.length ===
+      2,
+  );
+  const one = await rpc(verified, "admin_lab_reviews", { p_lab_id: ready.id });
+  check(
+    "an admin reads one lab, with its email",
+    one.data?.length === 1 && one.data[0].email === ready.email,
+  );
+  const log = await rpc(verified, "admin_audit_log", { p_user_id: ready.id });
+  check(
+    "the approval is in the audit log",
+    log.data?.some(
+      (entry) =>
+        entry.action === "lab.approved" &&
+        entry.actor_id === adminUser.id &&
+        entry.target_type === "lab",
+    ),
+  );
+  const submitted = await rpc(verified, "admin_audit_log", {
+    p_user_id: lab.id,
+  });
+  check(
+    "sending details is in the audit log",
+    submitted.data?.some((entry) => entry.action === "lab.details_submitted"),
+  );
+
+  section("Licence access (ADM-04, SEC-07)");
+
+  await db.query(
+    `insert into storage.objects (bucket_id, name) values ('lab-documents', $1)`,
+    [secondPath],
+  );
+  const seenLicences = async (caller) =>
+    (
+      await as(
+        caller,
+        `select name from storage.objects where bucket_id = 'lab-documents'`,
+      )
+    ).data?.length ?? 0;
+  check("the lab sees its own licence", (await seenLicences(lab)) === 1);
+  check("another lab doesn't", (await seenLicences(ready)) === 0);
+  check(
+    "an admin with two-factor sees it",
+    (await seenLicences(verified)) === 1,
+  );
+  check(
+    "an admin without two-factor doesn't",
+    (await seenLicences(passwordOnly)) === 0,
+  );
+  check("a patient doesn't", (await seenLicences(patient)) === 0);
+}
+
 async function testCareRecipients({ patient, secondPatient }) {
   section("Care recipients (PRO-03)");
 
@@ -2444,6 +2887,13 @@ async function testUpgrade() {
     [firstVisit.id, doctorId, withProfile],
   );
 
+  const labId = await addUser("lab");
+  await run(
+    `insert into public.lab_profiles (id, lab_name, registration_number, contact_person, phone, address)
+     values ($1, 'Old Lab', 'x', 'x', '+92 300 0000000', 'x')`,
+    [labId],
+  );
+
   let upgraded = true;
   try {
     await older.upgrade();
@@ -2499,6 +2949,18 @@ async function testUpgrade() {
        where tgname = 'set_updated_at' and tgenabled = 'D'`,
     );
     check("no trigger is left switched off", Number(triggers[0].off) === 0);
+
+    const { rows: labs } = await run(
+      `select l.verification_status, exists (
+         select 1 from public.lab_directory d where d.id = l.id
+       ) as listed
+       from public.lab_profiles l where l.id = $1`,
+      [labId],
+    );
+    check(
+      "an existing lab waits for review and isn't listed (ADM-04)",
+      labs[0]?.verification_status === "pending" && labs[0]?.listed === false,
+    );
   }
 
   await older.db.close();
@@ -4175,8 +4637,7 @@ async function testMessaging() {
 
   check(
     "the list returns only the newest conversations asked for",
-    (await rpc(doctor, "get_conversations", { p_limit: 1 })).data?.length ===
-      1,
+    (await rpc(doctor, "get_conversations", { p_limit: 1 })).data?.length === 1,
   );
 
   const formerDoctor = await createDoctor();
@@ -4692,6 +5153,7 @@ async function testSchemaRules() {
   const guestTables = new Set([
     "doctor_availability",
     "doctor_directory",
+    "lab_directory",
     ...globalGuestTables,
   ]);
   const { rows: readable } = await db.query(`
@@ -4976,6 +5438,7 @@ try {
   await testPatientDocuments(await freshPatients());
   await testVerification(await freshPatients());
   await testReview(await freshPatients());
+  await testLabVerification(await freshPatients());
   await testCareRecipients(await freshPatients());
   await testDoctorMedicalProfiles(await freshPatients());
   await testFamilyMembers(await freshPatients());

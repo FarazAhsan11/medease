@@ -3,9 +3,9 @@ import Link from "next/link";
 
 import { DetailList } from "@/components/shared/detail-list";
 import { PanelCard } from "@/components/shared/panel-card";
+import { VerificationStatusBadge } from "@/components/shared/verification-status-badge";
 import { doctorRoutes } from "@/config/routes";
 import type { DoctorProfile } from "@/features/doctor-dashboard/data/doctor-profile";
-import { VerificationStatusBadge } from "@/features/doctor-verification/components/verification-status-badge";
 import { formatFee } from "@/lib/format";
 
 type ProfileDetailsProps = {

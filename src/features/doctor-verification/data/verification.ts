@@ -3,10 +3,8 @@ import "server-only";
 import { cache } from "react";
 
 import type { DocumentKind } from "@/features/doctor-verification/lib/document-rules";
-import type {
-  DoctorDocuments,
-  VerificationStatus,
-} from "@/features/doctor-verification/lib/verification";
+import type { DoctorDocuments } from "@/features/doctor-verification/lib/verification";
+import type { VerificationStatus } from "@/lib/verification";
 import { createClient } from "@/lib/supabase/server";
 
 export type DoctorVerification = {
