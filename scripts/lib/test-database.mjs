@@ -85,7 +85,9 @@ const SUPABASE_STUBS = /* sql */ `
     id uuid primary key default gen_random_uuid(),
     topic text,
     extension text,
-    payload jsonb
+    payload jsonb,
+    event text,
+    private boolean
   );
   alter table realtime.messages enable row level security;
   grant select, insert on realtime.messages to authenticated;
@@ -94,6 +96,14 @@ const SUPABASE_STUBS = /* sql */ `
     select nullif(current_setting('realtime.topic', true), '');
   $$;
   grant execute on function realtime.topic() to authenticated;
+
+  -- Like Supabase's: stores a Broadcast for the channel's subscribers.
+  create function realtime.send(
+    payload jsonb, event text, topic text, private boolean default true
+  ) returns void language sql as $$
+    insert into realtime.messages (topic, extension, payload, event, private)
+    values (topic, 'broadcast', payload, event, private);
+  $$;
 
   -- pg_cron, pg_net and Vault aren't in PGlite. These stand-ins record what
   -- they're asked to do, so a test can read it back.

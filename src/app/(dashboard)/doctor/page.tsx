@@ -16,8 +16,6 @@ import {
   listDoctorAppointments,
 } from "@/features/appointments/data/appointments";
 import { AppointmentsPanel } from "@/features/doctor-dashboard/components/appointments-panel";
-import { RecentMessagesCard } from "@/features/doctor-dashboard/components/recent-messages-card";
-import { messageThreads } from "@/features/doctor-dashboard/data/dashboard";
 import {
   countPreviousVisits,
   groupDoctorAppointments,
@@ -28,6 +26,11 @@ import {
 import { VerificationBanner } from "@/features/doctor-verification/components/verification-banner";
 import { getDoctorVerification } from "@/features/doctor-verification/data/verification";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
+import {
+  RECENT_MESSAGES_SHOWN,
+  RecentMessagesCard,
+} from "@/features/messaging/components/recent-messages-card";
+import { listConversations } from "@/features/messaging/data/messaging";
 import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
@@ -35,11 +38,13 @@ import { formatTime } from "@/lib/datetime";
 
 export default async function DoctorOverviewPage() {
   const user = await requireRole("doctor");
-  const [appointments, prescriptions, verification] = await Promise.all([
-    listDoctorAppointments(user.id),
-    getDoctorPrescriptionSummaries(user.id),
-    getDoctorVerification(user.id),
-  ]);
+  const [appointments, prescriptions, verification, conversations] =
+    await Promise.all([
+      listDoctorAppointments(user.id),
+      getDoctorPrescriptionSummaries(user.id),
+      getDoctorVerification(user.id),
+      listConversations("doctor", RECENT_MESSAGES_SHOWN),
+    ]);
   const { upcoming, needsOutcome } = groupDoctorAppointments(appointments);
 
   const today = appointments.filter((item) => isToday(item));
@@ -112,7 +117,11 @@ export default async function DoctorOverviewPage() {
         profiles={profiles}
         nextAppointment={upcoming[0] ?? null}
       />
-      <RecentMessagesCard threads={messageThreads} />
+      <RecentMessagesCard
+        userId={user.id}
+        role="doctor"
+        conversations={conversations}
+      />
     </>
   );
 }

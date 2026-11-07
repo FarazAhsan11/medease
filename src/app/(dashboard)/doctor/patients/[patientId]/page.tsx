@@ -6,6 +6,7 @@ import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { doctorRoutes } from "@/config/routes";
 import { ChartHeader } from "@/features/patient-chart/components/chart-header";
 import { ChartVisitCard } from "@/features/patient-chart/components/chart-visit-card";
+import { MessageButton } from "@/features/messaging/components/message-button";
 import { MedicalProfileCard } from "@/features/medical-profile/components/medical-profile-card";
 import { getPatientChart } from "@/features/patient-chart/data/patient-chart";
 import { requireRole } from "@/lib/auth/session";
@@ -29,6 +30,7 @@ export default async function DoctorPatientChartPage({
       <DashboardPageHeader
         title="Patient chart"
         description="Your visits with this patient, newest first, with your notes, the summaries you wrote and your prescriptions."
+        actions={<MessageButton otherId={patientId} label="Message patient" />}
       />
       <ChartHeader chart={chart} />
       {chart.ownProfile && <MedicalProfileCard profile={chart.ownProfile} />}

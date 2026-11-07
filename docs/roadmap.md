@@ -216,6 +216,7 @@ The profile saves for real (PRO-01), and doctors see it (PRO-02, 2026-11-06): a 
 Real conversations between a patient and the doctors they have booked with, replacing the mock doctor inbox. Full design in [chat.md](./chat.md#doctorpatient-messaging).
 
 - **Done when**: a patient messages their doctor, the doctor sees it live with an unread badge, and replies.
+- **Built 2026-11-07 (MSG-01 to MSG-04)** and tested end to end on the dev server against the real database, with throwaway accounts: a patient opens a conversation from an appointment, the doctor's header badge and overview update live, both sides see "Seen" receipts live, another patient can't read, send or join the private channel, and the doctor's close, extend and the 7-day window all hold in the browser and the database. Live updates are Broadcast on one private `user:<id>` channel per person, sent by the database functions, with no polling. `20261107150000_messaging.sql` is applied. Left: the bell still uses Postgres Changes and should move onto `user:<id>`; MSG-05 onward (attachments, quick replies, auto reply, report abuse) are not started.
 
 ### 5. Lab tests: catalog, bookings and reports
 

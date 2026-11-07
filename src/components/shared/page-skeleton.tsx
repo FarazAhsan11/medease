@@ -1,7 +1,8 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PageSkeletonProps = {
-  variant?: "page" | "list" | "cards" | "detail" | "form";
+  // "conversation" fills the open conversation in the messages inbox.
+  variant?: "page" | "list" | "cards" | "detail" | "form" | "conversation";
 };
 
 function HeadingSkeleton() {
@@ -61,8 +62,33 @@ function CardsSkeleton() {
   );
 }
 
+function ConversationSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading"
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <div className="flex items-center gap-3 border-b px-5 py-3">
+        <Skeleton className="size-9 rounded-full" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <Skeleton className="h-12 w-3/5 rounded-2xl" />
+        <Skeleton className="h-10 w-2/5 self-end rounded-2xl" />
+        <Skeleton className="h-16 w-1/2 rounded-2xl" />
+      </div>
+      <div className="border-t p-4">
+        <Skeleton className="h-9 w-full" />
+      </div>
+    </div>
+  );
+}
+
 // Shown the moment a link is clicked, in the shape of the page on its way.
 export function PageSkeleton({ variant = "page" }: PageSkeletonProps) {
+  if (variant === "conversation") return <ConversationSkeleton />;
+
   return (
     <div role="status" aria-label="Loading" className="space-y-6">
       {variant === "detail" ? (

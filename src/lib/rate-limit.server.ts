@@ -38,6 +38,20 @@ export const rateLimits = {
   // Each call hands out signed upload links for one batch of files; counted
   // per account, which is always signed in.
   uploadUser: { name: "upload-user", limit: 20, windowSeconds: ONE_HOUR },
+  // Per account: generous for a real conversation, a stop for a script.
+  messageUser: { name: "message-user", limit: 200, windowSeconds: ONE_HOUR },
+  // Marking read follows the messages that arrive, which the limit above caps.
+  messageReadUser: {
+    name: "message-read-user",
+    limit: 600,
+    windowSeconds: ONE_HOUR,
+  },
+  // Starting a conversation, or a doctor extending or closing one.
+  conversationUser: {
+    name: "conversation-user",
+    limit: 60,
+    windowSeconds: ONE_HOUR,
+  },
 } as const satisfies Record<string, RateLimit>;
 
 export const RATE_LIMITED_MESSAGE =

@@ -27,6 +27,7 @@ export const privacyPolicy: LegalDocument = {
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
           "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date) and the private notes your doctor keeps.",
+          "Messages: what you and a doctor write to each other, and when each message was sent and read.",
           "Documents you upload: the file (PDF, JPG or PNG), the name, type and date you give it, and its size. Only you can see them; doctors cannot.",
           "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
           "Email settings: which optional emails you have turned off.",
@@ -56,6 +57,7 @@ export const privacyPolicy: LegalDocument = {
         [
           "You, through your account.",
           "A doctor, only for patients who have an appointment with them. Their private notes are not shown to patients.",
+          "Messages, only by you and the doctor you are writing to. You can message a doctor for 7 days after a visit, and the doctor can give you longer.",
           "Our administrators, who review doctor and lab verification documents. Clinical records are not part of that work, and sensitive actions are logged.",
           "The service providers listed below, only to run the service.",
           "Authorities, when the law requires it.",
@@ -129,6 +131,7 @@ export const privacyPolicy: LegalDocument = {
               "Kept, no longer linked to your identity",
             ],
             ["Documents you upload", "Until you delete them", "Deleted"],
+            ["Messages", "2 years after the last message", "Deleted"],
             [
               "Doctor and lab verification documents",
               "While the account is active, then 1 year",

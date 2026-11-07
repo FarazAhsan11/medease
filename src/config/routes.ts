@@ -34,6 +34,9 @@ export const patientRoutes = {
   recordDocument: (documentId: string) =>
     `/patient/records/documents/${documentId}`,
   settings: "/patient/settings",
+  messages: "/patient/messages",
+  conversation: (conversationId: string) =>
+    `/patient/messages/${conversationId}`,
   consultation: (appointmentId: string) =>
     `/patient/consultation/${appointmentId}`,
 } as const;
@@ -61,6 +64,8 @@ export const doctorRoutes = {
   profile: "/doctor/profile",
   verification: "/doctor/verification",
   messages: "/doctor/messages",
+  conversation: (conversationId: string) =>
+    `/doctor/messages/${conversationId}`,
   consultation: (appointmentId: string) =>
     `/doctor/consultation/${appointmentId}`,
   prescription: (appointmentId: string) =>

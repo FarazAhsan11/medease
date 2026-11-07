@@ -10,6 +10,7 @@ import { AppointmentStatusBadge } from "@/features/appointments/components/appoi
 import { CountBadge } from "@/features/appointments/components/count-badge";
 import { UpcomingAppointmentCard } from "@/features/appointments/components/upcoming-appointment-card";
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import { MessageButton } from "@/features/messaging/components/message-button";
 import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
 import { PatientVisitSummary } from "@/features/visit-summaries/components/patient-visit-summary";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
@@ -65,6 +66,9 @@ function HistoryList({
               <ViewPrescriptionLink
                 href={patientRoutes.prescription(prescriptionId)}
               />
+            )}
+            {appointment.status !== "cancelled" && (
+              <MessageButton otherId={appointment.doctorId} />
             )}
             <BookAgainLink doctorId={appointment.doctorId} />
           </>

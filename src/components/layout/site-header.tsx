@@ -1,22 +1,30 @@
 import { Container } from "@/components/layout/container";
 import { HeaderAuthActions } from "@/components/layout/header-auth-actions";
 import { Logo } from "@/components/layout/logo";
+import { MessagesLink } from "@/components/layout/messages-link";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NavLinks } from "@/components/layout/nav-links";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { dashboards } from "@/config/dashboards";
+import { messagesRoutes } from "@/features/messaging/lib/messaging";
 import type { NotificationFeed } from "@/features/notifications/lib/notifications";
 import type { SessionUser } from "@/lib/auth/session";
 
 type SiteHeaderProps = {
   user: SessionUser | null;
   notifications: NotificationFeed | null;
+  // Patients and doctors only.
+  unreadMessages: number | null;
 };
 
 // One header for everyone: guests get the public links, signed-in users get
 // their role's links plus notifications and the account menu.
-export function SiteHeader({ user, notifications }: SiteHeaderProps) {
+export function SiteHeader({
+  user,
+  notifications,
+  unreadMessages,
+}: SiteHeaderProps) {
   const role = user?.role ?? null;
 
   return (
@@ -31,6 +39,17 @@ export function SiteHeader({ user, notifications }: SiteHeaderProps) {
         <div className="flex items-center gap-1">
           {user ? (
             <>
+              {unreadMessages !== null &&
+                (user.role === "patient" || user.role === "doctor") && (
+                  <MessagesLink
+                    // Keyed so a different account never inherits this one's
+                    // count; distinct from the bell's key beside it.
+                    key={`messages:${user.id}`}
+                    userId={user.id}
+                    href={messagesRoutes[user.role].inbox}
+                    unread={unreadMessages}
+                  />
+                )}
               {notifications && (
                 // Keyed so a different account never inherits this one's bell.
                 <NotificationsMenu

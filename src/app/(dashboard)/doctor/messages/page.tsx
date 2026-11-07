@@ -1,23 +1,16 @@
-import type { Metadata } from "next";
+import { MessageSquareIcon } from "lucide-react";
 
-import { PreviewNotice } from "@/components/shared/preview-notice";
-import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
-import { MessagesInbox } from "@/features/doctor-dashboard/components/messages-inbox";
-import { messageThreads } from "@/features/doctor-dashboard/data/dashboard";
+import { IconTile } from "@/components/shared/icon-tile";
 
-export const metadata: Metadata = {
-  title: "Messages",
-};
-
+// On a phone the list fills the screen, so this only shows on wider ones.
+// The inbox hides its column there.
 export default function DoctorMessagesPage() {
   return (
-    <>
-      <PreviewNotice feature="Messaging" />
-      <DashboardPageHeader
-        title="Messages"
-        description="Questions and follow-ups from your patients."
-      />
-      <MessagesInbox threads={messageThreads} />
-    </>
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
+      <IconTile icon={MessageSquareIcon} size="lg" />
+      <p className="max-w-xs text-sm text-muted-foreground">
+        Pick a conversation, or message a patient from their chart.
+      </p>
+    </div>
   );
 }

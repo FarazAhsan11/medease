@@ -7,6 +7,7 @@ import {
   type Appointment,
 } from "@/features/appointments/lib/appointments";
 import { patientRoutes } from "@/config/routes";
+import { MessageButton } from "@/features/messaging/components/message-button";
 import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { PatientVisitSummary } from "@/features/visit-summaries/components/patient-visit-summary";
@@ -44,6 +45,7 @@ export function UpcomingAppointmentCard({
               href={patientRoutes.prescription(prescriptionId)}
             />
           )}
+          <MessageButton otherId={appointment.doctorId} />
           <AddToCalendarButton
             // Only what the file needs reaches the browser.
             appointment={{

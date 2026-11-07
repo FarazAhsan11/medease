@@ -8,7 +8,6 @@ import {
   FlaskConicalIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
-  MessageSquareIcon,
   PillIcon,
   ScrollTextIcon,
   SettingsIcon,
@@ -32,7 +31,8 @@ export type DashboardConfig = {
   home: string;
   loginHref: string;
   // Links in the header; `moreNav` overflows into a "More" menu and
-  // `account` sits in the user menu.
+  // `account` sits in the user menu. Messages has its own icon in the header,
+  // with the unread count, so it isn't listed here.
   nav: DashboardNavItem[];
   moreNav: DashboardNavItem[];
   account: DashboardNavItem;
@@ -97,7 +97,6 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
         icon: CalendarDaysIcon,
       },
       { title: "Patients", href: "/doctor/patients", icon: UsersIcon },
-      { title: "Messages", href: "/doctor/messages", icon: MessageSquareIcon },
       {
         title: "Availability",
         href: "/doctor/availability",

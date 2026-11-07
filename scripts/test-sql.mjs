@@ -3804,6 +3804,496 @@ async function testNotificationPreferences() {
   );
 }
 
+async function testMessaging() {
+  section("Starting a conversation (MSG-01)");
+
+  const DAY_MINUTES = 24 * 60;
+  const doctor = await createDoctor();
+  const otherDoctor = await createDoctor();
+  const patient = await createPatient();
+  const lapsed = await createPatient();
+  const stranger = await createPatient();
+  const lab = await createUser("lab");
+
+  // A visit 3 days ago, one 8 days ago, and a booking that was cancelled.
+  await createAppointment(doctor, patient, {
+    from: -3 * DAY_MINUTES,
+    status: "completed",
+  });
+  await createAppointment(doctor, lapsed, {
+    from: -8 * DAY_MINUTES,
+    status: "completed",
+  });
+  await createAppointment(otherDoctor, patient, {
+    from: 2 * DAY_MINUTES,
+    status: "cancelled",
+  });
+
+  const open = (caller, otherId) =>
+    rpc(caller, "open_conversation", { p_other_id: otherId });
+  const opened = (result) => result.data?.[0]?.open_conversation;
+  const send = (caller, conversationId, body) =>
+    rpc(caller, "send_message", {
+      p_conversation_id: conversationId,
+      p_body: body,
+    });
+  const conversations = async (caller, id = null) =>
+    (await rpc(caller, "get_conversations", { p_conversation_id: id })).data ??
+    [];
+  const window = (caller, conversationId, action) =>
+    rpc(caller, "set_message_window", {
+      p_conversation_id: conversationId,
+      p_action: action,
+    });
+
+  denied("a guest can't start one", await open(null, doctor.id));
+  refused("a lab can't message", await open(lab, doctor.id), "not_allowed");
+  refused(
+    "a patient who never booked the doctor can't",
+    await open(stranger, doctor.id),
+    "no_appointment",
+  );
+  refused(
+    "nor can one whose only booking was cancelled",
+    await open(patient, otherDoctor.id),
+    "no_appointment",
+  );
+
+  const first = await open(patient, doctor.id);
+  succeeded("a patient with a visit starts one", first);
+  const conversationId = opened(first);
+  check(
+    "opening again finds the same conversation",
+    opened(await open(patient, doctor.id)) === conversationId,
+  );
+  check(
+    "and the doctor opening it from their side does too",
+    opened(await open(doctor, patient.id)) === conversationId,
+  );
+
+  section("Sending messages (MSG-01)");
+
+  denied("a guest can't send", await send(null, conversationId, "Hi"));
+  refused(
+    "someone outside the conversation can't send into it",
+    await send(stranger, conversationId, "Hi"),
+    "not_participant",
+  );
+  refused(
+    "nor can another doctor",
+    await send(otherDoctor, conversationId, "Hi"),
+    "not_participant",
+  );
+  refused(
+    "an empty message is refused",
+    await send(patient, conversationId, "  \n "),
+    "invalid_message",
+  );
+  refused(
+    "so is one over 2000 characters",
+    await send(patient, conversationId, "a".repeat(2001)),
+    "invalid_message",
+  );
+  succeeded(
+    "the patient sends one",
+    await send(patient, conversationId, "  Is the dose with food?\n"),
+  );
+  const { rows: sent } = await db.query(
+    `select m.*, c.last_message_at from public.messages m
+     join public.conversations c on c.id = m.conversation_id
+     where m.conversation_id = $1`,
+    [conversationId],
+  );
+  check(
+    "it's stored trimmed, from the patient to the doctor",
+    sent.length === 1 &&
+      sent[0].body === "Is the dose with food?" &&
+      sent[0].sender_id === patient.id &&
+      sent[0].recipient_id === doctor.id &&
+      sent[0].read_at === null,
+  );
+  check(
+    "and the conversation moves to the top",
+    sent[0]?.last_message_at?.getTime() === sent[0]?.created_at?.getTime(),
+  );
+  succeeded(
+    "the doctor replies",
+    await send(doctor, conversationId, "Yes, after breakfast."),
+  );
+  succeeded(
+    "2000 characters is fine",
+    await send(patient, conversationId, "b".repeat(2000)),
+  );
+
+  section("Who can read them (MSG-01, MSG-02)");
+
+  const messagesSeenBy = async (caller) =>
+    (
+      await as(
+        caller,
+        `select body from public.messages where conversation_id = $1`,
+        [conversationId],
+      )
+    ).data ?? [];
+  check(
+    "the patient reads all 3",
+    (await messagesSeenBy(patient)).length === 3,
+  );
+  check("the doctor reads all 3", (await messagesSeenBy(doctor)).length === 3);
+  check(
+    "another patient reads none",
+    (await messagesSeenBy(stranger)).length === 0,
+  );
+  check(
+    "another doctor reads none",
+    (await messagesSeenBy(otherDoctor)).length === 0,
+  );
+  denied(
+    "a guest reads nothing",
+    await as(null, `select 1 from public.messages`),
+  );
+  check(
+    "a doctor with only a password reads nothing",
+    (await messagesSeenBy({ ...doctor, aal: "aal1" })).length === 0,
+  );
+  refused(
+    "nor lists conversations",
+    await rpc({ ...doctor, aal: "aal1" }, "get_conversations"),
+    "second_factor_required",
+  );
+  refused(
+    "nor sends",
+    {
+      ...(await send({ ...doctor, aal: "aal1" }, conversationId, "Hi")),
+      fn: "require_second_factor",
+    },
+    "second_factor_required",
+  );
+  denied(
+    "nobody writes messages directly",
+    await as(
+      patient,
+      `insert into public.messages (conversation_id, sender_id, recipient_id, body)
+       values ($1, $2, $3, 'x')`,
+      [conversationId, patient.id, doctor.id],
+    ),
+  );
+  denied(
+    "or marks them read directly",
+    await as(doctor, `update public.messages set read_at = now()`),
+  );
+  denied(
+    "or edits a conversation directly",
+    await as(
+      patient,
+      `update public.conversations set patient_window_ends_at = null`,
+    ),
+  );
+
+  const [doctorView] = await conversations(doctor);
+  check(
+    "the doctor's list names the patient and shows the last message",
+    doctorView?.id === conversationId &&
+      doctorView.other_name === "Sql Patient" &&
+      doctorView.last_body === "b".repeat(2000) &&
+      doctorView.last_sender_id === patient.id &&
+      doctorView.unread === 2 &&
+      doctorView.can_write === true,
+  );
+  const [patientView] = await conversations(patient, conversationId);
+  check(
+    "the patient's names the doctor, with 1 unread",
+    patientView?.other_name === "Sql Doctor" && patientView.unread === 1,
+  );
+  check(
+    "someone else lists nothing",
+    (await conversations(stranger)).length === 0 &&
+      (await conversations(stranger, conversationId)).length === 0,
+  );
+  check("a guest lists nothing", (await conversations(null)).length === 0);
+
+  const read = async (caller, id = conversationId) =>
+    (await rpc(caller, "mark_conversation_read", { p_conversation_id: id }))
+      .data?.[0]?.mark_conversation_read;
+  check("someone else can't mark them read", (await read(stranger)) === 0);
+  check("the doctor reads the patient's 2", (await read(doctor)) === 2);
+  check("reading again marks nothing", (await read(doctor)) === 0);
+  const { rows: receipts } = await db.query(
+    `select sender_id, read_at from public.messages where conversation_id = $1`,
+    [conversationId],
+  );
+  check(
+    "only the messages to the doctor are read",
+    receipts.every((row) =>
+      row.sender_id === patient.id
+        ? row.read_at !== null
+        : row.read_at === null,
+    ),
+  );
+  check(
+    "and the doctor's unread count is 0",
+    (await conversations(doctor))[0]?.unread === 0,
+  );
+
+  section("Messaging window (MSG-04)");
+
+  const lapsedId = opened(await open(lapsed, doctor.id));
+  check("a patient whose visit was 8 days ago can still open it", !!lapsedId);
+  refused(
+    "but can't write",
+    await send(lapsed, lapsedId, "Hello?"),
+    "window_closed",
+  );
+  check(
+    "and the list says so",
+    (await conversations(lapsed))[0]?.can_write === false,
+  );
+  succeeded(
+    "the doctor can still write to them",
+    await send(doctor, lapsedId, "How are you feeling?"),
+  );
+
+  refused(
+    "a patient can't change the window",
+    await window(patient, conversationId, "close"),
+    "not_doctor",
+  );
+  refused(
+    "nor can another doctor",
+    await window(otherDoctor, conversationId, "close"),
+    "not_doctor",
+  );
+  refused(
+    "only extend or close",
+    await window(doctor, conversationId, "forever"),
+    "invalid_action",
+  );
+  refused(
+    "a missing action is refused",
+    await window(doctor, conversationId, null),
+    "invalid_action",
+  );
+
+  succeeded(
+    "the doctor closes it",
+    await window(doctor, conversationId, "close"),
+  );
+  refused(
+    "and the patient can't write",
+    await send(patient, conversationId, "One more thing"),
+    "window_closed",
+  );
+
+  const extended = await window(doctor, lapsedId, "extend");
+  const endsAt = extended.data?.[0]?.set_message_window;
+  const days = (endsAt - Date.now()) / DAY;
+  check(
+    "extending a lapsed window gives 7 days from now",
+    days > 6.99 && days <= 7,
+    `${days.toFixed(3)} days`,
+  );
+  succeeded(
+    "and the patient can write again",
+    await send(lapsed, lapsedId, "Thank you"),
+  );
+  const again = (await window(doctor, lapsedId, "extend")).data?.[0]
+    ?.set_message_window;
+  check(
+    "extending again adds 7 more days",
+    Math.abs((again - endsAt) / DAY - 7) < 0.001,
+  );
+
+  await createAppointment(doctor, patient, { from: 5 * DAY_MINUTES });
+  check(
+    "a new booking reopens a window the doctor closed",
+    (
+      await db.query(
+        `select patient_window_ends_at from public.conversations where id = $1`,
+        [conversationId],
+      )
+    ).rows[0]?.patient_window_ends_at === null,
+  );
+  succeeded(
+    "so the patient can write before the visit",
+    await send(patient, conversationId, "See you then"),
+  );
+  check(
+    "but a booking doesn't shorten a longer extension",
+    await (async () => {
+      await createAppointment(doctor, lapsed, { from: 6 * DAY_MINUTES });
+      const { rows } = await db.query(
+        `select patient_window_ends_at from public.conversations where id = $1`,
+        [lapsedId],
+      );
+      return rows[0]?.patient_window_ends_at?.getTime() === again?.getTime();
+    })(),
+  );
+
+  // Closed two hours ago, with a visit already booked: once the visit happens,
+  // the patient gets their usual 7 days, though no new booking was made.
+  const booked = await createPatient();
+  const bookedDoctor = await createDoctor();
+  await createAppointment(bookedDoctor, booked, {
+    from: -3 * DAY_MINUTES,
+    status: "completed",
+  });
+  const upcoming = await createAppointment(bookedDoctor, booked, {
+    from: 2 * DAY_MINUTES,
+  });
+  const bookedId = opened(await open(booked, bookedDoctor.id));
+  await window(bookedDoctor, bookedId, "close");
+  await db.query(
+    `update public.conversations
+     set patient_window_ends_at = now() - interval '2 hours',
+         patient_window_set_at = now() - interval '2 hours'
+     where id = $1`,
+    [bookedId],
+  );
+  refused(
+    "closing holds while a visit booked earlier is still ahead",
+    await send(booked, bookedId, "Hello"),
+    "window_closed",
+  );
+  await db.query(
+    `update public.appointments
+     set starts_at = now() - interval '1 hour',
+         ends_at = now() - interval '30 minutes',
+         status = 'completed'
+     where id = $1`,
+    [upcoming],
+  );
+  succeeded(
+    "once that visit has happened, the patient can write again",
+    await send(booked, bookedId, "Thanks for today"),
+  );
+  const reopenedEnd = (await conversations(booked, bookedId))[0]
+    ?.patient_window_ends_at;
+  check(
+    "for 7 days after it",
+    Math.abs((new Date(reopenedEnd) - Date.now()) / DAY - 7) < 0.05,
+  );
+
+  check(
+    "the list returns only the newest conversations asked for",
+    (await rpc(doctor, "get_conversations", { p_limit: 1 })).data?.length ===
+      1,
+  );
+
+  const formerDoctor = await createDoctor();
+  const former = await createPatient();
+  const formerVisit = await createAppointment(formerDoctor, former, {
+    from: 3 * DAY_MINUTES,
+  });
+  const formerId = opened(await open(former, formerDoctor.id));
+  await db.query(
+    `update public.appointments set status = 'cancelled' where id = $1`,
+    [formerVisit],
+  );
+  refused(
+    "once every booking is cancelled, nobody can write",
+    await send(formerDoctor, formerId, "Hello"),
+    "no_appointment",
+  );
+
+  section("Live delivery (MSG-02)");
+
+  const { rows: published } = await db.query(
+    `select tablename from pg_publication_tables
+     where pubname = 'supabase_realtime' and tablename = 'messages'`,
+  );
+  check(
+    "messages go out by Broadcast, not Postgres Changes",
+    published.length === 0,
+  );
+
+  const events = async (userId) =>
+    (
+      await db.query(
+        `select event, payload, private from realtime.messages
+         where topic = $1 order by id`,
+        [`user:${userId}`],
+      )
+    ).rows;
+  const liveDoctor = await createDoctor();
+  const livePatient = await createPatient();
+  await createAppointment(liveDoctor, livePatient, { from: DAY_MINUTES });
+  const liveId = opened(await open(livePatient, liveDoctor.id));
+  await db.query(`delete from realtime.messages`);
+  const liveSent = await send(livePatient, liveId, "Live hello");
+  const liveMessageId = liveSent.data?.[0]?.id;
+  const [toDoctor] = await events(liveDoctor.id);
+  const [toPatient] = await events(livePatient.id);
+  check(
+    "a sent message goes to both people's private channels",
+    toDoctor?.event === "message" &&
+      toDoctor.private === true &&
+      toDoctor.payload.id === liveMessageId &&
+      toDoctor.payload.body === "Live hello" &&
+      toDoctor.payload.recipient_id === liveDoctor.id &&
+      toPatient?.payload.id === liveMessageId,
+  );
+  check(
+    "and to nobody else",
+    (await db.query(`select count(*)::int as n from realtime.messages`)).rows[0]
+      .n === 2,
+  );
+
+  await db.query(`delete from realtime.messages`);
+  await read(liveDoctor, liveId);
+  const [receiptToPatient] = await events(livePatient.id);
+  const [receiptToDoctor] = await events(liveDoctor.id);
+  check(
+    "reading sends one receipt to both, with how many were read",
+    receiptToPatient?.event === "read" &&
+      receiptToPatient.payload.conversation_id === liveId &&
+      receiptToPatient.payload.reader_id === liveDoctor.id &&
+      receiptToPatient.payload.count === 1 &&
+      receiptToDoctor?.event === "read",
+  );
+  await db.query(`delete from realtime.messages`);
+  await read(liveDoctor, liveId);
+  check(
+    "reading with nothing new sends nothing",
+    (await db.query(`select count(*)::int as n from realtime.messages`)).rows[0]
+      .n === 0,
+  );
+
+  await send(liveDoctor, liveId, "Live reply");
+  const listen = async (caller, topic) => {
+    await db.query(`select set_config('realtime.topic', $1, false)`, [topic]);
+    const result = await as(
+      caller,
+      `select count(*)::int as n from realtime.messages`,
+    );
+    await db.query(`select set_config('realtime.topic', '', false)`);
+    return result.data?.[0]?.n ?? 0;
+  };
+  check(
+    "a person can join their own channel",
+    (await listen(livePatient, `user:${livePatient.id}`)) > 0,
+  );
+  check(
+    "but not someone else's",
+    (await listen(stranger, `user:${livePatient.id}`)) === 0 &&
+      (await listen(liveDoctor, `user:${livePatient.id}`)) === 0,
+  );
+  check(
+    "a doctor with only a password can't join their own",
+    (await listen({ ...liveDoctor, aal: "aal1" }, `user:${liveDoctor.id}`)) ===
+      0,
+  );
+  await db.query(`select set_config('realtime.topic', $1, false)`, [
+    `user:${livePatient.id}`,
+  ]);
+  const spoof = await as(
+    livePatient,
+    `insert into realtime.messages (topic, extension) values ($1, 'broadcast')`,
+    [`user:${livePatient.id}`],
+  );
+  await db.query(`select set_config('realtime.topic', '', false)`);
+  denied("nobody can send on these channels from the browser", spoof);
+}
+
 async function testMedicineReminders() {
   section("Medicine reminders (MED-01)");
 
@@ -4501,6 +4991,7 @@ try {
   await testReminderSchedule();
   await testMedicineReminderSettings();
   await testNotificationPreferences();
+  await testMessaging();
   await testMedicineReminders();
   await testConsents();
   await testUpgrade();
