@@ -1,6 +1,9 @@
 import { ClockIcon, FlaskConicalIcon, MapPinIcon } from "lucide-react";
+import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import { CollectionAreasLine } from "@/features/home-collection/components/collection-areas-line";
 import { formatTurnaround } from "@/features/lab-catalog/lib/lab-catalog";
 import type { LabTestOffer } from "@/features/lab-tests/data/lab-test-catalog";
@@ -47,8 +50,7 @@ export function LabOfferList({
         <p className="text-sm text-muted-foreground">
           {complete
             ? "Compare prices and turnaround here."
-            : `The ${offers.length} lowest prices are shown here.`}{" "}
-          Booking a lab test on MedEase opens soon.
+            : `The ${offers.length} lowest prices are shown here.`}
         </p>
       </div>
       <ul className="grid gap-3">
@@ -64,9 +66,19 @@ export function LabOfferList({
                   <span className="break-words">{offer.labAddress}</span>
                 </p>
               </div>
-              <p className="text-base font-semibold">
-                {formatFee(offer.price)}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-base font-semibold">
+                  {formatFee(offer.price)}
+                </p>
+                {/* Guests are sent to log in first, then back here. */}
+                <Link
+                  href={patientRoutes.bookLab(offer.labId, { test: offer.id })}
+                  className={buttonVariants({ size: "sm", className: "px-4" })}
+                  aria-label={`Book at ${offer.labName}`}
+                >
+                  Book
+                </Link>
+              </div>
             </div>
             <ul className="mt-3 flex flex-wrap gap-2 text-xs">
               {offers.length > 1 && offer.price === cheapest && (

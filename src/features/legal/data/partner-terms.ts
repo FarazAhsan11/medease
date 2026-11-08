@@ -8,8 +8,8 @@ export const partnerTerms: LegalDocument = {
   slug: "partner-terms",
   title: "Doctor and Lab Partner Terms",
   summary: `The agreement between ${name} and the doctors and labs who join it.`,
-  version: "1.0",
-  updated: "2 November 2026",
+  version: "1.1",
+  updated: "8 November 2026",
   sections: [
     {
       title: "These terms",
@@ -49,13 +49,14 @@ export const partnerTerms: LegalDocument = {
     {
       title: "Labs",
       body: [
-        "Lab bookings are still being built. Registering now lets you prepare your account. When bookings start:",
+        "Once we approve your lab, patients can book the tests and packages you list, for a visit to your lab or for home collection in the cities you serve.",
         [
           "You must hold a valid licence from your provincial healthcare commission.",
-          "You must keep your address, test catalog and prices accurate.",
+          "You must keep your address, phone number, test catalog, prices, collection cities, fees and hours accurate. A booking keeps the prices shown when it was made.",
+          "Patients pay you in cash, at the lab or to your collector, the total shown on the booking.",
+          "Use a patient's details only to carry out their booking.",
           "You alone are responsible for sample handling, testing and the accuracy of your reports.",
         ],
-        "We will publish a new version of these terms before lab bookings start.",
       ],
     },
     {

@@ -57,6 +57,12 @@ export const rateLimits = {
   catalogUser: { name: "catalog-user", limit: 300, windowSeconds: ONE_HOUR },
   // A patient saving or deleting a saved address.
   addressUser: { name: "address-user", limit: 60, windowSeconds: ONE_HOUR },
+  // A patient booking lab tests: a family's needs, not a script's.
+  labBookingUser: {
+    name: "lab-booking-user",
+    limit: 20,
+    windowSeconds: ONE_HOUR,
+  },
   // Starting a conversation, or a doctor extending or closing one.
   conversationUser: {
     name: "conversation-user",

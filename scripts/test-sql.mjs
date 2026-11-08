@@ -3436,7 +3436,7 @@ async function testHomeCollection({ patient }) {
       )
     ).data ?? [];
   const slots = (labId, days = 7) =>
-    rpc(null, "get_lab_collection_slots", { p_lab_id: labId, p_days: days });
+    rpc(patient, "get_lab_collection_slots", { p_lab_id: labId, p_days: days });
 
   check(
     "a ticked test shows no home collection while it's off",
@@ -3521,6 +3521,514 @@ async function testHomeCollection({ patient }) {
       (await offerCollects()) === false,
   );
   succeeded("and then the last city can go", await deleteArea(lab, lahoreId));
+}
+
+async function testLabBooking({ patient, secondPatient }) {
+  section("Booking a lab test (LAB-03)");
+
+  const lab = await createLab({ status: "approved" });
+  const pendingLab = await createLab();
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const addTest = async (caller, testTypeId, fields = {}) =>
+    idOf(
+      await rpc(caller, "save_lab_test", {
+        p_test_type_id: testTypeId,
+        p_price: 1000,
+        p_turnaround_hours: 24,
+        p_home_collection: true,
+        p_preparation: null,
+        p_listed: true,
+        ...fields,
+      }),
+    );
+  const cbc = await addTest(lab, "cbc", { p_price: 900 });
+  const hba1c = await addTest(lab, "hba1c", { p_price: 1500 });
+  const lipid = await addTest(lab, "lipid-profile", { p_price: 2200 });
+  const urine = await addTest(lab, "urine-re", {
+    p_price: 400,
+    p_home_collection: false,
+  });
+  const unlisted = await addTest(lab, "tsh", { p_listed: false });
+  const pendingTest = await addTest(pendingLab, "cbc");
+  const sugarPackage = idOf(
+    await rpc(lab, "save_lab_package", {
+      p_package_id: null,
+      p_name: "Sugar check",
+      p_description: null,
+      p_price: 2000,
+      p_test_ids: [cbc, hba1c],
+      p_listed: true,
+    }),
+  );
+  check(
+    "the fixtures are in place",
+    [cbc, hba1c, lipid, urine, unlisted, pendingTest, sugarPackage].every(
+      Boolean,
+    ),
+  );
+
+  const address = async (caller, city) =>
+    idOf(
+      await rpc(caller, "save_patient_address", {
+        p_id: null,
+        p_label: "Home",
+        p_street_address: "House 1, Street 2",
+        p_area: "Model Town",
+        p_city: city,
+        p_contact_phone: "+92 300 1234567",
+      }),
+    );
+  const lahoreHome = await address(patient, "Lahore");
+  const karachiHome = await address(patient, "Karachi");
+  const otherHome = await address(secondPatient, "Lahore");
+  const child = idOf(
+    await rpc(patient, "save_family_member", {
+      p_id: null,
+      p_first_name: "Little",
+      p_last_name: "One",
+      p_relation: "child",
+      p_date_of_birth: "2018-04-02",
+      p_gender: "Female",
+    }),
+  );
+
+  const localToday = () =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(
+      new Date(),
+    );
+  const addDays = (key, days) =>
+    new Date(Date.parse(`${key}T00:00:00Z`) + days * DAY)
+      .toISOString()
+      .slice(0, 10);
+
+  const book = (caller, fields = {}) =>
+    rpc(caller, "book_lab_test", {
+      p_request_id: randomUUID(),
+      p_lab_id: lab.id,
+      p_lab_test_ids: [cbc],
+      p_package_ids: [],
+      p_collection: "lab",
+      p_visit_date: addDays(localToday(), 1),
+      p_slot_starts_at: null,
+      p_address_id: null,
+      p_care_recipient_id: null,
+      ...fields,
+    });
+  const bookingRow = async (id) =>
+    (await db.query(`select * from public.lab_bookings where id = $1`, [id]))
+      .rows[0];
+  const itemsOf = async (id) =>
+    (
+      await db.query(
+        `select name, price, test_names, lab_test_id, package_id
+         from public.lab_booking_items where booking_id = $1 order by name`,
+        [id],
+      )
+    ).rows;
+
+  denied("a guest can't book", await book(null));
+  refused("a lab can't book", await book(lab), "not_patient");
+
+  const visit = await book(patient, {
+    p_lab_test_ids: [cbc, hba1c],
+    p_care_recipient_id: child,
+  });
+  succeeded("a patient books two tests as a lab visit", visit);
+  const visitId = idOf(visit);
+  const visitRow = await bookingRow(visitId);
+  check(
+    "the booking keeps the total, lab and the person tested",
+    visitRow?.status === "booked" &&
+      visitRow.collection === "lab" &&
+      visitRow.subtotal === 2400 &&
+      visitRow.collection_fee === 0 &&
+      visitRow.total === 2400 &&
+      visitRow.lab_name === "Sql Lab" &&
+      visitRow.care_recipient_name === "Little One" &&
+      visitRow.care_recipient_relation === "child" &&
+      visitRow.care_recipient_gender === "Female" &&
+      visitRow.patient_name === "Sql Patient" &&
+      visitRow.payment_method === "cash" &&
+      visitRow.payment_status === "unpaid" &&
+      visitRow.street_address === null,
+  );
+  const visitItems = await itemsOf(visitId);
+  check(
+    "each item keeps its name and price",
+    visitItems.map((item) => `${item.name}:${item.price}`).join() ===
+      "Complete Blood Count (CBC):900,HbA1c (Glycated Haemoglobin):1500" ||
+      (visitItems.length === 2 &&
+        visitItems.reduce((sum, item) => sum + item.price, 0) === 2400),
+    visitItems.map((item) => item.name).join(", "),
+  );
+
+  await rpc(lab, "save_lab_test", {
+    p_test_type_id: "cbc",
+    p_price: 5000,
+    p_turnaround_hours: 24,
+    p_home_collection: true,
+    p_preparation: null,
+    p_listed: true,
+  });
+  check(
+    "a later price change leaves the booking alone",
+    (await bookingRow(visitId)).total === 2400,
+  );
+  await rpc(lab, "save_lab_test", {
+    p_test_type_id: "cbc",
+    p_price: 900,
+    p_turnaround_hours: 24,
+    p_home_collection: true,
+    p_preparation: null,
+    p_listed: true,
+  });
+
+  const requestId = randomUUID();
+  const first = await book(patient, { p_request_id: requestId });
+  const again = await book(patient, {
+    p_request_id: requestId,
+    p_lab_test_ids: [lipid],
+  });
+  check(
+    "sending the same request again returns the same booking",
+    idOf(first) && idOf(first) === idOf(again),
+  );
+  check(
+    "and books nothing more",
+    (
+      await db.query(
+        `select count(*)::int as n from public.lab_bookings where request_id = $1`,
+        [requestId],
+      )
+    ).rows[0].n === 1,
+  );
+  const sameKeyOther = await book(secondPatient, { p_request_id: requestId });
+  check(
+    "another account's request id is its own",
+    idOf(sameKeyOther) && idOf(sameKeyOther) !== idOf(first),
+  );
+
+  const pkg = await book(patient, {
+    p_lab_test_ids: [lipid],
+    p_package_ids: [sugarPackage],
+  });
+  succeeded("a package and a test book together", pkg);
+  const pkgItems = await itemsOf(idOf(pkg));
+  check(
+    "the package keeps its tests' names",
+    pkgItems.some(
+      (item) =>
+        item.package_id === sugarPackage && item.test_names.length === 2,
+    ) && (await bookingRow(idOf(pkg))).subtotal === 4200,
+  );
+
+  refused(
+    "a missing request id is refused",
+    await book(patient, { p_request_id: null }),
+    "invalid_booking",
+  );
+  refused(
+    "an unknown collection is refused",
+    await book(patient, { p_collection: "post" }),
+    "invalid_booking",
+  );
+  refused(
+    "no items is refused",
+    await book(patient, { p_lab_test_ids: [] }),
+    "invalid_items",
+  );
+  refused(
+    "the same test twice is refused",
+    await book(patient, { p_lab_test_ids: [cbc, cbc] }),
+    "invalid_items",
+  );
+  refused(
+    "more than 20 items is refused",
+    await book(patient, {
+      p_lab_test_ids: Array.from({ length: 21 }, () => randomUUID()),
+    }),
+    "invalid_items",
+  );
+  refused(
+    "a test also inside a package is refused",
+    await book(patient, {
+      p_lab_test_ids: [cbc],
+      p_package_ids: [sugarPackage],
+    }),
+    "duplicate_test",
+  );
+  refused(
+    "an unlisted test is refused",
+    await book(patient, { p_lab_test_ids: [unlisted] }),
+    "item_unavailable",
+  );
+  refused(
+    "another lab's test is refused",
+    await book(patient, { p_lab_test_ids: [pendingTest] }),
+    "item_unavailable",
+  );
+  refused(
+    "a lab under review can't be booked",
+    await book(patient, {
+      p_lab_id: pendingLab.id,
+      p_lab_test_ids: [pendingTest],
+    }),
+    "lab_not_found",
+  );
+  refused(
+    "someone else's family member is refused",
+    await book(secondPatient, { p_care_recipient_id: child }),
+    "invalid_care_recipient",
+  );
+  refused(
+    "a visit day in the past is refused",
+    await book(patient, { p_visit_date: addDays(localToday(), -1) }),
+    "invalid_visit_date",
+  );
+  refused(
+    "a visit day more than 13 days ahead is refused",
+    await book(patient, { p_visit_date: addDays(localToday(), 14) }),
+    "invalid_visit_date",
+  );
+  refused(
+    "a lab visit needs a day",
+    await book(patient, { p_visit_date: null }),
+    "invalid_visit_date",
+  );
+
+  section("Home collection bookings (LAB-03)");
+
+  const home = (caller, fields = {}) =>
+    book(caller, {
+      p_collection: "home",
+      p_visit_date: null,
+      p_address_id: lahoreHome,
+      ...fields,
+    });
+  refused(
+    "home collection while it's off is refused",
+    await home(patient, { p_slot_starts_at: new Date().toISOString() }),
+    "not_collecting",
+  );
+
+  await rpc(lab, "save_lab_service_area", {
+    p_id: null,
+    p_city: "Lahore",
+    p_fee: 300,
+    p_note: null,
+  });
+  await rpc(lab, "save_lab_collection_schedule", {
+    p_ranges: JSON.stringify(
+      [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+        weekday,
+        start: "00:00",
+        end: "23:00",
+      })),
+    ),
+    p_slot_minutes: 60,
+    p_capacity: 2,
+    p_notice_hours: 1,
+    p_free_above: 3000,
+    p_accepting: true,
+  });
+  const slots = async () =>
+    (
+      await rpc(patient, "get_lab_collection_slots", {
+        p_lab_id: lab.id,
+        p_days: 14,
+      })
+    ).data ?? [];
+  denied(
+    "a guest can't read collection windows, which count bookings",
+    await rpc(null, "get_lab_collection_slots", { p_lab_id: lab.id, p_days: 14 }),
+  );
+  const [slot, nextSlot] = await slots();
+  const spotsAt = async (startsAt) =>
+    (await slots()).find(
+      (item) =>
+        new Date(item.starts_at).getTime() === new Date(startsAt).getTime(),
+    )?.spots_left;
+
+  const homeBooking = await home(patient, { p_slot_starts_at: slot.starts_at });
+  succeeded("a patient books a home collection window", homeBooking);
+  const homeRow = await bookingRow(idOf(homeBooking));
+  check(
+    "it copies the address and charges the city's fee",
+    homeRow?.collection === "home" &&
+      homeRow.city === "Lahore" &&
+      homeRow.street_address === "House 1, Street 2" &&
+      homeRow.contact_phone === "+92 300 1234567" &&
+      homeRow.collection_fee === 300 &&
+      homeRow.total === 1200 &&
+      homeRow.care_recipient_relation === "self" &&
+      new Date(homeRow.slot_starts_at).getTime() ===
+        new Date(slot.starts_at).getTime(),
+  );
+  check("the window has one visit left", (await spotsAt(slot.starts_at)) === 1);
+
+  const free = await home(patient, {
+    p_lab_test_ids: [lipid, hba1c],
+    p_slot_starts_at: nextSlot.starts_at,
+  });
+  check(
+    "the fee is waived above the lab's amount",
+    (await bookingRow(idOf(free)))?.collection_fee === 0 &&
+      (await bookingRow(idOf(free))).total === 3700,
+  );
+
+  await home(secondPatient, {
+    p_address_id: otherHome,
+    p_slot_starts_at: slot.starts_at,
+  });
+  check("now it's full", (await spotsAt(slot.starts_at)) === 0);
+  refused(
+    "a full window is refused",
+    await home(patient, { p_slot_starts_at: slot.starts_at }),
+    "slot_full",
+  );
+
+  refused(
+    "a time that isn't a window is refused",
+    await home(patient, {
+      p_slot_starts_at: new Date(
+        Date.now() + 26 * 60 * MINUTE + 17 * 60_000,
+      ).toISOString(),
+    }),
+    "slot_unavailable",
+  );
+  refused(
+    "a test the lab doesn't collect at home is refused",
+    await home(patient, {
+      p_lab_test_ids: [urine],
+      p_slot_starts_at: nextSlot.starts_at,
+    }),
+    "no_home_collection",
+  );
+  refused(
+    "someone else's address is refused",
+    await home(patient, {
+      p_address_id: otherHome,
+      p_slot_starts_at: nextSlot.starts_at,
+    }),
+    "invalid_address",
+  );
+  refused(
+    "a city the lab doesn't collect in is refused",
+    await home(patient, {
+      p_address_id: karachiHome,
+      p_slot_starts_at: nextSlot.starts_at,
+    }),
+    "area_not_served",
+  );
+
+  section("Who reads lab bookings (LAB-03, PRV-03)");
+
+  const read = async (caller, table = "lab_bookings") =>
+    (await as(caller, `select id from public.${table}`)).data ?? [];
+  const otherLab = await createLab({ status: "approved" });
+  check(
+    "the patient reads their bookings and items",
+    (await read(patient)).some((row) => row.id === visitId) &&
+      (await read(patient, "lab_booking_items")).length >= 2,
+  );
+  check(
+    "the lab reads its bookings",
+    (await read(lab)).some((row) => row.id === visitId),
+  );
+  check(
+    "another patient and another lab read none of them",
+    !(await read(secondPatient)).some((row) => row.id === visitId) &&
+      (await read(otherLab)).length === 0 &&
+      (await read(otherLab, "lab_booking_items")).length === 0,
+  );
+  check(
+    "a lab without two-factor reads nothing",
+    (await read({ ...lab, aal: "aal1" })).length === 0,
+  );
+  denied(
+    "a guest reads nothing",
+    await as(null, `select id from public.lab_bookings`),
+  );
+  const write = await as(
+    patient,
+    `update public.lab_bookings set total = 1 where id = $1`,
+    [visitId],
+  );
+  denied("nobody writes directly", write);
+
+  const notices = async (userId, kind) =>
+    (
+      await db.query(
+        `select href from public.notifications where user_id = $1 and kind = $2`,
+        [userId, kind],
+      )
+    ).rows;
+  check(
+    "the patient and the lab get a notice",
+    (await notices(patient.id, "lab_booking_booked"))[0]?.href ===
+      "/patient/lab-tests" &&
+      (await notices(lab.id, "lab_booking_new"))[0]?.href === "/lab/bookings",
+  );
+
+  section("What bookings hold on to (LAB-03)");
+
+  refused(
+    "a booked package can't be deleted",
+    await rpc(lab, "delete_lab_package", { p_package_id: sugarPackage }),
+    "package_has_bookings",
+  );
+  refused(
+    "a family member with lab bookings can't be removed",
+    await rpc(patient, "delete_family_member", { p_id: child }),
+    "family_member_has_records",
+  );
+
+  const busy = await createPatient();
+  let opened = 0;
+  for (let i = 0; i < 20; i++) {
+    if (!(await book(busy)).error) opened++;
+  }
+  check("an account can hold 20 open bookings", opened === 20);
+  refused("the 21st is refused", await book(busy), "too_many_bookings");
+  await db.query(
+    `update public.lab_bookings set visit_date = visit_date - 30 where patient_id = $1`,
+    [busy.id],
+  );
+  succeeded(
+    "bookings left on past days don't count against the limit",
+    await book(busy),
+  );
+
+  const gone = await createPatient();
+  await book(gone);
+  await db.query(`delete from auth.users where id = $1`, [gone.id]);
+  check(
+    "deleting an account removes its bookings",
+    (
+      await db.query(
+        `select count(*)::int as n from public.lab_bookings where patient_id = $1`,
+        [gone.id],
+      )
+    ).rows[0].n === 0,
+  );
+
+  const labGone = await db
+    .query(`delete from auth.users where id = $1`, [lab.id])
+    .then(
+      () => null,
+      (error) => error.message,
+    );
+  check(
+    "a lab with bookings can delete its account, taking its bookings",
+    labGone === null &&
+      (
+        await db.query(
+          `select count(*)::int as n from public.lab_bookings where lab_id = $1`,
+          [lab.id],
+        )
+      ).rows[0].n === 0,
+    labGone ?? "",
+  );
 }
 
 async function testFamilyMembers({ patient, secondPatient }) {
@@ -6220,7 +6728,6 @@ async function testSchemaRules() {
   // account. has_confirmed_email is read by the public directory view.
   const guestAllowed = new Set([
     "get_doctor_slots",
-    "get_lab_collection_slots",
     "has_confirmed_email",
     ...globalGuestFunctions,
   ]);
@@ -6529,6 +7036,7 @@ try {
   await testLabVerification(await freshPatients());
   await testLabCatalog(await freshPatients());
   await testHomeCollection(await freshPatients());
+  await testLabBooking(await freshPatients());
   await testCareRecipients(await freshPatients());
   await testDoctorMedicalProfiles(await freshPatients());
   await testFamilyMembers(await freshPatients());

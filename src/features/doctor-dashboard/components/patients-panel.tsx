@@ -13,6 +13,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { doctorRoutes } from "@/config/routes";
 import type { PatientSummary } from "@/features/doctor-dashboard/lib/practice";
 import { formatDate, formatDateTime } from "@/lib/datetime";
+import { telHref } from "@/lib/format";
 
 type PatientsPanelProps = {
   patients: PatientSummary[];
@@ -63,7 +64,7 @@ export function PatientsPanel({ patients, searching }: PatientsPanelProps) {
             </a>
             {patient.phone && (
               <a
-                href={`tel:${patient.phone.replace(/\s/g, "")}`}
+                href={telHref(patient.phone)}
                 className="flex min-w-0 items-center gap-2 text-primary hover:underline"
               >
                 <PhoneIcon className="size-4 shrink-0" aria-hidden />

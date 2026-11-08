@@ -1,5 +1,8 @@
 import { CheckIcon, ClockIcon, MapPinIcon } from "lucide-react";
+import Link from "next/link";
 
+import { buttonVariants } from "@/components/ui/button";
+import { patientRoutes } from "@/config/routes";
 import { CollectionAreasLine } from "@/features/home-collection/components/collection-areas-line";
 import {
   formatTurnaround,
@@ -73,13 +76,27 @@ export function LabPackageCard({ labPackage }: LabPackageCardProps) {
         )}
       </ul>
 
-      <div className="mt-4 border-t pt-4">
-        {savings && (
-          <p className="text-xs text-muted-foreground line-through">
-            {formatFee(labPackage.separatePrice)}
+      <div className="mt-4 flex items-end justify-between gap-3 border-t pt-4">
+        <div>
+          {savings && (
+            <p className="text-xs text-muted-foreground line-through">
+              {formatFee(labPackage.separatePrice)}
+            </p>
+          )}
+          <p className="text-base font-semibold">
+            {formatFee(labPackage.price)}
           </p>
-        )}
-        <p className="text-base font-semibold">{formatFee(labPackage.price)}</p>
+        </div>
+        {/* Guests are sent to log in first, then back here. */}
+        <Link
+          href={patientRoutes.bookLab(labPackage.labId, {
+            package: labPackage.id,
+          })}
+          className={buttonVariants({ size: "sm", className: "px-4" })}
+          aria-label={`Book ${labPackage.name} at ${labPackage.labName}`}
+        >
+          Book
+        </Link>
       </div>
     </article>
   );

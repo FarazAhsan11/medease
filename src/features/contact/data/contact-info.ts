@@ -1,6 +1,7 @@
 import { ClockIcon, PhoneIcon, type LucideIcon } from "lucide-react";
 
 import { siteConfig } from "@/config/site";
+import { telHref } from "@/lib/format";
 
 export type ContactInfo = {
   icon: LucideIcon;
@@ -14,7 +15,7 @@ export const contactInfo: ContactInfo[] = [
     icon: PhoneIcon,
     label: "Phone",
     value: siteConfig.contact.phone,
-    href: `tel:${siteConfig.contact.phone.replace(/[^+\d]/g, "")}`,
+    href: telHref(siteConfig.contact.phone),
   },
   {
     icon: ClockIcon,

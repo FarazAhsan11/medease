@@ -22,6 +22,7 @@ import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summarie
 import { DoctorVisitSummary } from "@/features/visit-summaries/components/doctor-visit-summary";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
+import { telHref } from "@/lib/format";
 
 // "10:02 AM – 10:24 AM (22 min)" once a call has happened.
 function describeCall(appointment: Appointment) {
@@ -88,7 +89,7 @@ export function AppointmentDetails({
         </a>
         {appointment.patientPhone && (
           <a
-            href={`tel:${appointment.patientPhone.replace(/\s/g, "")}`}
+            href={telHref(appointment.patientPhone)}
             className="flex items-center gap-2 text-primary hover:underline"
           >
             <PhoneIcon className="size-4 shrink-0" aria-hidden />

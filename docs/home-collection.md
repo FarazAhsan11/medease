@@ -16,7 +16,7 @@ A lab says where it collects samples at home, what the visit costs, and when its
 
 **What patients see follows from it.** A test's "Home collection" badge (`lab_tests.home_collection`) now shows only while its lab has home collection on, in `lab_test_offers`, `lab_test_catalog` and `lab_package_offers`. A lab can tick the box on a test before setting up collection; it shows from the moment collection is on.
 
-**Capacity at booking (LAB-03).** `get_lab_collection_slots` returns each slot's spots left; today that's the full capacity. LAB-03 subtracts bookings that weren't cancelled, and `book_lab_test` takes a transaction-level advisory lock on the lab and slot (`pg_advisory_xact_lock`) before counting and inserting, so two patients can't take the last spot together. A count followed by an insert without a lock lets both through, and `FOR UPDATE` can't lock rows that don't exist yet.
+**Capacity at booking (LAB-03).** `get_lab_collection_slots` returns each slot's spots left, capacity minus bookings that weren't cancelled (LAB-03), to signed-in users only, and `book_lab_test` takes a transaction-level advisory lock on the lab and slot (`pg_advisory_xact_lock`) before counting and inserting, so two patients can't take the last spot together. A count followed by an insert without a lock lets both through, and `FOR UPDATE` can't lock rows that don't exist yet.
 
 **Bookings already made stay.** Changing hours, capacity or areas never cancels a booking; the lab handles those in its bookings list (LAB-04).
 

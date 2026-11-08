@@ -42,6 +42,7 @@ export type CatalogTest = {
 
 export type PackageOffer = {
   id: string;
+  labId: string;
   labName: string;
   labAddress: string;
   name: string;
@@ -208,6 +209,7 @@ export async function searchLabPackages(search: LabTestSearch) {
     page,
     packages: data.map((row): PackageOffer => ({
       id: row.id,
+      labId: row.lab_id,
       labName: row.lab_name,
       labAddress: row.lab_address,
       name: row.name,

@@ -1,25 +1,35 @@
 import { CheckIcon } from "lucide-react";
 
 import {
-  orderStages,
-  type OrderStage,
-} from "@/features/lab-tests/data/lab-orders";
+  progressSteps,
+  statusLabels,
+  type LabBookingStatus,
+} from "@/features/lab-booking/lib/lab-bookings";
 import { cn } from "@/lib/utils";
 
 type OrderTrackerProps = {
-  stage: OrderStage;
+  status: LabBookingStatus;
 };
 
-export function OrderTracker({ stage }: OrderTrackerProps) {
-  const current = orderStages.indexOf(stage);
+// Where a lab booking is on its way to a report.
+export function OrderTracker({ status }: OrderTrackerProps) {
+  // A new sample restarts collection; a cancelled booking shows no progress.
+  const current =
+    status === "recollection_needed"
+      ? 0
+      : progressSteps.indexOf(status as (typeof progressSteps)[number]);
 
   return (
-    <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">
-      {orderStages.map((label, index) => {
+    <ol className="grid grid-cols-4 gap-2" aria-label="Booking progress">
+      {progressSteps.map((step, index) => {
         const done = index <= current;
 
         return (
-          <li key={label} className="grid gap-2">
+          <li
+            key={step}
+            className="grid gap-2"
+            aria-current={index === current ? "step" : undefined}
+          >
             <div className="flex items-center gap-2">
               <span
                 className={cn(
@@ -35,7 +45,7 @@ export function OrderTracker({ stage }: OrderTrackerProps) {
                   index + 1
                 )}
               </span>
-              {index < orderStages.length - 1 && (
+              {index < progressSteps.length - 1 && (
                 <span
                   className={cn(
                     "h-0.5 flex-1 rounded-full",
@@ -50,7 +60,7 @@ export function OrderTracker({ stage }: OrderTrackerProps) {
                 done ? "font-medium text-foreground" : "text-muted-foreground",
               )}
             >
-              {label}
+              {statusLabels[step]}
             </span>
           </li>
         );

@@ -25,6 +25,15 @@ export const patientRoutes = {
   bookLabTests: "/patient/lab-tests/book",
   // One test compared across labs.
   labTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
+  // Booking at one lab, starting with the test or package the patient picked.
+  bookLab: (labId: string, start?: { test?: string; package?: string }) => {
+    const query = start?.test
+      ? `?test=${start.test}`
+      : start?.package
+        ? `?package=${start.package}`
+        : "";
+    return `/patient/lab-tests/labs/${labId}${query}`;
+  },
   medicines: "/patient/medicines",
   prescriptions: "/patient/prescriptions",
   prescription: (prescriptionId: string) =>
@@ -85,6 +94,7 @@ export const labRoutes = {
   verification: "/lab/verification",
   tests: "/lab/tests",
   homeCollection: "/lab/home-collection",
+  bookings: "/lab/bookings",
 } as const;
 
 export const adminRoutes = {

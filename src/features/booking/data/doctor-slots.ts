@@ -1,12 +1,9 @@
 import "server-only";
 
-import { dateChipParts, formatTime, toDateKey } from "@/lib/datetime";
-import type { DateOption, TimeSlot } from "@/lib/schedule";
+import { groupSlotsByDay, type BookingDay } from "@/lib/schedule";
 import { createClient } from "@/lib/supabase/server";
 
 export const BOOKING_WINDOW_DAYS = 14;
-
-export type BookingDay = DateOption & { slots: TimeSlot[]; openCount: number };
 
 type SlotRow = { starts_at: string; ends_at: string; is_booked: boolean };
 
@@ -24,29 +21,12 @@ export async function getBookingDays(
 
   if (error) throw new Error(`get_doctor_slots: ${error.message}`);
 
-  const days = new Map<string, BookingDay>();
-  for (const slot of (data ?? []) as SlotRow[]) {
-    const key = toDateKey(slot.starts_at, timeZone);
-    let day = days.get(key);
-    if (!day) {
-      day = {
-        value: key,
-        ...dateChipParts(key, timeZone),
-        slots: [],
-        openCount: 0,
-      };
-      days.set(key, day);
-    }
-    day.slots.push({
-      value: new Date(slot.starts_at).toISOString(),
-      label: formatTime(slot.starts_at, timeZone),
-      disabled: slot.is_booked,
+  return groupSlotsByDay(
+    ((data ?? []) as SlotRow[]).map((slot) => ({
+      startsAt: slot.starts_at,
+      taken: slot.is_booked,
       note: slot.is_booked ? "Booked" : undefined,
-    });
-    if (!slot.is_booked) day.openCount += 1;
-  }
-
-  return [...days.values()].map((day) =>
-    day.openCount === 0 ? { ...day, note: "Full" } : day,
+    })),
+    timeZone,
   );
 }

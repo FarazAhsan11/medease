@@ -11,10 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { bookAppointment } from "@/features/booking/actions/book-appointment";
 import { EmergencyNotice } from "@/components/shared/emergency-notice";
 import { BookingSummary } from "@/features/booking/components/booking-summary";
-import type { BookingDay } from "@/features/booking/data/doctor-slots";
 import { useFormAction } from "@/hooks/use-form-action";
+import { useRefreshOnVisible } from "@/hooks/use-refresh-on-visible";
 import { initialFormState } from "@/lib/form-state";
-import type { TimeSlot } from "@/lib/schedule";
+import type { BookingDay, TimeSlot } from "@/lib/schedule";
 
 type BookingFormProps = {
   doctorId: string;
@@ -55,14 +55,7 @@ export function BookingForm({
     if (state.code && staleSlotCodes.has(state.code)) router.refresh();
   }, [state, router]);
 
-  // Coming back to the tab: someone may have booked in the meantime.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") router.refresh();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [router]);
+  useRefreshOnVisible();
 
   return (
     <form

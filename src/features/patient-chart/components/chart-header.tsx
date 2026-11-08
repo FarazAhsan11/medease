@@ -4,6 +4,7 @@ import { DetailList } from "@/components/shared/detail-list";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import type { PatientChart } from "@/features/patient-chart/data/patient-chart";
 import { formatDate, formatDateTime } from "@/lib/datetime";
+import { telHref } from "@/lib/format";
 
 export function ChartHeader({ chart }: { chart: PatientChart }) {
   const { patient, firstVisit, nextVisit, completedVisits } = chart;
@@ -25,7 +26,7 @@ export function ChartHeader({ chart }: { chart: PatientChart }) {
           </a>
           {patient.phone && (
             <a
-              href={`tel:${patient.phone.replace(/\s/g, "")}`}
+              href={telHref(patient.phone)}
               className="flex min-w-0 items-center gap-2 text-primary hover:underline"
             >
               <PhoneIcon className="size-4 shrink-0" aria-hidden />
