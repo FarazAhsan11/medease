@@ -9,7 +9,7 @@ export const privacyPolicy: LegalDocument = {
   title: "Privacy Policy",
   summary: `What personal data ${name} holds, why we hold it, who can see it and how long we keep it.`,
   version: "1.0",
-  updated: "7 November 2026",
+  updated: "8 November 2026",
   sections: [
     {
       title: "Who we are",
@@ -23,6 +23,7 @@ export const privacyPolicy: LegalDocument = {
         [
           "Account details: your name, email address, phone number and role. Your password is stored only as a hash.",
           "Emergency contact: the name and phone number you choose to give us.",
+          "Saved addresses: the addresses you save for home sample collection, with a landmark and the name and phone number of someone to contact there. Only you can see them.",
           "Medical profile: date of birth, gender, blood group, height, weight, allergies, long-term conditions and current medicines.",
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
@@ -131,6 +132,7 @@ export const privacyPolicy: LegalDocument = {
               "Kept, no longer linked to your identity",
             ],
             ["Documents you upload", "Until you delete them", "Deleted"],
+            ["Saved addresses", "Until you delete them", "Deleted"],
             ["Messages", "2 years after the last message", "Deleted"],
             [
               "Doctor and lab verification documents",

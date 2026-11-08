@@ -11,6 +11,7 @@
 // new refusal can't ship unchecked.
 
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import {
   callAs,
@@ -2901,6 +2902,209 @@ async function testDoctorMedicalProfiles({ patient, secondPatient }) {
   check(
     "the profile is unchanged",
     unchanged.rows[0].allergies[0] === "Penicillin",
+  );
+}
+
+async function testPatientAddresses({ patient, secondPatient }) {
+  section("Address book (PRO-07)");
+
+  const address = (fields = {}) => ({
+    p_id: null,
+    p_label: " Home ",
+    p_street_address: "House 21, Street 5",
+    p_area: "G-10/2",
+    p_city: "Islamabad",
+    p_contact_phone: "+92 300 1234567",
+    p_landmark: "  ",
+    ...fields,
+  });
+  const save = (caller, fields) =>
+    rpc(caller, "save_patient_address", address(fields));
+  const remove = (caller, id) =>
+    rpc(caller, "delete_patient_address", { p_id: id });
+  const savedId = (result) => result.data?.[0]?.save_patient_address;
+  const rows = async (accountId) =>
+    (
+      await db.query(
+        `select * from public.patient_addresses where account_id = $1 order by created_at`,
+        [accountId],
+      )
+    ).rows;
+  const defaults = async (accountId) =>
+    (await rows(accountId))
+      .filter((row) => row.is_default)
+      .map((row) => row.id);
+
+  const first = await save(patient);
+  const homeId = savedId(first);
+  const [home] = await rows(patient.id);
+  check(
+    "a patient adds an address, trimmed, and the first is the default",
+    home?.id === homeId &&
+      home.label === "Home" &&
+      home.landmark === null &&
+      home.is_default === true,
+    first.error?.message,
+  );
+
+  const officeId = savedId(
+    await save(patient, { p_label: "Office", p_area: "Blue Area" }),
+  );
+  check(
+    "a second address doesn't take the default",
+    (await defaults(patient.id)).join() === homeId,
+  );
+
+  succeeded(
+    "the patient makes another address the default",
+    await save(patient, {
+      p_id: officeId,
+      p_label: "Office",
+      p_is_default: true,
+    }),
+  );
+  check(
+    "only that one is the default",
+    (await defaults(patient.id)).join() === officeId,
+  );
+
+  succeeded(
+    "editing the default without the flag keeps it the default",
+    await save(patient, {
+      p_id: officeId,
+      p_label: "Work",
+      p_is_default: false,
+    }),
+  );
+  check(
+    "and the edit is saved",
+    (await defaults(patient.id)).join() === officeId &&
+      (await rows(patient.id)).find((row) => row.id === officeId)?.label ===
+        "Work",
+  );
+
+  refused(
+    "another patient can't edit it",
+    await save(secondPatient, { p_id: homeId }),
+    "address_not_found",
+  );
+  refused(
+    "another patient can't delete it",
+    await remove(secondPatient, homeId),
+    "address_not_found",
+  );
+  check(
+    "another patient reads none of it",
+    (await as(secondPatient, `select id from public.patient_addresses`)).data
+      ?.length === 0,
+  );
+  check(
+    "the owner reads their own",
+    (await as(patient, `select id from public.patient_addresses`)).data
+      ?.length === 2,
+  );
+  denied(
+    "nobody writes the table directly",
+    await as(
+      patient,
+      `update public.patient_addresses set label = 'x' where id = $1`,
+      [homeId],
+    ),
+  );
+
+  const doctor = await createDoctor();
+  refused("a doctor can't save one", await save(doctor), "not_patient");
+  refused(
+    "a doctor can't delete one",
+    await remove(doctor, homeId),
+    "not_patient",
+  );
+  refused(
+    "a blank area is refused",
+    await save(patient, { p_area: "  " }),
+    "invalid_address",
+  );
+  refused(
+    "a street address over 200 characters is refused",
+    await save(patient, { p_street_address: "x".repeat(201) }),
+    "invalid_address",
+  );
+  refused(
+    "a phone with letters is refused",
+    await save(patient, { p_contact_phone: "call me" }),
+    "invalid_address",
+  );
+  refused(
+    "a city outside the list is refused",
+    await save(patient, { p_city: "lahore" }),
+    "invalid_address",
+  );
+
+  const appCities = [
+    ...(
+      await readFile(new URL("../src/lib/cities.ts", import.meta.url), "utf8")
+    ).matchAll(/^\s+"([^"]+)",$/gm),
+  ].map((match) => match[1]);
+  const { rows: sqlCities } = await db.query(
+    `select unnest(private.cities()) as city`,
+  );
+  check(
+    "the database's cities match src/lib/cities.ts",
+    appCities.length > 0 &&
+      appCities.join("|") === sqlCities.map((row) => row.city).join("|"),
+  );
+
+  succeeded("deleting the default works", await remove(patient, officeId));
+  check(
+    "and the remaining address becomes the default",
+    (await defaults(patient.id)).join() === homeId,
+  );
+  succeeded("deleting the last address works", await remove(patient, homeId));
+  check("none are left", (await rows(patient.id)).length === 0);
+
+  for (let index = 0; index < 10; index++) {
+    await save(secondPatient, { p_label: `Place ${index}` });
+  }
+  refused(
+    "an eleventh address is refused",
+    await save(secondPatient),
+    "too_many_addresses",
+  );
+  const places = await rows(secondPatient.id);
+  check(
+    "ten addresses, one default",
+    places.length === 10 && (await defaults(secondPatient.id)).length === 1,
+  );
+  await save(secondPatient, {
+    p_id: places[5].id,
+    p_label: "Place 5",
+    p_is_default: true,
+  });
+  await save(secondPatient, {
+    p_id: places[9].id,
+    p_label: "Place 9",
+    p_is_default: true,
+  });
+  await remove(secondPatient, places[9].id);
+  check(
+    "deleting the default hands it to the oldest address",
+    (await defaults(secondPatient.id)).join() === places[0].id,
+  );
+
+  const paired = await createPatient();
+  await db.query(
+    `insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`,
+    [paired.id],
+  );
+  check(
+    "a patient who paired an app needs it to save an address",
+    (await save(paired)).error?.message === "second_factor_required",
+  );
+  succeeded("with the app they can", await save({ ...paired, aal: "aal2" }));
+  check(
+    "and with only a password they read nothing",
+    (await as(paired, `select id from public.patient_addresses`)).data
+      ?.length === 0,
   );
 }
 
@@ -5910,6 +6114,7 @@ try {
   await testCareRecipients(await freshPatients());
   await testDoctorMedicalProfiles(await freshPatients());
   await testFamilyMembers(await freshPatients());
+  await testPatientAddresses(await freshPatients());
   await testPatientProfile(await freshPatients());
   await testSecondFactor(await freshPatients());
   await testRecoveryCodes(await freshPatients());

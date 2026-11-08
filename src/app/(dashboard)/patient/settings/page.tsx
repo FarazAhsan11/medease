@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
+import { AddressesCard } from "@/features/addresses/components/addresses-card";
+import { getPatientAddresses } from "@/features/addresses/data/addresses";
 import { ChangePasswordCard } from "@/features/auth/components/change-password-card";
 import { TelemedicineConsentCard } from "@/features/consent/components/telemedicine-consent-card";
 import { hasTelemedicineConsent } from "@/features/consent/data/consents";
@@ -25,6 +27,7 @@ export default async function PatientSettingsPage() {
   const user = await requireRole("patient");
   const [
     profile,
+    addresses,
     familyMembers,
     factorId,
     consentGiven,
@@ -32,6 +35,7 @@ export default async function PatientSettingsPage() {
     emailPreferences,
   ] = await Promise.all([
     getPatientProfile(user.id, user.email),
+    getPatientAddresses(user.id),
     getFamilyMembers(user.id),
     getVerifiedFactorId(),
     hasTelemedicineConsent(),
@@ -43,16 +47,23 @@ export default async function PatientSettingsPage() {
     <>
       <DashboardPageHeader
         title="Settings"
-        description="Manage your profile, family, reminders, emails and how you sign in."
+        description="Manage your profile, family, addresses, reminders, emails and how you sign in."
       />
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {profile ? (
           <PersonalInfoForm profile={profile} />
         ) : (
           <MissingPatientProfileNotice />
         )}
-        <div className="grid h-fit gap-6">
+        <div className="grid h-fit grid-cols-[minmax(0,1fr)] gap-6">
           <FamilyMembersCard members={familyMembers} />
+          {profile && (
+            <AddressesCard
+              addresses={addresses}
+              accountPhone={profile.phone}
+              homeAddress={profile.homeAddress}
+            />
+          )}
           <MedicineRemindersCard settings={medicineReminders} />
           <EmailPreferencesCard role="patient" preferences={emailPreferences} />
           <TwoFactorCard enabled={Boolean(factorId)} />

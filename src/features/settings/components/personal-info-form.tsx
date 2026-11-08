@@ -90,7 +90,7 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
           <FormField
             id="patient-homeAddress"
             label="Home address"
-            hint="Used for home sample collection."
+            hint="For home sample collection, save it under Addresses."
             error={fieldError("homeAddress")}
             className="sm:col-span-2"
           >
