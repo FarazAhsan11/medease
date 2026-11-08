@@ -23,7 +23,8 @@ export const patientRoutes = {
   appointments: "/patient/appointments",
   labTests: "/patient/lab-tests",
   bookLabTests: "/patient/lab-tests/book",
-  bookLabTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
+  // One test compared across labs.
+  labTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
   medicines: "/patient/medicines",
   prescriptions: "/patient/prescriptions",
   prescription: (prescriptionId: string) =>
@@ -50,7 +51,14 @@ const patientRoutesByPublicPath: Record<string, string> = {
   "/talk-to-ai": patientRoutes.talkToAi,
 };
 
+export const publicRoutes = {
+  labTests: "/lab-tests",
+  labTest: (testId: string) => `/lab-tests/${testId}`,
+} as const;
+
 export function getPatientRouteFor(publicPath: string): string | undefined {
+  const labTest = /^\/lab-tests\/([a-z0-9-]{1,40})$/.exec(publicPath);
+  if (labTest) return patientRoutes.labTest(labTest[1]);
   return patientRoutesByPublicPath[publicPath];
 }
 
@@ -75,6 +83,7 @@ export const doctorRoutes = {
 export const labRoutes = {
   home: "/lab",
   verification: "/lab/verification",
+  tests: "/lab/tests",
 } as const;
 
 export const adminRoutes = {

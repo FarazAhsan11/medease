@@ -3,6 +3,14 @@ import "server-only";
 import { cache } from "react";
 import { z } from "zod";
 
+import {
+  isPastLastPage,
+  likePattern,
+  pageCount,
+  pageParam,
+  pageRange,
+  searchParam,
+} from "@/lib/directory-search";
 import { createClient } from "@/lib/supabase/server";
 
 export const DOCTORS_PER_PAGE = 6;
@@ -73,60 +81,58 @@ function toDoctor(row: DoctorRow): DirectoryDoctor {
   };
 }
 
-const param = (value: string | string[] | undefined) =>
-  (Array.isArray(value) ? value[0] : value)?.trim().slice(0, 80) ?? "";
-
 export function parseDoctorSearch(
   params: Record<string, string | string[] | undefined>,
 ): DoctorSearch {
-  const page = Number.parseInt(param(params.page), 10);
   return {
-    q: param(params.q),
-    specialty: param(params.specialty),
-    gender: param(params.gender),
-    city: param(params.city),
-    page: Number.isFinite(page) && page > 0 ? page : 1,
+    q: searchParam(params.q),
+    specialty: searchParam(params.specialty),
+    gender: searchParam(params.gender),
+    city: searchParam(params.city),
+    page: pageParam(params.page),
   };
 }
 
-// Characters with meaning in PostgREST filters or LIKE patterns.
-const sanitize = (value: string) => value.replace(/[,()%*\\_.:]/g, " ").trim();
-
 export async function searchDoctors(search: DoctorSearch) {
   const supabase = await createClient();
-  let query = supabase
-    .from("doctor_directory")
-    .select(COLUMNS, { count: "exact" });
+  const city = likePattern(search.city);
+  const q = likePattern(search.q);
+  const fetchPage = (page: number) => {
+    let query = supabase
+      .from("doctor_directory")
+      .select(COLUMNS, { count: "exact" });
+    if (search.specialty) query = query.eq("specialization", search.specialty);
+    if (search.gender) query = query.eq("gender", search.gender);
+    if (city) query = query.ilike("city", city);
+    if (q) {
+      query = query.or(
+        `full_name.ilike.${q},specialization.ilike.${q},city.ilike.${q}`,
+      );
+    }
+    return query
+      .order("accepting_appointments", { ascending: false })
+      .order("has_schedule", { ascending: false })
+      .order("experience_years", { ascending: false })
+      .order("full_name")
+      .range(...pageRange(page, DOCTORS_PER_PAGE))
+      .returns<DoctorRow[]>();
+  };
 
-  if (search.specialty) query = query.eq("specialization", search.specialty);
-  if (search.gender) query = query.eq("gender", search.gender);
-
-  const city = sanitize(search.city);
-  if (city) query = query.ilike("city", `%${city}%`);
-
-  const q = sanitize(search.q);
-  if (q) {
-    query = query.or(
-      `full_name.ilike.%${q}%,specialization.ilike.%${q}%,city.ilike.%${q}%`,
-    );
+  let page = search.page;
+  let result = await fetchPage(page);
+  if (page > 1 && isPastLastPage(result.error)) {
+    page = 1;
+    result = await fetchPage(page);
   }
-
-  const from = (search.page - 1) * DOCTORS_PER_PAGE;
-  const { data, count, error } = await query
-    .order("accepting_appointments", { ascending: false })
-    .order("has_schedule", { ascending: false })
-    .order("experience_years", { ascending: false })
-    .order("full_name")
-    .range(from, from + DOCTORS_PER_PAGE - 1)
-    .returns<DoctorRow[]>();
-
+  const { data, count, error } = result;
   if (error) throw new Error(`doctor_directory: ${error.message}`);
 
   const total = count ?? 0;
   return {
+    page,
     doctors: data.map(toDoctor),
     total,
-    totalPages: Math.max(1, Math.ceil(total / DOCTORS_PER_PAGE)),
+    totalPages: pageCount(total, DOCTORS_PER_PAGE),
   };
 }
 

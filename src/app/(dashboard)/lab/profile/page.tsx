@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { ToggleListCard } from "@/components/shared/toggle-list-card";
 import { ChangePasswordCard } from "@/features/auth/components/change-password-card";
 import { LabProfileForm } from "@/features/lab-dashboard/components/lab-profile-form";
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 export default function LabProfilePage() {
   return (
     <>
+      <PreviewNotice feature="The lab profile" />
       <DashboardPageHeader
         title="Lab profile"
         description="Your laboratory details, services, and account security."

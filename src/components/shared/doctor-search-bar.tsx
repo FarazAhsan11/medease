@@ -56,7 +56,9 @@ export function DoctorSearchBar({
           className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden
         />
+        {/* Keyed so a new search on the same page shows its own text. */}
         <Input
+          key={defaultValues?.q}
           name="q"
           aria-label="Search doctors"
           defaultValue={defaultValues?.q}

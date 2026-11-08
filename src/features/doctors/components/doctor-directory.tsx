@@ -17,7 +17,7 @@ export async function DoctorDirectory({
   searchAction,
   search,
 }: DoctorDirectoryProps) {
-  const { doctors, total, totalPages } = await searchDoctors(search);
+  const { page, doctors, total, totalPages } = await searchDoctors(search);
 
   return (
     <div className="space-y-8">
@@ -37,7 +37,7 @@ export async function DoctorDirectory({
           />
           <DoctorsPagination
             basePath={searchAction}
-            search={search}
+            search={{ ...search, page }}
             totalPages={totalPages}
           />
         </div>

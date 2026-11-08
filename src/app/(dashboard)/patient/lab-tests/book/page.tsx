@@ -1,25 +1,32 @@
 import type { Metadata } from "next";
 
-import { PreviewNotice } from "@/components/shared/preview-notice";
 import { BackLink } from "@/components/shared/back-link";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { patientRoutes } from "@/config/routes";
 import { LabTestDirectory } from "@/features/lab-tests/components/lab-test-directory";
+import { parseLabTestSearch } from "@/features/lab-tests/data/lab-test-catalog";
 
 export const metadata: Metadata = {
-  title: "Book a lab test",
+  title: "Find a lab test",
 };
 
-export default function PatientBookLabTestsPage() {
+export default async function PatientBookLabTestsPage({
+  searchParams,
+}: PageProps<"/patient/lab-tests/book">) {
+  const search = parseLabTestSearch(await searchParams);
+
   return (
     <>
-      <PreviewNotice feature="Lab booking" />
       <BackLink href={patientRoutes.labTests}>Back to my lab tests</BackLink>
       <DashboardPageHeader
-        title="Book a lab test"
-        description="Sample tests and packages."
+        title="Find a lab test"
+        description="Compare what verified labs charge and how soon results are ready."
       />
-      <LabTestDirectory />
+      <LabTestDirectory
+        basePath={patientRoutes.bookLabTests}
+        testHref={patientRoutes.labTest}
+        search={search}
+      />
     </>
   );
 }

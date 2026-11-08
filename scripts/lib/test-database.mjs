@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 
 const MIGRATIONS = "supabase/migrations";
 
@@ -171,10 +172,11 @@ async function applyAll(db, migrations) {
   }
 }
 
-// `create extension ... with schema extensions` installs btree_gist where the
-// constraints look for it; the search path mirrors Supabase's own.
+// `create extension ... with schema extensions` installs btree_gist and pg_trgm
+// where the constraints and indexes look for them; the search path mirrors
+// Supabase's own.
 async function emptyDatabase() {
-  const db = await PGlite.create({ extensions: { btree_gist } });
+  const db = await PGlite.create({ extensions: { btree_gist, pg_trgm } });
   await db.exec(SUPABASE_STUBS);
   await db.exec(
     `alter database template1 set search_path = public, extensions`,

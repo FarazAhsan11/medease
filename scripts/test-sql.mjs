@@ -2307,6 +2307,378 @@ async function testLabVerification({ patient }) {
   check("a patient doesn't", (await seenLicences(patient)) === 0);
 }
 
+async function testLabCatalog({ patient }) {
+  section("Lab catalog (LAB-01)");
+
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  // A lab login whose profile is missing.
+  const noProfile = await createUser("lab");
+  const passwordOnly = { ...lab, aal: "aal1" };
+
+  const saveTest = (caller, fields = {}) =>
+    rpc(caller, "save_lab_test", {
+      p_test_type_id: "cbc",
+      p_price: 1200,
+      p_turnaround_hours: 24,
+      p_home_collection: true,
+      p_preparation: null,
+      p_listed: true,
+      ...fields,
+    });
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const testRow = async (id) =>
+    (await db.query(`select * from public.lab_tests where id = $1`, [id]))
+      .rows[0];
+
+  const cbc = await saveTest(lab);
+  succeeded("a lab adds a test from the shared list", cbc);
+  const cbcId = idOf(cbc);
+
+  const again = await saveTest(lab, {
+    p_price: 1100,
+    p_preparation: "  Come in before 10 am.  ",
+  });
+  const cbcRow = await testRow(cbcId);
+  check(
+    "adding the same test again updates it, with the note trimmed",
+    idOf(again) === cbcId &&
+      cbcRow.price === 1100 &&
+      cbcRow.preparation === "Come in before 10 am.",
+  );
+  await saveTest(lab, { p_price: 1100, p_preparation: "   " });
+  check(
+    "a blank note falls back to the shared one",
+    (await testRow(cbcId)).preparation === null,
+  );
+
+  refused(
+    "a test not on the shared list is refused",
+    await saveTest(lab, { p_test_type_id: "made-up" }),
+    "unknown_test",
+  );
+  refused("a patient can't add tests", await saveTest(patient), "not_lab");
+  refused(
+    "a lab without two-factor can't",
+    await saveTest(passwordOnly),
+    "second_factor_required",
+  );
+  refused(
+    "a lab login with no lab profile can't",
+    await saveTest(noProfile),
+    "lab_not_found",
+  );
+  check(
+    "a price of zero is refused",
+    (await saveTest(lab, { p_price: 0 })).error?.code === "23514",
+  );
+  check(
+    "a turnaround over 30 days is refused",
+    (await saveTest(lab, { p_turnaround_hours: 721 })).error?.code === "23514",
+  );
+
+  const pendingLab = await createLab();
+  succeeded(
+    "a lab under review builds its catalog",
+    await saveTest(pendingLab, { p_price: 500 }),
+  );
+
+  denied(
+    "labs can't write the table directly",
+    await as(lab, `update public.lab_tests set price = 1 where id = $1`, [
+      cbcId,
+    ]),
+  );
+  check(
+    "a lab reads its own tests, not another lab's",
+    (await as(lab, `select id from public.lab_tests`)).data?.length === 1 &&
+      (
+        await as(otherLab, `select id from public.lab_tests where id = $1`, [
+          cbcId,
+        ])
+      ).data?.length === 0,
+  );
+  denied(
+    "guests can't read labs' tests directly",
+    await as(null, `select id from public.lab_tests`),
+  );
+
+  const setListed = (caller, id, listed) =>
+    rpc(caller, "set_lab_test_listed", { p_test_id: id, p_listed: listed });
+  succeeded("a lab unlists a test", await setListed(lab, cbcId, false));
+  check("it's kept, unlisted", (await testRow(cbcId)).listed === false);
+  refused(
+    "another lab can't list it",
+    await setListed(otherLab, cbcId, true),
+    "test_not_found",
+  );
+  refused("a patient can't", await setListed(patient, cbcId, true), "not_lab");
+  refused(
+    "a lab without two-factor can't",
+    await setListed(passwordOnly, cbcId, true),
+    "second_factor_required",
+  );
+  await setListed(lab, cbcId, true);
+
+  section("Lab packages (LAB-01)");
+
+  const hba1cId = idOf(
+    await saveTest(lab, {
+      p_test_type_id: "hba1c",
+      p_price: 1800,
+      p_turnaround_hours: 48,
+      p_home_collection: false,
+    }),
+  );
+  const lipidId = idOf(
+    await saveTest(lab, { p_test_type_id: "lipid-profile", p_price: 2200 }),
+  );
+  const otherCbcId = idOf(
+    await saveTest(otherLab, {
+      p_price: 900,
+      p_turnaround_hours: 12,
+      p_home_collection: false,
+    }),
+  );
+  const otherTshId = idOf(
+    await saveTest(otherLab, { p_test_type_id: "tsh", p_price: 1500 }),
+  );
+
+  const savePackage = (caller, fields = {}) =>
+    rpc(caller, "save_lab_package", {
+      p_package_id: null,
+      p_name: "  Diabetes Care ",
+      p_description: " ",
+      p_price: 2500,
+      p_test_ids: [cbcId, hba1cId, hba1cId],
+      p_listed: true,
+      ...fields,
+    });
+  const packageTests = async (id) =>
+    (
+      await db.query(
+        `select lab_test_id from public.lab_package_items where package_id = $1`,
+        [id],
+      )
+    ).rows
+      .map((row) => row.lab_test_id)
+      .sort();
+
+  const created = await savePackage(lab);
+  succeeded("a lab makes a package from its tests", created);
+  const packageId = idOf(created);
+  const packageRow = (
+    await db.query(`select * from public.lab_packages where id = $1`, [
+      packageId,
+    ])
+  ).rows[0];
+  check(
+    "a repeated test counts once; the name is trimmed, a blank description dropped",
+    (await packageTests(packageId)).length === 2 &&
+      packageRow.name === "Diabetes Care" &&
+      packageRow.description === null,
+  );
+
+  refused(
+    "a package needs at least two tests",
+    await savePackage(lab, { p_test_ids: [cbcId] }),
+    "package_size",
+  );
+  refused(
+    "another lab's test can't go in",
+    await savePackage(lab, { p_test_ids: [cbcId, otherCbcId] }),
+    "test_not_found",
+  );
+  refused("a patient can't make one", await savePackage(patient), "not_lab");
+  refused(
+    "a lab without two-factor can't",
+    await savePackage(passwordOnly),
+    "second_factor_required",
+  );
+  refused(
+    "a lab login with no lab profile can't",
+    await savePackage(noProfile),
+    "lab_not_found",
+  );
+
+  const edited = await savePackage(lab, {
+    p_package_id: packageId,
+    p_test_ids: [hba1cId, lipidId],
+    p_price: 3500,
+  });
+  check(
+    "editing a package replaces its tests",
+    idOf(edited) === packageId &&
+      JSON.stringify(await packageTests(packageId)) ===
+        JSON.stringify([hba1cId, lipidId].sort()),
+    edited.error?.message ?? "",
+  );
+  refused(
+    "another lab can't edit it",
+    await savePackage(otherLab, {
+      p_package_id: packageId,
+      p_test_ids: [otherCbcId, otherTshId],
+    }),
+    "package_not_found",
+  );
+
+  await db.query(
+    `insert into public.lab_packages (lab_id, name, price)
+     select $1, 'Bulk ' || n, 100 from generate_series(1, 49) as n`,
+    [lab.id],
+  );
+  refused(
+    "a lab has at most 50 packages",
+    await savePackage(lab),
+    "too_many_packages",
+  );
+  await db.query(
+    `delete from public.lab_packages where lab_id = $1 and name like 'Bulk %'`,
+    [lab.id],
+  );
+
+  const setPackageListed = (caller, id, listed) =>
+    rpc(caller, "set_lab_package_listed", {
+      p_package_id: id,
+      p_listed: listed,
+    });
+  refused(
+    "another lab can't unlist a package",
+    await setPackageListed(otherLab, packageId, false),
+    "package_not_found",
+  );
+  refused(
+    "a patient can't",
+    await setPackageListed(patient, packageId, false),
+    "not_lab",
+  );
+  refused(
+    "a lab without two-factor can't",
+    await setPackageListed(passwordOnly, packageId, false),
+    "second_factor_required",
+  );
+
+  section("What patients see (LAB-02)");
+
+  const offers = async (testTypeId) =>
+    (
+      await as(
+        null,
+        `select lab_id, price, preparation from public.lab_test_offers
+         where test_type_id = $1 order by price`,
+        [testTypeId],
+      )
+    ).data ?? [];
+  const catalogRow = async (testTypeId) =>
+    (
+      await as(null, `select * from public.lab_test_catalog where id = $1`, [
+        testTypeId,
+      ])
+    ).data?.[0];
+  const packageOffer = async (id) =>
+    (
+      await as(null, `select * from public.lab_package_offers where id = $1`, [
+        id,
+      ])
+    ).data?.[0];
+
+  const cbcOffers = await offers("cbc");
+  check(
+    "a guest compares a test across approved labs, cheapest first",
+    cbcOffers.length === 2 &&
+      cbcOffers[0].lab_id === otherLab.id &&
+      cbcOffers[1].lab_id === lab.id,
+    `${cbcOffers.length} offers`,
+  );
+  check(
+    "a lab under review stays out",
+    !cbcOffers.some((offer) => offer.lab_id === pendingLab.id),
+  );
+  check(
+    "with no note of its own, a lab shows the shared preparation",
+    cbcOffers[0].preparation === "No special preparation needed.",
+  );
+  const cbcSummary = await catalogRow("cbc");
+  check(
+    "the catalog sums a test up: labs, lowest price, fastest result, home collection",
+    cbcSummary?.lab_count === 2 &&
+      cbcSummary.lowest_price === 900 &&
+      cbcSummary.fastest_hours === 12 &&
+      cbcSummary.home_collection === true,
+    JSON.stringify(cbcSummary ?? {}),
+  );
+  check(
+    "a test no lab offers isn't in the catalog",
+    (await catalogRow("ogtt")) === undefined,
+  );
+  check(
+    "search matches other names",
+    (
+      await as(
+        null,
+        `select id from public.lab_test_catalog where search_text ilike $1`,
+        ["%blood cp%"],
+      )
+    ).data?.[0]?.id === "cbc",
+  );
+
+  await setListed(otherLab, otherCbcId, false);
+  check(
+    "an unlisted test drops out",
+    (await offers("cbc")).length === 1 &&
+      (await catalogRow("cbc"))?.lab_count === 1,
+  );
+
+  const offer = await packageOffer(packageId);
+  check(
+    "a package shows its tests' separate price, slowest result and home collection",
+    offer?.separate_price === 4000 &&
+      offer.turnaround_hours === 48 &&
+      offer.home_collection === false &&
+      JSON.stringify(offer.test_names) ===
+        JSON.stringify(["HbA1c", "Lipid Profile"]),
+    JSON.stringify(offer ?? {}),
+  );
+  await setListed(lab, lipidId, false);
+  check(
+    "a package with an unlisted test is hidden",
+    (await packageOffer(packageId)) === undefined,
+  );
+  await setListed(lab, lipidId, true);
+  succeeded(
+    "a lab unlists a package",
+    await setPackageListed(lab, packageId, false),
+  );
+  check(
+    "an unlisted package is hidden",
+    (await packageOffer(packageId)) === undefined,
+  );
+
+  const deletePackage = (caller, id) =>
+    rpc(caller, "delete_lab_package", { p_package_id: id });
+  refused(
+    "another lab can't delete a package",
+    await deletePackage(otherLab, packageId),
+    "package_not_found",
+  );
+  refused(
+    "a patient can't",
+    await deletePackage(patient, packageId),
+    "not_lab",
+  );
+  refused(
+    "a lab without two-factor can't",
+    await deletePackage(passwordOnly, packageId),
+    "second_factor_required",
+  );
+  succeeded("a lab deletes a package", await deletePackage(lab, packageId));
+  check(
+    "its tests go with it, and the lab's tests stay",
+    (await packageTests(packageId)).length === 0 &&
+      (await testRow(hba1cId)) !== undefined,
+  );
+}
+
 async function testCareRecipients({ patient, secondPatient }) {
   section("Care recipients (PRO-03)");
 
@@ -5245,6 +5617,10 @@ async function testSchemaRules() {
     "doctor_availability",
     "doctor_directory",
     "lab_directory",
+    "lab_test_types",
+    "lab_test_offers",
+    "lab_test_catalog",
+    "lab_package_offers",
     ...globalGuestTables,
   ]);
   const { rows: readable } = await db.query(`
@@ -5530,6 +5906,7 @@ try {
   await testVerification(await freshPatients());
   await testReview(await freshPatients());
   await testLabVerification(await freshPatients());
+  await testLabCatalog(await freshPatients());
   await testCareRecipients(await freshPatients());
   await testDoctorMedicalProfiles(await freshPatients());
   await testFamilyMembers(await freshPatients());

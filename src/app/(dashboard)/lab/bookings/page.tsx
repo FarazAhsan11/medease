@@ -2,6 +2,7 @@ import { DownloadIcon } from "lucide-react";
 import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { Button } from "@/components/ui/button";
 import { BookingsTabs } from "@/features/lab-dashboard/components/bookings-tabs";
 import { labBookings } from "@/features/lab-dashboard/data/lab-dashboard";
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 export default function LabBookingsPage() {
   return (
     <>
+      <PreviewNotice feature="Lab bookings" />
       <DashboardPageHeader
         title="Bookings"
         description="Move each booking from collection to report delivery."

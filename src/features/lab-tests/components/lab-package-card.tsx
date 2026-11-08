@@ -1,83 +1,87 @@
-import { CheckIcon } from "lucide-react";
-import Link from "next/link";
+import { CheckIcon, ClockIcon, HouseIcon, MapPinIcon } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
-import { patientRoutes } from "@/config/routes";
-import type { LabPackage } from "@/features/lab-tests/data/lab-tests";
+import {
+  formatTurnaround,
+  packageSavings,
+} from "@/features/lab-catalog/lib/lab-catalog";
+import type { PackageOffer } from "@/features/lab-tests/data/lab-test-catalog";
 import { formatFee } from "@/lib/format";
-import { cn } from "@/lib/utils";
+
+const SHOWN_TESTS = 6;
 
 type LabPackageCardProps = {
-  labPackage: LabPackage;
-  featured?: boolean;
+  labPackage: PackageOffer;
 };
 
-export function LabPackageCard({
-  labPackage,
-  featured = false,
-}: LabPackageCardProps) {
-  const savings = Math.round(
-    (1 - labPackage.price / labPackage.originalPrice) * 100,
-  );
+export function LabPackageCard({ labPackage }: LabPackageCardProps) {
+  const savings = packageSavings(labPackage.price, labPackage.separatePrice);
+  const shown = labPackage.testNames.slice(0, SHOWN_TESTS);
+  const more = labPackage.testNames.length - shown.length;
 
   return (
-    <article
-      className={cn(
-        "relative flex flex-col rounded-2xl border p-6",
-        featured
-          ? "border-primary bg-primary text-primary-foreground"
-          : "bg-card",
+    <article className="flex flex-col rounded-2xl border bg-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold break-words">
+            {labPackage.name}
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {labPackage.labName}
+          </p>
+        </div>
+        {savings && (
+          <span className="shrink-0 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">
+            Save {savings}%
+          </span>
+        )}
+      </div>
+      {labPackage.description && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {labPackage.description}
+        </p>
       )}
-    >
-      <span
-        className={cn(
-          "w-fit rounded-full px-2 py-0.5 text-xs font-medium",
-          featured ? "bg-white/15" : "bg-success-soft text-success",
-        )}
-      >
-        Save {savings}%
-      </span>
-      <h3 className="mt-4 text-base font-semibold">{labPackage.name}</h3>
-      <p
-        className={cn(
-          "mt-1 text-sm",
-          featured ? "text-white/80" : "text-muted-foreground",
-        )}
-      >
-        {labPackage.description} · {labPackage.testCount} tests
-      </p>
-      <ul className="mt-5 grid flex-1 gap-2 text-sm">
-        {labPackage.includes.map((item) => (
-          <li key={item} className="flex items-center gap-2">
+
+      <ul className="mt-4 grid flex-1 content-start gap-1.5 text-sm">
+        {shown.map((name) => (
+          <li key={name} className="flex items-start gap-2">
             <CheckIcon
-              className={cn("size-4", featured ? "text-white" : "text-success")}
+              className="mt-0.5 size-4 shrink-0 text-success"
               aria-hidden
             />
-            {item}
+            {name}
           </li>
         ))}
+        {more > 0 && (
+          <li className="pl-6 text-xs text-muted-foreground">
+            and {more} more
+          </li>
+        )}
       </ul>
-      <div className="mt-6 flex items-end justify-between gap-3">
-        <div>
-          <p
-            className={cn(
-              "text-xs line-through",
-              featured ? "text-white/60" : "text-muted-foreground",
-            )}
-          >
-            {formatFee(labPackage.originalPrice)}
+
+      <ul className="mt-4 grid gap-1 text-xs text-muted-foreground">
+        <li className="flex items-start gap-1.5">
+          <MapPinIcon className="mt-px size-3.5 shrink-0" aria-hidden />
+          <span className="break-words">{labPackage.labAddress}</span>
+        </li>
+        <li className="flex items-center gap-1.5">
+          <ClockIcon className="size-3.5" aria-hidden />
+          Results in {formatTurnaround(labPackage.turnaroundHours)}
+        </li>
+        {labPackage.homeCollection && (
+          <li className="flex items-center gap-1.5">
+            <HouseIcon className="size-3.5" aria-hidden />
+            Home collection
+          </li>
+        )}
+      </ul>
+
+      <div className="mt-4 border-t pt-4">
+        {savings && (
+          <p className="text-xs text-muted-foreground line-through">
+            {formatFee(labPackage.separatePrice)}
           </p>
-          <p className="text-lg font-semibold">{formatFee(labPackage.price)}</p>
-        </div>
-        <Link
-          href={patientRoutes.bookLabTest(labPackage.id)}
-          className={buttonVariants({
-            variant: featured ? "secondary" : "default",
-            className: "h-9 px-4",
-          })}
-        >
-          Book package
-        </Link>
+        )}
+        <p className="text-base font-semibold">{formatFee(labPackage.price)}</p>
       </div>
     </article>
   );

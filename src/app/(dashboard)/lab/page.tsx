@@ -2,6 +2,7 @@ import { ClipboardListIcon } from "lucide-react";
 import Link from "next/link";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
+import { PreviewNotice } from "@/components/shared/preview-notice";
 import { StatGrid } from "@/components/shared/stat-grid";
 import { VerificationBanner } from "@/components/shared/verification-banner";
 import { buttonVariants } from "@/components/ui/button";
@@ -47,6 +48,10 @@ export default async function LabOverviewPage() {
           href={labRoutes.verification}
         />
       )}
+      <PreviewNotice
+        feature="The lab overview"
+        detail="The figures, collections and queue below are sample information."
+      />
       <StatGrid stats={labStats} />
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <HomeCollectionsCard bookings={labBookings} />

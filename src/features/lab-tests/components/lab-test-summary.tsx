@@ -1,22 +1,33 @@
-import { ClockIcon, DropletIcon, InfoIcon } from "lucide-react";
+import { DropletIcon, InfoIcon, LayersIcon } from "lucide-react";
 
 import { IconTile } from "@/components/shared/icon-tile";
-import type { BookableTest } from "@/features/lab-tests/data/lab-tests";
-import { formatFee } from "@/lib/format";
+import {
+  categoryLabel,
+  sampleTypeLabel,
+} from "@/features/lab-catalog/lib/lab-catalog";
+import type { LabTestDetails } from "@/features/lab-tests/data/lab-test-catalog";
 
 type LabTestSummaryProps = {
-  test: BookableTest;
+  test: LabTestDetails;
 };
 
 export function LabTestSummary({ test }: LabTestSummaryProps) {
   const details = [
-    { icon: DropletIcon, label: "Sample", value: test.sampleType },
-    { icon: ClockIcon, label: "Results in", value: test.turnaround },
+    {
+      icon: DropletIcon,
+      label: "Sample",
+      value: sampleTypeLabel(test.sampleType),
+    },
+    {
+      icon: LayersIcon,
+      label: "Category",
+      value: categoryLabel(test.category),
+    },
   ];
 
   return (
     <aside className="h-fit rounded-2xl border bg-card p-6">
-      <h1 className="text-lg font-semibold">{test.name}</h1>
+      <h1 className="text-2xl font-semibold">{test.name}</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         {test.description}
       </p>
@@ -25,7 +36,7 @@ export function LabTestSummary({ test }: LabTestSummaryProps) {
         {details.map(({ icon, label, value }) => (
           <div key={label} className="flex items-center gap-3">
             <IconTile icon={icon} size="sm" />
-            <div>
+            <div className="min-w-0">
               <dt className="text-xs text-muted-foreground">{label}</dt>
               <dd className="text-sm font-medium">{value}</dd>
             </div>
@@ -39,11 +50,6 @@ export function LabTestSummary({ test }: LabTestSummaryProps) {
           <p className="text-sm font-medium">Before your test</p>
           <p className="mt-0.5 text-sm">{test.preparation}</p>
         </div>
-      </div>
-
-      <div className="mt-6 flex items-center justify-between border-t pt-4">
-        <span className="text-sm text-muted-foreground">Price</span>
-        <span className="text-lg font-semibold">{formatFee(test.price)}</span>
       </div>
     </aside>
   );

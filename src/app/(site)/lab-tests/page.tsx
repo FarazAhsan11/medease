@@ -1,25 +1,33 @@
 import type { Metadata } from "next";
 
 import { Container } from "@/components/layout/container";
-import { PreviewNotice } from "@/components/shared/preview-notice";
 import { PageHeader } from "@/components/shared/page-header";
+import { publicRoutes } from "@/config/routes";
 import { LabTestDirectory } from "@/features/lab-tests/components/lab-test-directory";
+import { parseLabTestSearch } from "@/features/lab-tests/data/lab-test-catalog";
 
 export const metadata: Metadata = {
   title: "Lab Tests",
 };
 
-export default function LabTestsPage() {
+export default async function LabTestsPage({
+  searchParams,
+}: PageProps<"/lab-tests">) {
+  const search = parseLabTestSearch(await searchParams);
+
   return (
     <>
       <PageHeader
         eyebrow="Lab tests"
-        title="Lab tests"
-        description="A look at what booking lab tests on MedEase will be like."
+        title="Compare lab tests"
+        description="See what verified labs charge for the same test and how soon results are ready."
       />
-      <Container className="space-y-12 py-8">
-        <PreviewNotice feature="Lab booking" />
-        <LabTestDirectory />
+      <Container className="py-8">
+        <LabTestDirectory
+          basePath={publicRoutes.labTests}
+          testHref={publicRoutes.labTest}
+          search={search}
+        />
       </Container>
     </>
   );

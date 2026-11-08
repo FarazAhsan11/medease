@@ -52,6 +52,8 @@ export const rateLimits = {
     limit: 600,
     windowSeconds: ONE_HOUR,
   },
+  // A lab editing its test catalog: each switch flipped is one write.
+  catalogUser: { name: "catalog-user", limit: 300, windowSeconds: ONE_HOUR },
   // Starting a conversation, or a doctor extending or closing one.
   conversationUser: {
     name: "conversation-user",
