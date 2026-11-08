@@ -6,6 +6,7 @@ import {
   FileHeartIcon,
   FileTextIcon,
   FlaskConicalIcon,
+  HouseIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   PillIcon,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 
 import type { NavItem } from "@/config/navigation";
+import { labRoutes } from "@/config/routes";
 
 export type DashboardRole = "patient" | "doctor" | "lab" | "admin";
 
@@ -113,7 +115,12 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     nav: [
       { title: "Overview", href: "/lab", icon: LayoutDashboardIcon },
       { title: "Bookings", href: "/lab/bookings", icon: ClipboardListIcon },
-      { title: "Test catalog", href: "/lab/tests", icon: TestTubesIcon },
+      { title: "Test catalog", href: labRoutes.tests, icon: TestTubesIcon },
+      {
+        title: "Home collection",
+        href: labRoutes.homeCollection,
+        icon: HouseIcon,
+      },
       { title: "Reports", href: "/lab/reports", icon: FileTextIcon },
     ],
     moreNav: [],

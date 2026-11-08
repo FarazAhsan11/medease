@@ -199,7 +199,7 @@ export function LabTestSheet({ testTypes, test }: LabTestSheetProps) {
           <div className="grid gap-2">
             <SettingRow
               label="Home collection"
-              description="Your collector can take this sample at home."
+              description="Your collector can take this sample at home. Patients see it while home collection is on."
               htmlFor={id("home")}
             >
               <Switch

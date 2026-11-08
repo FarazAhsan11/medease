@@ -2599,6 +2599,21 @@ async function testLabCatalog({ patient }) {
     "with no note of its own, a lab shows the shared preparation",
     cbcOffers[0].preparation === "No special preparation needed.",
   );
+  // Home collection shows only while the lab collects at home (LAB-06).
+  await rpc(lab, "save_lab_service_area", {
+    p_id: null,
+    p_city: "Lahore",
+    p_fee: 300,
+    p_note: null,
+  });
+  await rpc(lab, "save_lab_collection_schedule", {
+    p_ranges: JSON.stringify([{ weekday: 1, start: "07:00", end: "11:00" }]),
+    p_slot_minutes: 60,
+    p_capacity: 2,
+    p_notice_hours: 2,
+    p_free_above: null,
+    p_accepting: true,
+  });
   const cbcSummary = await catalogRow("cbc");
   check(
     "the catalog sums a test up: labs, lowest price, fastest result, home collection",
@@ -3106,6 +3121,406 @@ async function testPatientAddresses({ patient, secondPatient }) {
     (await as(paired, `select id from public.patient_addresses`)).data
       ?.length === 0,
   );
+}
+
+async function testHomeCollection({ patient }) {
+  section("Home collection setup (LAB-06)");
+
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  const noProfile = await createUser("lab");
+  const passwordOnly = { ...lab, aal: "aal1" };
+  const weekdays = (start, end) =>
+    [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, start, end }));
+
+  const saveSchedule = (caller, fields = {}) =>
+    rpc(caller, "save_lab_collection_schedule", {
+      p_ranges: JSON.stringify([{ weekday: 1, start: "07:00", end: "11:00" }]),
+      p_slot_minutes: 60,
+      p_capacity: 3,
+      p_notice_hours: 2,
+      p_free_above: null,
+      p_accepting: false,
+      ...fields,
+    });
+  const saveArea = (caller, fields = {}) =>
+    rpc(caller, "save_lab_service_area", {
+      p_id: null,
+      p_city: "Lahore",
+      p_fee: 300,
+      p_note: null,
+      ...fields,
+    });
+  const deleteArea = (caller, id) =>
+    rpc(caller, "delete_lab_service_area", { p_id: id });
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const settings = async (labId) =>
+    (
+      await db.query(
+        `select * from public.lab_collection_settings where lab_id = $1`,
+        [labId],
+      )
+    ).rows[0];
+  const hours = async (labId) =>
+    (
+      await db.query(
+        `select weekday, start_time::text, end_time::text
+         from public.lab_collection_hours where lab_id = $1 order by weekday, start_time`,
+        [labId],
+      )
+    ).rows;
+
+  succeeded(
+    "a lab saves its hours with collection off",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify([
+        { weekday: 1, start: "07:00", end: "09:00" },
+        { weekday: 1, start: "16:00", end: "18:00" },
+      ]),
+      p_free_above: 3000,
+    }),
+  );
+  check(
+    "the hours and settings are stored",
+    (await hours(lab.id)).length === 2 &&
+      (await settings(lab.id))?.free_above === 3000 &&
+      (await settings(lab.id))?.accepting === false,
+  );
+  await saveSchedule(lab);
+  check(
+    "saving again replaces the week",
+    (await hours(lab.id)).map((h) => h.start_time).join() === "07:00:00",
+  );
+
+  const inLock = (result) => ({ ...result, fn: "lock_collection_lab" });
+  refused("a patient can't", inLock(await saveSchedule(patient)), "not_lab");
+  refused(
+    "a lab without two-factor can't",
+    inLock(await saveSchedule(passwordOnly)),
+    "second_factor_required",
+  );
+  refused(
+    "a lab login with no profile can't",
+    inLock(await saveSchedule(noProfile)),
+    "lab_not_found",
+  );
+  refused(
+    "a slot length off the list is refused",
+    await saveSchedule(lab, { p_slot_minutes: 45 }),
+    "invalid_collection_settings",
+  );
+  refused(
+    "a capacity over 20 is refused",
+    await saveSchedule(lab, { p_capacity: 21 }),
+    "invalid_collection_settings",
+  );
+  refused(
+    "a free-above amount of zero is refused",
+    await saveSchedule(lab, { p_free_above: 0 }),
+    "invalid_collection_settings",
+  );
+  refused(
+    "a time that doesn't parse is refused",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify([{ weekday: 1, start: "25:00", end: "26:00" }]),
+    }),
+    "invalid_schedule",
+  );
+  refused(
+    "24:00 is refused, as in the editor",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify([{ weekday: 1, start: "20:00", end: "24:00" }]),
+    }),
+    "invalid_schedule",
+  );
+  refused(
+    "an end before its start is refused",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify([{ weekday: 1, start: "11:00", end: "07:00" }]),
+    }),
+    "invalid_schedule",
+  );
+  refused(
+    "a range shorter than a slot is refused",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify([{ weekday: 1, start: "07:00", end: "07:30" }]),
+    }),
+    "invalid_schedule",
+  );
+  refused(
+    "four ranges in a day are refused",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify(
+        ["06", "09", "12", "15"].map((hour) => ({
+          weekday: 2,
+          start: `${hour}:00`,
+          end: `${hour}:59`,
+        })),
+      ),
+      p_slot_minutes: 30,
+    }),
+    "invalid_schedule",
+  );
+  refused(
+    "something other than a list is refused",
+    await saveSchedule(lab, { p_ranges: JSON.stringify({ weekday: 1 }) }),
+    "invalid_schedule",
+  );
+  refused(
+    "overlapping ranges are refused",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify([
+        { weekday: 1, start: "07:00", end: "10:00" },
+        { weekday: 1, start: "09:00", end: "11:00" },
+      ]),
+    }),
+    "overlapping_hours",
+  );
+  check(
+    "a refused save leaves the old hours",
+    (await hours(lab.id)).length === 1,
+  );
+  refused(
+    "collection can't be on without hours",
+    await saveSchedule(lab, { p_ranges: "[]", p_accepting: true }),
+    "no_collection_hours",
+  );
+  refused(
+    "or without a city",
+    await saveSchedule(lab, { p_accepting: true }),
+    "no_service_areas",
+  );
+
+  section("Service areas (LAB-06)");
+
+  const lahore = await saveArea(lab, { p_note: "  All of\n  Lahore  " });
+  succeeded("a lab adds a city", lahore);
+  const lahoreId = idOf(lahore);
+  const areaRow = async (id) =>
+    (
+      await db.query(`select * from public.lab_service_areas where id = $1`, [
+        id,
+      ])
+    ).rows[0];
+  check(
+    "the note is kept on one line",
+    (await areaRow(lahoreId))?.note === "All of Lahore",
+  );
+  refused(
+    "the same city twice is refused",
+    await saveArea(lab),
+    "duplicate_service_area",
+  );
+  refused(
+    "a city off the list is refused",
+    await saveArea(lab, { p_city: "lahore" }),
+    "invalid_service_area",
+  );
+  refused(
+    "a negative fee is refused",
+    await saveArea(lab, { p_city: "Multan", p_fee: -1 }),
+    "invalid_service_area",
+  );
+  refused(
+    "a note over 200 characters is refused",
+    await saveArea(lab, { p_city: "Multan", p_note: "x".repeat(201) }),
+    "invalid_service_area",
+  );
+  const sheikhupura = await saveArea(lab, {
+    p_city: "Sheikhupura",
+    p_fee: 800,
+  });
+  succeeded("a second city with its own fee", sheikhupura);
+  refused(
+    "renaming it to a city already there is refused",
+    await saveArea(lab, { p_id: idOf(sheikhupura), p_city: "Lahore" }),
+    "duplicate_service_area",
+  );
+  succeeded(
+    "a lab edits a city's fee",
+    await saveArea(lab, { p_id: lahoreId, p_fee: 0, p_note: " " }),
+  );
+  check(
+    "a free city with no note",
+    (await areaRow(lahoreId))?.fee === 0 &&
+      (await areaRow(lahoreId))?.note === null,
+  );
+  refused(
+    "another lab can't edit it",
+    await saveArea(otherLab, { p_id: lahoreId, p_city: "Multan" }),
+    "service_area_not_found",
+  );
+  refused(
+    "or delete it",
+    await deleteArea(otherLab, lahoreId),
+    "service_area_not_found",
+  );
+  refused(
+    "a patient can't add a city",
+    inLock(await saveArea(patient)),
+    "not_lab",
+  );
+  denied(
+    "labs can't write the tables directly",
+    await as(lab, `update public.lab_service_areas set fee = 1 where id = $1`, [
+      lahoreId,
+    ]),
+  );
+  denied(
+    "or their hours",
+    await as(lab, `delete from public.lab_collection_hours`),
+  );
+  check(
+    "a lab reads its own areas, not another lab's",
+    (await as(lab, `select id from public.lab_service_areas`)).data?.length ===
+      2 &&
+      (await as(otherLab, `select id from public.lab_service_areas`)).data
+        ?.length === 0 &&
+      (await as(otherLab, `select lab_id from public.lab_collection_settings`))
+        .data?.length === 0,
+  );
+  denied(
+    "guests can't read the tables directly",
+    await as(null, `select id from public.lab_service_areas`),
+  );
+
+  section("What patients see of home collection (LAB-06)");
+
+  const cbc = await rpc(lab, "save_lab_test", {
+    p_test_type_id: "cbc",
+    p_price: 900,
+    p_turnaround_hours: 24,
+    p_home_collection: true,
+    p_preparation: null,
+    p_listed: true,
+  });
+  const hba1c = await rpc(lab, "save_lab_test", {
+    p_test_type_id: "hba1c",
+    p_price: 1500,
+    p_turnaround_hours: 24,
+    p_home_collection: true,
+    p_preparation: null,
+    p_listed: true,
+  });
+  const labPackage = await rpc(lab, "save_lab_package", {
+    p_package_id: null,
+    p_name: "Sugar check",
+    p_description: null,
+    p_price: 2000,
+    p_test_ids: [idOf(cbc), idOf(hba1c)],
+    p_listed: true,
+  });
+  const offerCollects = async () =>
+    (
+      await as(
+        null,
+        `select home_collection from public.lab_test_offers where id = $1`,
+        [idOf(cbc)],
+      )
+    ).data?.[0]?.home_collection;
+  const packageCollects = async () =>
+    (
+      await as(
+        null,
+        `select home_collection from public.lab_package_offers where id = $1`,
+        [idOf(labPackage)],
+      )
+    ).data?.[0]?.home_collection;
+  const areasFor = async (labId) =>
+    (
+      await as(
+        null,
+        `select city, fee, note, free_above from public.lab_collection_areas
+         where lab_id = $1 order by city`,
+        [labId],
+      )
+    ).data ?? [];
+  const slots = (labId, days = 7) =>
+    rpc(null, "get_lab_collection_slots", { p_lab_id: labId, p_days: days });
+
+  check(
+    "a ticked test shows no home collection while it's off",
+    (await offerCollects()) === false && (await packageCollects()) === false,
+  );
+  check("no cities show", (await areasFor(lab.id)).length === 0);
+  check("no slots show", (await slots(lab.id)).data?.length === 0);
+
+  succeeded(
+    "with hours and a city, collection goes on",
+    await saveSchedule(lab, {
+      p_ranges: JSON.stringify(weekdays("00:00", "23:00")),
+      p_accepting: true,
+      p_free_above: 2500,
+    }),
+  );
+  check(
+    "now the test and package show home collection",
+    (await offerCollects()) === true && (await packageCollects()) === true,
+  );
+  const shownAreas = await areasFor(lab.id);
+  check(
+    "guests see each city's fee and the free-above amount",
+    shownAreas.map((area) => `${area.city}:${area.fee}`).join() ===
+      "Lahore:0,Sheikhupura:800" && shownAreas[0].free_above === 2500,
+  );
+
+  const week = (await slots(lab.id)).data ?? [];
+  const now = Date.now();
+  check(
+    "guests see a week of one-hour slots",
+    week.length > 100 &&
+      week.every(
+        (slot) =>
+          new Date(slot.ends_at) - new Date(slot.starts_at) === 3_600_000,
+      ),
+    `${week.length} slots`,
+  );
+  check(
+    "each with the full capacity",
+    week.every((slot) => slot.spots_left === 3),
+  );
+  check(
+    "none inside the two-hour notice",
+    week.every(
+      (slot) => new Date(slot.starts_at) - now >= 2 * 3_600_000 - 5000,
+    ),
+  );
+  const longest = (await slots(lab.id, 60)).data ?? [];
+  check(
+    "at most 14 days ahead",
+    longest.length > week.length &&
+      new Date(longest.at(-1).starts_at) - now <= 15 * 86_400_000,
+  );
+
+  refused(
+    "the last city can't go while collection is on",
+    await deleteArea(lab, idOf(sheikhupura)).then(() =>
+      deleteArea(lab, lahoreId),
+    ),
+    "last_service_area",
+  );
+  check("it's kept", Boolean(await areaRow(lahoreId)));
+
+  const pendingLab = await createLab();
+  await saveArea(pendingLab);
+  succeeded(
+    "a lab under review sets up collection",
+    await saveSchedule(pendingLab, { p_accepting: true }),
+  );
+  check(
+    "but patients don't see it yet",
+    (await areasFor(pendingLab.id)).length === 0 &&
+      (await slots(pendingLab.id)).data?.length === 0,
+  );
+
+  await saveSchedule(lab, { p_accepting: false });
+  check(
+    "pausing hides the cities, slots and badges",
+    (await areasFor(lab.id)).length === 0 &&
+      (await slots(lab.id)).data?.length === 0 &&
+      (await offerCollects()) === false,
+  );
+  succeeded("and then the last city can go", await deleteArea(lab, lahoreId));
 }
 
 async function testFamilyMembers({ patient, secondPatient }) {
@@ -5805,6 +6220,7 @@ async function testSchemaRules() {
   // account. has_confirmed_email is read by the public directory view.
   const guestAllowed = new Set([
     "get_doctor_slots",
+    "get_lab_collection_slots",
     "has_confirmed_email",
     ...globalGuestFunctions,
   ]);
@@ -5825,6 +6241,7 @@ async function testSchemaRules() {
     "lab_test_offers",
     "lab_test_catalog",
     "lab_package_offers",
+    "lab_collection_areas",
     ...globalGuestTables,
   ]);
   const { rows: readable } = await db.query(`
@@ -6111,6 +6528,7 @@ try {
   await testReview(await freshPatients());
   await testLabVerification(await freshPatients());
   await testLabCatalog(await freshPatients());
+  await testHomeCollection(await freshPatients());
   await testCareRecipients(await freshPatients());
   await testDoctorMedicalProfiles(await freshPatients());
   await testFamilyMembers(await freshPatients());

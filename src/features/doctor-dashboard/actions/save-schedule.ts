@@ -7,19 +7,12 @@ import { scheduleSchema } from "@/features/doctor-dashboard/schemas/schedule";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, validationError, type FormState } from "@/lib/form-state";
 import { createClient } from "@/lib/supabase/server";
-
-function parseRanges(value: FormDataEntryValue | null) {
-  try {
-    return JSON.parse(String(value ?? "[]")) as unknown;
-  } catch {
-    return null;
-  }
-}
+import { parseRangesField } from "@/lib/weekly-hours";
 
 export const saveSchedule = withFormErrors(
   async (_previousState: FormState, formData: FormData) => {
     const parsed = scheduleSchema.safeParse({
-      ranges: parseRanges(formData.get("ranges")),
+      ranges: parseRangesField(formData.get("ranges")),
       slotMinutes: formData.get("slotMinutes"),
       accepting: formData.get("accepting"),
       fee: formData.get("fee"),

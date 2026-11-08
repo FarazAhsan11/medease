@@ -1,5 +1,6 @@
-import { CheckIcon, ClockIcon, HouseIcon, MapPinIcon } from "lucide-react";
+import { CheckIcon, ClockIcon, MapPinIcon } from "lucide-react";
 
+import { CollectionAreasLine } from "@/features/home-collection/components/collection-areas-line";
 import {
   formatTurnaround,
   packageSavings,
@@ -68,10 +69,7 @@ export function LabPackageCard({ labPackage }: LabPackageCardProps) {
           Results in {formatTurnaround(labPackage.turnaroundHours)}
         </li>
         {labPackage.homeCollection && (
-          <li className="flex items-center gap-1.5">
-            <HouseIcon className="size-3.5" aria-hidden />
-            Home collection
-          </li>
+          <CollectionAreasLine areas={labPackage.homeCollection} />
         )}
       </ul>
 

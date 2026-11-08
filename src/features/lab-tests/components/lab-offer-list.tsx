@@ -1,11 +1,7 @@
-import {
-  ClockIcon,
-  FlaskConicalIcon,
-  HouseIcon,
-  MapPinIcon,
-} from "lucide-react";
+import { ClockIcon, FlaskConicalIcon, MapPinIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { CollectionAreasLine } from "@/features/home-collection/components/collection-areas-line";
 import { formatTurnaround } from "@/features/lab-catalog/lib/lab-catalog";
 import type { LabTestOffer } from "@/features/lab-tests/data/lab-test-catalog";
 import { formatFee } from "@/lib/format";
@@ -90,10 +86,7 @@ export function LabOfferList({
                 Results in {formatTurnaround(offer.turnaroundHours)}
               </li>
               {offer.homeCollection && (
-                <li className="flex items-center gap-1.5 text-muted-foreground">
-                  <HouseIcon className="size-3.5" aria-hidden />
-                  Home collection
-                </li>
+                <CollectionAreasLine areas={offer.homeCollection} />
               )}
             </ul>
             {offer.preparation !== sharedPreparation && (

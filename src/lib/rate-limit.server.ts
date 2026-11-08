@@ -52,7 +52,8 @@ export const rateLimits = {
     limit: 600,
     windowSeconds: ONE_HOUR,
   },
-  // A lab editing its test catalog: each switch flipped is one write.
+  // A lab editing its test catalog or home collection setup: each switch
+  // flipped is one write.
   catalogUser: { name: "catalog-user", limit: 300, windowSeconds: ONE_HOUR },
   // A patient saving or deleting a saved address.
   addressUser: { name: "address-user", limit: 60, windowSeconds: ONE_HOUR },

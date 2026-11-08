@@ -227,6 +227,7 @@ Real conversations between a patient and the doctors they have booked with, repl
 - **Lab UI**: manage the test catalog, move bookings through statuses, upload a report; the bookings, tests, reports and profile pages become real.
 - **Patient UI**: browse real tests, book with `lab-booking-form`, follow progress in `order-tracker`, download the report from records.
 - **Done when**: a patient books a test, the lab uploads the report, and the patient downloads it.
+- **Built so far**: the catalog and comparison (LAB-01, LAB-02, 2026-11-08, [lab-catalog.md](./lab-catalog.md)), the patient address book (PRO-07, [addresses.md](./addresses.md)) and home collection setup (LAB-06 Partial, 2026-11-08, [home-collection.md](./home-collection.md)): cities with a fee each, a free-above amount, weekly collection hours, arrival window, visits per window and notice, on `/lab/home-collection`. The compare page shows each lab's collection cities and fee. Next is LAB-03 booking: copy the chosen address onto the booking, subtract bookings from `get_lab_collection_slots`'s `spots_left`, and take `pg_advisory_xact_lock` on the lab and slot before counting. Assigning a collector waits for bookings and LAB-07 staff accounts.
 
 ### 6. AI health assistant (Talk to AI)
 

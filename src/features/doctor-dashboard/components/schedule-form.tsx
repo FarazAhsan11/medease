@@ -1,31 +1,27 @@
 "use client";
 
-import { CopyIcon } from "lucide-react";
 import { useState } from "react";
 
-import { PanelCard } from "@/components/shared/panel-card";
-import { Button } from "@/components/ui/button";
+import { WeeklyHoursCard } from "@/components/shared/weekly-hours-card";
 import { saveSchedule } from "@/features/doctor-dashboard/actions/save-schedule";
 import { ScheduleSettingsCard } from "@/features/doctor-dashboard/components/schedule-settings-card";
-import { WeekdayHoursRow } from "@/features/doctor-dashboard/components/weekday-hours-row";
-import {
-  countWeeklySlots,
-  findDayProblem,
-  toWeekSchedule,
-  type WeekSchedule,
-} from "@/features/doctor-dashboard/lib/schedule";
 import { useFormAction } from "@/hooks/use-form-action";
 import { initialFormState } from "@/lib/form-state";
+import {
+  countWeeklySlots,
+  findWeekProblems,
+  toWeeklyRanges,
+  toWeekSchedule,
+  type WeeklyRange,
+  type WeekSchedule,
+} from "@/lib/weekly-hours";
 
 type ScheduleFormProps = {
-  hours: { weekday: number; start: string; end: string }[];
+  hours: WeeklyRange[];
   slotMinutes: number;
   accepting: boolean;
   fee: number;
 };
-
-const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
-const WEEKDAYS = [2, 3, 4, 5];
 
 export function ScheduleForm(props: ScheduleFormProps) {
   const [schedule, setSchedule] = useState<WeekSchedule>(() =>
@@ -39,16 +35,8 @@ export function ScheduleForm(props: ScheduleFormProps) {
     initialFormState,
   );
 
-  const problems = Object.fromEntries(
-    MONDAY_FIRST.map((day) => [
-      day,
-      findDayProblem(schedule[day], slotMinutes),
-    ]),
-  );
+  const problems = findWeekProblems(schedule, slotMinutes);
   const hasProblems = Object.values(problems).some(Boolean);
-  const ranges = MONDAY_FIRST.flatMap((weekday) =>
-    schedule[weekday].map((range) => ({ weekday, ...range })),
-  );
 
   return (
     <form
@@ -57,51 +45,22 @@ export function ScheduleForm(props: ScheduleFormProps) {
       className="grid gap-6 xl:grid-cols-[1.5fr_1fr]"
       noValidate
     >
-      <input type="hidden" name="ranges" value={JSON.stringify(ranges)} />
+      <input
+        type="hidden"
+        name="ranges"
+        value={JSON.stringify(toWeeklyRanges(schedule))}
+      />
       <input type="hidden" name="accepting" value={String(accepting)} />
 
-      <PanelCard
+      <WeeklyHoursCard
         title="Weekly hours"
         description="Patients can only book inside these hours."
-        action={
-          schedule[1].length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5"
-              onClick={() =>
-                setSchedule((current) => ({
-                  ...current,
-                  ...Object.fromEntries(
-                    WEEKDAYS.map((day) => [
-                      day,
-                      current[1].map((r) => ({ ...r })),
-                    ]),
-                  ),
-                }))
-              }
-            >
-              <CopyIcon aria-hidden />
-              Copy Monday to Tue–Fri
-            </Button>
-          )
-        }
-      >
-        <ul className="divide-y">
-          {MONDAY_FIRST.map((weekday) => (
-            <WeekdayHoursRow
-              key={weekday}
-              weekday={weekday}
-              ranges={schedule[weekday]}
-              problem={problems[weekday]}
-              onChange={(next) =>
-                setSchedule((current) => ({ ...current, [weekday]: next }))
-              }
-            />
-          ))}
-        </ul>
-      </PanelCard>
+        schedule={schedule}
+        problems={problems}
+        onChange={setSchedule}
+        defaultRange={{ start: "09:00", end: "17:00" }}
+        offLabel="Unavailable"
+      />
 
       <ScheduleSettingsCard
         slotMinutes={slotMinutes}

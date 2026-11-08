@@ -3,26 +3,27 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  MAX_RANGES_PER_DAY,
-  type TimeRange,
-} from "@/features/doctor-dashboard/lib/schedule";
 import { weekdayNames } from "@/lib/datetime";
+import { MAX_RANGES_PER_DAY, type TimeRange } from "@/lib/weekly-hours";
 
 type WeekdayHoursRowProps = {
   weekday: number;
   ranges: TimeRange[];
   problem: string | null;
   onChange: (ranges: TimeRange[]) => void;
+  // The hours a day starts with when switched on.
+  defaultRange: TimeRange;
+  // Shown for a day that's switched off, such as "Unavailable".
+  offLabel: string;
 };
-
-const DEFAULT_RANGE: TimeRange = { start: "09:00", end: "17:00" };
 
 export function WeekdayHoursRow({
   weekday,
   ranges,
   problem,
   onChange,
+  defaultRange,
+  offLabel,
 }: WeekdayHoursRowProps) {
   const name = weekdayNames[weekday];
   const id = `available-${name.toLowerCase()}`;
@@ -40,7 +41,7 @@ export function WeekdayHoursRow({
           id={id}
           checked={enabled}
           onCheckedChange={(checked) =>
-            onChange(checked ? [DEFAULT_RANGE] : [])
+            onChange(checked ? [{ ...defaultRange }] : [])
           }
         />
         <label htmlFor={id} className="text-sm font-medium">
@@ -103,7 +104,7 @@ export function WeekdayHoursRow({
         </div>
       ) : (
         <p className="flex h-9 items-center text-sm text-muted-foreground">
-          Unavailable
+          {offLabel}
         </p>
       )}
     </li>

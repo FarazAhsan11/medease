@@ -84,6 +84,7 @@ export const labRoutes = {
   home: "/lab",
   verification: "/lab/verification",
   tests: "/lab/tests",
+  homeCollection: "/lab/home-collection",
 } as const;
 
 export const adminRoutes = {

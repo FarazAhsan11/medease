@@ -2,6 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 
+import { getCollectionAreas } from "@/features/home-collection/data/home-collection";
+import type { LabCollectionAreas } from "@/features/home-collection/lib/home-collection";
 import { labTestCategories } from "@/features/lab-catalog/lib/lab-catalog";
 import {
   isPastLastPage,
@@ -47,7 +49,8 @@ export type PackageOffer = {
   price: number;
   separatePrice: number;
   turnaroundHours: number;
-  homeCollection: boolean;
+  // Where the lab collects at home, or null when it can't for every test in it.
+  homeCollection: LabCollectionAreas | null;
   testNames: string[];
 };
 
@@ -67,7 +70,8 @@ export type LabTestOffer = {
   labAddress: string;
   price: number;
   turnaroundHours: number;
-  homeCollection: boolean;
+  // Where the lab collects at home, or null when it doesn't for this test.
+  homeCollection: LabCollectionAreas | null;
   preparation: string;
 };
 
@@ -147,6 +151,7 @@ export async function searchLabTests(search: LabTestSearch) {
 
 type PackageRow = {
   id: string;
+  lab_id: string;
   lab_name: string;
   lab_address: string;
   name: string;
@@ -158,6 +163,18 @@ type PackageRow = {
   test_names: string[];
 };
 
+// Where the labs in a list collect at home, in one query for the whole list.
+// A lab with home collection on always has a city; a lab missing from the map
+// (a city removed between the two queries) shows no home collection.
+const collectionAreasFor = (
+  rows: { lab_id: string; home_collection: boolean }[],
+) =>
+  getCollectionAreas([
+    ...new Set(
+      rows.filter((row) => row.home_collection).map((row) => row.lab_id),
+    ),
+  ]);
+
 export async function searchLabPackages(search: LabTestSearch) {
   const supabase = await createClient();
   const pattern = likePattern(search.q);
@@ -165,7 +182,7 @@ export async function searchLabPackages(search: LabTestSearch) {
     let query = supabase
       .from("lab_package_offers")
       .select(
-        "id, lab_name, lab_address, name, description, price, separate_price, turnaround_hours, home_collection, test_names",
+        "id, lab_id, lab_name, lab_address, name, description, price, separate_price, turnaround_hours, home_collection, test_names",
         { count: "exact" },
       );
     if (pattern) query = query.ilike("search_text", pattern);
@@ -184,6 +201,7 @@ export async function searchLabPackages(search: LabTestSearch) {
   }
   const { data, count, error } = result;
   if (error) throw new Error(`lab_package_offers: ${error.message}`);
+  const collection = await collectionAreasFor(data);
 
   const total = count ?? 0;
   return {
@@ -197,7 +215,9 @@ export async function searchLabPackages(search: LabTestSearch) {
       price: row.price,
       separatePrice: row.separate_price,
       turnaroundHours: row.turnaround_hours,
-      homeCollection: row.home_collection,
+      homeCollection: row.home_collection
+        ? (collection.get(row.lab_id) ?? null)
+        : null,
       testNames: row.test_names,
     })),
     total,
@@ -279,6 +299,8 @@ export async function getLabTestOffers(
 
   if (error) throw new Error(`lab_test_offers: ${error.message}`);
 
+  const collection = await collectionAreasFor(data);
+
   return {
     offers: data.map((row) => ({
       id: row.id,
@@ -287,7 +309,9 @@ export async function getLabTestOffers(
       labAddress: row.lab_address,
       price: row.price,
       turnaroundHours: row.turnaround_hours,
-      homeCollection: row.home_collection,
+      homeCollection: row.home_collection
+        ? (collection.get(row.lab_id) ?? null)
+        : null,
       preparation: row.preparation,
     })),
     total: count ?? data.length,
