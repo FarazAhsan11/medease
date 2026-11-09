@@ -19,7 +19,11 @@ export const metadata: Metadata = {
 
 export default async function PatientLabTestsPage() {
   const user = await requireRole("patient");
-  const bookings = await getPatientLabBookings(user.id);
+  const bookings = await getPatientLabBookings(
+    user.id,
+    PATIENT_BOOKINGS_SHOWN,
+    true,
+  );
 
   return (
     <>

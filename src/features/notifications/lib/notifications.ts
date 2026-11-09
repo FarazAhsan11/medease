@@ -16,6 +16,11 @@ const titles = {
   visit_summary_updated: "Your visit summary was updated",
   lab_booking_booked: "Your lab test is booked",
   lab_booking_new: "You have a new lab booking",
+  lab_booking_sample_collected: "Your lab sample was collected",
+  lab_booking_processing: "The lab is testing your sample",
+  lab_booking_report_ready: "Your lab report is ready",
+  lab_booking_recollection_needed: "The lab needs a new sample",
+  lab_booking_cancelled: "A lab booking was cancelled",
 } as const;
 
 export type NotificationKind = keyof typeof titles;

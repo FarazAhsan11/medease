@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { MAX_BOOKING_ITEMS } from "@/features/lab-booking/lib/lab-bookings";
+import {
+  cancelReasons,
+  labBookingStatuses,
+  MAX_BOOKING_ITEMS,
+  MAX_STATUS_NOTE,
+  recollectionReasons,
+} from "@/features/lab-booking/lib/lab-bookings";
 
 const optionalId = (message: string) =>
   z
@@ -70,5 +76,54 @@ export const bookLabTestSchema = z
           message: "Pick a collection window.",
         });
       }
+    }
+  });
+
+// A lab moving a booking on (LAB-04). The database checks the move itself.
+export const moveLabBookingSchema = z
+  .object({
+    bookingId: z.uuid(),
+    fromStatus: z.enum(labBookingStatuses),
+    toStatus: z.enum(labBookingStatuses),
+    reason: z
+      .string()
+      .optional()
+      .transform((value) => value || null)
+      .pipe(
+        z
+          .enum([...recollectionReasons, ...cancelReasons], "Choose a reason.")
+          .nullable(),
+      ),
+    note: z
+      .string()
+      .optional()
+      .transform((value) => value?.replace(/\r\n/g, "\n").trim() || null)
+      .pipe(
+        z
+          .string()
+          .max(
+            MAX_STATUS_NOTE,
+            `Keep the note under ${MAX_STATUS_NOTE} characters.`,
+          )
+          .nullable(),
+      ),
+  })
+  .superRefine((value, context) => {
+    const needsReason =
+      value.toStatus === "recollection_needed" ||
+      value.toStatus === "cancelled";
+    if (needsReason && !value.reason) {
+      context.addIssue({
+        code: "custom",
+        path: ["reason"],
+        message: "Choose a reason.",
+      });
+    }
+    if (value.reason === "other" && !value.note) {
+      context.addIssue({
+        code: "custom",
+        path: ["note"],
+        message: "Add a note saying what happened.",
+      });
     }
   });

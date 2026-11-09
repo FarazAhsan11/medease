@@ -2,6 +2,7 @@ import { CalendarIcon, HouseIcon, PhoneIcon, StoreIcon } from "lucide-react";
 
 import { BookedForBadge } from "@/features/family/components/booked-for-badge";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
+import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
 import { OrderTracker } from "@/features/lab-booking/components/order-tracker";
 import {
   formatBookingWhen,
@@ -78,9 +79,25 @@ export function LabBookingCard({ booking }: LabBookingCardProps) {
         </li>
       </ul>
 
+      {booking.statusReason && (
+        <div className="mt-4">
+          <LabBookingStatusReason booking={booking} audience="patient" />
+        </div>
+      )}
+
       {booking.status !== "cancelled" && (
         <div className="mt-5 border-t pt-5">
-          <OrderTracker status={booking.status} />
+          <OrderTracker
+            status={booking.status}
+            steps={{ booked: booking.createdAt, ...booking.steps }}
+            timezone={booking.timezone}
+          />
+          {booking.status === "report_ready" && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              Collect your report from the lab or ask them how they&apos;ll send
+              it.
+            </p>
+          )}
         </div>
       )}
     </article>

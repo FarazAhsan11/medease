@@ -4,9 +4,12 @@ import { cache } from "react";
 
 import {
   LAB_BOOKING_COLUMNS,
+  LAB_BOOKING_WITH_STEPS_COLUMNS,
   LAB_TIMEZONE,
+  stageStatuses,
   toLabBooking,
   type LabBookingRow,
+  type LabBookingStage,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { toDateKey } from "@/lib/datetime";
 import { createClient } from "@/lib/supabase/server";
@@ -17,13 +20,14 @@ import { createClient } from "@/lib/supabase/server";
 export const PATIENT_BOOKINGS_SHOWN = 50;
 export const LAB_BOOKINGS_SHOWN = 100;
 
-// The patient's bookings, newest first.
+// The patient's bookings, newest first; with `steps`, when each step
+// happened, for the tracker.
 export const getPatientLabBookings = cache(
-  async (userId: string, limit = PATIENT_BOOKINGS_SHOWN) => {
+  async (userId: string, limit = PATIENT_BOOKINGS_SHOWN, steps = false) => {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("lab_bookings")
-      .select(LAB_BOOKING_COLUMNS)
+      .select(steps ? LAB_BOOKING_WITH_STEPS_COLUMNS : LAB_BOOKING_COLUMNS)
       .eq("patient_id", userId)
       .order("created_at", { ascending: false })
       .limit(limit)
@@ -34,32 +38,89 @@ export const getPatientLabBookings = cache(
   },
 );
 
-export type LabBookingsView = "upcoming" | "past";
+type DayRange = { from?: string; before?: string };
 
-// The lab's bookings: from today on, soonest first, or earlier ones, latest
-// first.
-export async function getLabBookings(labId: string, view: LabBookingsView) {
-  const today = toDateKey(new Date(), LAB_TIMEZONE);
-  const upcoming = view === "upcoming";
+// One page of a lab's bookings at a stage, by visit day, forwards or
+// backwards along the stage's index. One extra row says whether there are
+// more, without counting them all.
+async function readLabBookings(
+  labId: string,
+  stage: LabBookingStage,
+  ascending: boolean,
+  { from, before }: DayRange,
+  shown: number,
+) {
   const supabase = await createClient();
   let query = supabase
     .from("lab_bookings")
     .select(LAB_BOOKING_COLUMNS)
-    .eq("lab_id", labId);
-  query = upcoming
-    ? query.gte("visit_date", today)
-    : query.lt("visit_date", today);
+    .eq("lab_id", labId)
+    .in("status", stageStatuses[stage]);
+  if (from) query = query.gte("visit_date", from);
+  if (before) query = query.lt("visit_date", before);
   const { data, error } = await query
-    .order("visit_date", { ascending: upcoming })
-    .order("slot_starts_at", { ascending: upcoming, nullsFirst: upcoming })
-    .order("created_at", { ascending: upcoming })
-    // One extra row says whether there are more, without counting them all.
-    .limit(LAB_BOOKINGS_SHOWN + 1)
+    .order("visit_date", { ascending })
+    // A day's lab visits (no window) come before its windows.
+    .order("slot_starts_at", { ascending, nullsFirst: ascending })
+    .order("created_at", { ascending })
+    .limit(shown + 1)
     .returns<LabBookingRow[]>();
 
   if (error) throw new Error(`lab_bookings: ${error.message}`);
   return {
-    bookings: data.slice(0, LAB_BOOKINGS_SHOWN).map(toLabBooking),
-    more: data.length > LAB_BOOKINGS_SHOWN,
+    bookings: data.slice(0, shown).map(toLabBooking),
+    more: data.length > shown,
   };
+}
+
+export const EARLIER_BOOKINGS_SHOWN = 50;
+
+// The lab's bookings at one stage. To collect: today and later, soonest
+// first, plus bookings still open from earlier days, latest first, kept apart
+// so a pile of old ones can't push today's off the page. In the lab: oldest
+// first, as samples are worked in order. Finished: latest first.
+export async function getLabBookings(labId: string, stage: LabBookingStage) {
+  if (stage === "to-collect") {
+    const today = toDateKey(new Date(), LAB_TIMEZONE);
+    const [current, earlier] = await Promise.all([
+      readLabBookings(labId, stage, true, { from: today }, LAB_BOOKINGS_SHOWN),
+      readLabBookings(
+        labId,
+        stage,
+        false,
+        { before: today },
+        EARLIER_BOOKINGS_SHOWN,
+      ),
+    ]);
+    return { ...current, earlier };
+  }
+  const list = await readLabBookings(
+    labId,
+    stage,
+    stage === "in-lab",
+    {},
+    LAB_BOOKINGS_SHOWN,
+  );
+  return { ...list, earlier: null };
+}
+
+// How many bookings wait at each open stage, for the tabs.
+export async function getOpenLabBookingCounts(labId: string) {
+  const supabase = await createClient();
+  const count = async (stage: LabBookingStage) => {
+    const { count, error } = await supabase
+      .from("lab_bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("lab_id", labId)
+      .in("status", stageStatuses[stage]);
+    if (error) throw new Error(`lab_bookings: ${error.message}`);
+    return count ?? 0;
+  };
+  const [toCollect, inLab] = await Promise.all([
+    count("to-collect"),
+    count("in-lab"),
+  ]);
+  return { "to-collect": toCollect, "in-lab": inLab } satisfies Partial<
+    Record<LabBookingStage, number>
+  >;
 }

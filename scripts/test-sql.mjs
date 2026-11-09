@@ -3840,7 +3840,10 @@ async function testLabBooking({ patient, secondPatient }) {
     ).data ?? [];
   denied(
     "a guest can't read collection windows, which count bookings",
-    await rpc(null, "get_lab_collection_slots", { p_lab_id: lab.id, p_days: 14 }),
+    await rpc(null, "get_lab_collection_slots", {
+      p_lab_id: lab.id,
+      p_days: 14,
+    }),
   );
   const [slot, nextSlot] = await slots();
   const spotsAt = async (startsAt) =>
@@ -3968,6 +3971,265 @@ async function testLabBooking({ patient, secondPatient }) {
     (await notices(patient.id, "lab_booking_booked"))[0]?.href ===
       "/patient/lab-tests" &&
       (await notices(lab.id, "lab_booking_new"))[0]?.href === "/lab/bookings",
+  );
+
+  section("Moving a lab booking along (LAB-04)");
+
+  const move = (caller, id, from, to, fields = {}) =>
+    rpc(caller, "move_lab_booking", {
+      p_booking_id: id,
+      p_from_status: from,
+      p_to_status: to,
+      p_reason: null,
+      p_note: null,
+      ...fields,
+    });
+  const eventsOf = async (id) =>
+    (
+      await db.query(
+        `select status, reason, note, changed_by from public.lab_booking_events
+         where booking_id = $1 order by created_at, id`,
+        [id],
+      )
+    ).rows;
+  const kindsFor = async (userId) =>
+    (
+      await db.query(
+        `select kind from public.notifications where user_id = $1`,
+        [userId],
+      )
+    ).rows.map((row) => row.kind);
+
+  const visitEvents = await eventsOf(visitId);
+  check(
+    "a new booking starts its history as booked, by the patient",
+    visitEvents.length === 1 &&
+      visitEvents[0].status === "booked" &&
+      visitEvents[0].changed_by === patient.id,
+  );
+  denied(
+    "a guest can't move a booking",
+    await move(null, visitId, "booked", "cancelled"),
+  );
+  refused(
+    "a patient can't move a booking",
+    await move(patient, visitId, "booked", "cancelled", {
+      p_reason: "patient_request",
+    }),
+    "not_lab",
+  );
+  refused(
+    "another lab can't move it",
+    await move(otherLab, visitId, "booked", "cancelled", {
+      p_reason: "patient_request",
+    }),
+    "booking_not_found",
+  );
+  refused(
+    "a sample can't be collected before the booked day",
+    await move(lab, visitId, "booked", "sample_collected"),
+    "too_early",
+  );
+  refused(
+    "a booking without a status to move from is refused",
+    await move(lab, visitId, null, "sample_collected"),
+    "invalid_move",
+  );
+
+  const todayId = idOf(await book(patient, { p_visit_date: localToday() }));
+  refused(
+    "steps can't be skipped",
+    await move(lab, todayId, "booked", "processing"),
+    "invalid_move",
+  );
+  refused(
+    "a move from a status the booking isn't in is refused",
+    await move(lab, todayId, "processing", "report_ready"),
+    "status_changed",
+  );
+  check(
+    "a lab without two-factor can't move it",
+    (await move({ ...lab, aal: "aal1" }, todayId, "booked", "sample_collected"))
+      .error?.message === "second_factor_required",
+  );
+  succeeded(
+    "on the day, the lab marks the sample collected",
+    await move(lab, todayId, "booked", "sample_collected"),
+  );
+  refused(
+    "a second click on the same step is refused",
+    await move(lab, todayId, "booked", "sample_collected"),
+    "status_changed",
+  );
+  refused(
+    "a forward move takes no reason",
+    await move(lab, todayId, "sample_collected", "processing", {
+      p_reason: "other",
+    }),
+    "invalid_reason",
+  );
+  refused(
+    "a forward move takes no note",
+    await move(lab, todayId, "sample_collected", "processing", {
+      p_note: "Done",
+    }),
+    "invalid_note",
+  );
+  refused(
+    "asking for a new sample needs a reason",
+    await move(lab, todayId, "sample_collected", "recollection_needed"),
+    "reason_required",
+  );
+  refused(
+    "a cancel reason doesn't fit a new sample",
+    await move(lab, todayId, "sample_collected", "recollection_needed", {
+      p_reason: "patient_request",
+    }),
+    "invalid_reason",
+  );
+  refused(
+    "'other' needs a note",
+    await move(lab, todayId, "sample_collected", "recollection_needed", {
+      p_reason: "other",
+      p_note: "  ",
+    }),
+    "note_required",
+  );
+  refused(
+    "a note of only line breaks and tabs counts as none",
+    await move(lab, todayId, "sample_collected", "recollection_needed", {
+      p_reason: "other",
+      p_note: "\n\t\r\n",
+    }),
+    "note_required",
+  );
+  refused(
+    "a note over 500 characters is refused",
+    await move(lab, todayId, "sample_collected", "recollection_needed", {
+      p_reason: "other",
+      p_note: "x".repeat(501),
+    }),
+    "invalid_note",
+  );
+  succeeded(
+    "the lab asks for a new sample with a reason and a note",
+    await move(lab, todayId, "sample_collected", "recollection_needed", {
+      p_reason: "sample_haemolysed",
+      p_note: "Please come in the morning.\r\nNo need to fast.",
+    }),
+  );
+  const recollect = await bookingRow(todayId);
+  check(
+    "the booking shows the reason and the note, line breaks normalised",
+    recollect.status === "recollection_needed" &&
+      recollect.status_reason === "sample_haemolysed" &&
+      recollect.status_note === "Please come in the morning.\nNo need to fast.",
+  );
+  for (const [from, to] of [
+    ["recollection_needed", "sample_collected"],
+    ["sample_collected", "processing"],
+    ["processing", "report_ready"],
+  ]) {
+    succeeded(
+      `the lab moves it from ${from} to ${to}`,
+      await move(lab, todayId, from, to),
+    );
+  }
+  const ready = await bookingRow(todayId);
+  check(
+    "a forward move clears the reason and note",
+    ready.status === "report_ready" &&
+      ready.status_reason === null &&
+      ready.status_note === null,
+  );
+  const history = await eventsOf(todayId);
+  check(
+    "every move is kept in order, by the lab",
+    history.map((event) => event.status).join() ===
+      "booked,sample_collected,recollection_needed,sample_collected,processing,report_ready" &&
+      history.slice(1).every((event) => event.changed_by === lab.id) &&
+      history[2].reason === "sample_haemolysed",
+  );
+  await db.query(
+    `update public.lab_bookings set status = status, status_note = null where id = $1`,
+    [todayId],
+  );
+  check(
+    "writing the same status again adds no history",
+    (await eventsOf(todayId)).length === 6,
+  );
+  refused(
+    "a finished booking can't move again",
+    await move(lab, todayId, "report_ready", "cancelled", {
+      p_reason: "other",
+      p_note: "Mistake",
+    }),
+    "invalid_move",
+  );
+  const patientKinds = await kindsFor(patient.id);
+  check(
+    "the patient gets a notice at each step",
+    [
+      "lab_booking_sample_collected",
+      "lab_booking_recollection_needed",
+      "lab_booking_processing",
+      "lab_booking_report_ready",
+    ].every((kind) => patientKinds.includes(kind)),
+  );
+  check(
+    "the lab gets no notice for its own moves",
+    !(await kindsFor(lab.id)).some((kind) =>
+      ["lab_booking_sample_collected", "lab_booking_report_ready"].includes(
+        kind,
+      ),
+    ),
+  );
+
+  const homeId = idOf(homeBooking);
+  succeeded(
+    "the lab cancels a home collection the patient phoned about",
+    await move(lab, homeId, "booked", "cancelled", {
+      p_reason: "patient_request",
+    }),
+  );
+  check(
+    "cancelling frees a visit in the window",
+    (await spotsAt(slot.starts_at)) === 1,
+  );
+  check(
+    "the patient is told it was cancelled",
+    (await kindsFor(patient.id)).includes("lab_booking_cancelled"),
+  );
+  refused(
+    "a cancelled booking can't move again",
+    await move(lab, homeId, "cancelled", "sample_collected"),
+    "invalid_move",
+  );
+
+  const historySeenBy = async (caller) =>
+    (
+      await as(
+        caller,
+        `select count(*)::int as n from public.lab_booking_events where booking_id = $1`,
+        [todayId],
+      )
+    ).data?.[0]?.n ?? 0;
+  check(
+    "the patient and the lab read the history; others don't",
+    (await historySeenBy(patient)) === 6 &&
+      (await historySeenBy(lab)) === 6 &&
+      (await historySeenBy(secondPatient)) === 0 &&
+      (await historySeenBy(otherLab)) === 0 &&
+      (await historySeenBy({ ...lab, aal: "aal1" })) === 0,
+  );
+  denied(
+    "nobody writes the history directly",
+    await as(
+      lab,
+      `insert into public.lab_booking_events (booking_id, lab_id, patient_id, status)
+       values ($1, $2, $3, 'report_ready')`,
+      [visitId, lab.id, patient.id],
+    ),
   );
 
   section("What bookings hold on to (LAB-03)");

@@ -1,6 +1,6 @@
-# Lab booking (LAB-03)
+# Lab booking (LAB-03, LAB-04)
 
-A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list. Moving it through collection and processing is LAB-04, cancelling and rescheduling LAB-20, paying online PAY-07; until PAY-07, every booking is paid in cash at the lab or to the collector.
+A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list and moves it through collection and processing (LAB-04, "Status moves" below). The patient cancelling or rescheduling in the app is LAB-20, paying online PAY-07; until PAY-07, every booking is paid in cash at the lab or to the collector.
 
 ## Choices
 
@@ -27,18 +27,47 @@ A patient books one or more tests or packages at one lab, for themselves or a fa
 - **Tables**: `lab_bookings` (one per order) and `lab_booking_items`. Items carry `lab_id` and `patient_id` with a foreign key to the booking on all three, so row-level security reads them directly without a join. The person tested is paired with the account by a foreign key to `care_recipients`, as on appointments.
 - **Reads**: the patient reads their bookings (`patient_id = auth.uid()`), the lab its own (`lab_id = auth.uid()`); clinical data, so both need a second factor (restrictive policy and write trigger). Nobody writes directly.
 - **Write**: `book_lab_test` checks the caller is a patient, the person is theirs, the lab is listed, every item is listed at that lab, and the collection rules above, then inserts the booking and items in one transaction.
-- **Status**: `booked`, `sample_collected`, `processing`, `report_ready`, `cancelled`, `recollection_needed`. Only `booked` is written now; LAB-04 adds the moves.
+- **Status**: `booked`, `sample_collected`, `processing`, `report_ready`, `cancelled`, `recollection_needed`, moved by the lab through `move_lab_booking` (see "Status moves").
 - **Related refusals**: `delete_lab_package` refuses a package that has been booked (`package_has_bookings`); the lab unlists it instead. `delete_family_member` refuses someone with lab bookings.
-- **Indexes**: the patient's list `(patient_id, created_at desc)`, the lab's list `(lab_id, visit_date, slot_starts_at)`, window capacity `(lab_id, slot_starts_at)` for home bookings that weren't cancelled.
+- **Indexes**: the patient's list `(patient_id, created_at desc)`, the lab's open and finished bookings, each `(lab_id, visit_date, slot_starts_at nulls first, created_at)` partial on its statuses and read forwards or backwards in exactly that order, window capacity `(lab_id, slot_starts_at)` for home bookings that weren't cancelled.
 
 ## Screens
 
 - Patient: on the compare page each lab has **Book**; packages too. Guests get **Log in to book**. `/patient/lab-tests/labs/[labId]` is the booking page: tests and packages (with a filter), lab visit or home collection, address, day and window, who it's for, and the total. After booking, `/patient/lab-tests` lists the patient's bookings with their progress; the dashboard card shows the latest.
-- Lab: `/lab/bookings` lists bookings by day, with the person tested, items, collection details and total. Status actions come with LAB-04.
+- Lab: `/lab/bookings` has three working lists, **To collect** (booked, new sample needed), **In the lab** (sample collected, processing) and **Finished** (report ready, cancelled), each by visit day, with counts on the first two. To collect shows today and later first, then bookings **still open from earlier days** in their own section, latest first, so leftovers can't push today's work off the page; In the lab is oldest first; Finished latest first. Each booking shows the person tested, items, collection details, total, any reason and note, and its next steps.
+- Patient: each booking's tracker shows when each step happened; a cancelled booking or one needing a new sample shows the reason and the lab's note.
+
+## Status moves (LAB-04)
+
+**One path, checked in the database.** `move_lab_booking` accepts only these moves, so a lab can't skip a step or reopen a finished booking:
+
+| From | To |
+| --- | --- |
+| booked | sample collected, cancelled |
+| new sample needed | sample collected, cancelled |
+| sample collected | processing, new sample needed, cancelled |
+| processing | report ready, new sample needed, cancelled |
+| report ready, cancelled | nothing (corrected reports are LAB-11) |
+
+This follows the order lifecycle in HL7's Clinical Order Workflows guide: the filler takes the order, waits for the specimen, works on it, and completes it with a report; an unusable specimen fails the step and the placer is told. "New sample needed" is that failure: the booking returns to the lab's **To collect** list until a new sample is taken.
+
+**The lab names the status it's moving from.** Two people on the lab's account, or two tabs, can act on the same booking. The function locks the row (`for update`) and refuses with `status_changed` when the booking isn't in the status the lab saw, so a double click never moves twice and nobody overwrites a move they didn't see. The page then reloads to show where the booking is. This is the usual guard for state machines in Postgres: serialise transitions with a lock and check the transition inside it.
+
+**Not before the day.** A sample can be marked collected from the booking's visit day on (the lab's local day), which catches a click on the wrong row among future bookings. Later steps have no date rule.
+
+**Reasons from a list, with an optional note.** A new sample and a cancellation each need a reason from a fixed list; "other" needs a note. The lists follow common specimen rejection policies (haemolysed, clotted, too little sample, a label that can't be matched, too long in transit) and the ways a booking falls through (the patient asked, couldn't be reached or wasn't there; the lab can't run the test or send a collector). The patient sees the reason and note in the app, behind sign-in. Patients cancel by phoning the lab until LAB-20, and the lab records it here with "patient asked", which frees the window's place.
+
+**History in its own table.** `lab_booking_events` keeps every status a booking reaches, with the reason, note and who moved it, written by a trigger on `lab_bookings` (insert and status change), so no code path can change a status without leaving a row. The booking keeps the current reason, note and `status_changed_at`, so lists don't read the history; the patient's list reads it for the tracker's times. Same read rules as the booking: the patient and the lab, with a second factor; nobody writes it directly.
+
+**A notice at each step, no email yet.** Every move puts a notice in the patient's bell (`lab_booking_<status>`), worded in `notifications.ts`. The lab gets none for its own moves. Emails for "report ready" and "cancelled" wait for LAB-05 reports and the NTF-05 outbox, so an email links to something the patient can open.
+
+**Report ready before reports upload.** Until LAB-05, "report ready" means the lab has the result and gives it to the patient its usual way; the lab confirms before marking it, and the patient's card says to collect it from the lab. LAB-05 attaches the PDF to this step.
+
+**Limits.** 600 moves an hour per lab account (`rateLimits.labBookingMoveUser`); notes up to 500 characters.
 
 ## Code
 
-- Migration: `supabase/migrations/20261109120000_lab_bookings.sql`
+- Migrations: `supabase/migrations/20261109120000_lab_bookings.sql`, `supabase/migrations/20261109150000_lab_booking_status.sql`
 - Feature: `src/features/lab-booking/`
 
 ## Sources
@@ -47,3 +76,6 @@ A patient books one or more tests or packages at one lab, for themselves or a fa
 - Brandur Leach, [Implementing Stripe-like idempotency keys in Postgres](https://brandur.org/idempotency-keys), and Square, [CreateBooking](https://developer.squareup.com/explorer/square/bookings-api/CreateBooking) (`idempotency_key`): one key per user action, enforced by a unique constraint.
 - Marham, [book lab tests online](https://www.marham.pk/labs): choose home sample collection or a lab visit.
 - Chughtai Lab, [home sampling](https://chughtailab.com/services/chughtai-home-sampling/): booking a home visit at a chosen time.
+- HL7, Clinical Order Workflows: [simple lab order flow](https://build.fhir.org/ig/HL7/fhir-cow-ig/ex1-simple-lab-order-flow.html) and [specimen rejected](https://build.fhir.org/ig/HL7/fhir-cow-ig/ex5-lab-order-flow-specimen-rejected.html): accepted, in progress waiting for the specimen, completed with a report; a rejected specimen fails the task and the placer is told.
+- Specimen rejection policies, e.g. [Munson Healthcare](https://munsonhealthcare.org/sites/default/files/media/file/Physician%20Services/LabMed%20Report/Specimen%20Rejection%20Policy%20-%20Cliincal%20Laboratory%20Specimesn%20%20October%202021%20%2C%20Volume%2012.pdf) and [SUNY Downstate](https://www.downstate.edu/patient-care/lab-services/_documents/LAB_11.pdf): mislabelled, haemolysed, clotted or too-small samples are rejected and recollected, and the collecting side is told.
+- thoughtbot, [Modeling state transitions in Postgres](https://thoughtbot.com/blog/modeling-state-transitions-in-postgres) and [Inserting state transitions in Postgres](https://thoughtbot.com/blog/inserting-state-transitions-in-postgres): validate transitions under a lock, keep an append-only history.

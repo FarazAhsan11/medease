@@ -63,6 +63,12 @@ export const rateLimits = {
     limit: 20,
     windowSeconds: ONE_HOUR,
   },
+  // A lab moving bookings along: a busy day is a few hundred moves.
+  labBookingMoveUser: {
+    name: "lab-booking-move-user",
+    limit: 600,
+    windowSeconds: ONE_HOUR,
+  },
   // Starting a conversation, or a doctor extending or closing one.
   conversationUser: {
     name: "conversation-user",

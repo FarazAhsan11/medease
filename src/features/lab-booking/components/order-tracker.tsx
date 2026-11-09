@@ -5,14 +5,18 @@ import {
   statusLabels,
   type LabBookingStatus,
 } from "@/features/lab-booking/lib/lab-bookings";
+import { formatDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 type OrderTrackerProps = {
   status: LabBookingStatus;
+  // When each step was reached, if known.
+  steps?: Partial<Record<LabBookingStatus, string>>;
+  timezone: string;
 };
 
 // Where a lab booking is on its way to a report.
-export function OrderTracker({ status }: OrderTrackerProps) {
+export function OrderTracker({ status, steps, timezone }: OrderTrackerProps) {
   // A new sample restarts collection; a cancelled booking shows no progress.
   const current =
     status === "recollection_needed"
@@ -23,6 +27,7 @@ export function OrderTracker({ status }: OrderTrackerProps) {
     <ol className="grid grid-cols-4 gap-2" aria-label="Booking progress">
       {progressSteps.map((step, index) => {
         const done = index <= current;
+        const at = done ? steps?.[step] : undefined;
 
         return (
           <li
@@ -61,6 +66,14 @@ export function OrderTracker({ status }: OrderTrackerProps) {
               )}
             >
               {statusLabels[step]}
+              {at && (
+                <time
+                  dateTime={at}
+                  className="block font-normal text-muted-foreground"
+                >
+                  {formatDateTime(at, timezone)}
+                </time>
+              )}
             </span>
           </li>
         );

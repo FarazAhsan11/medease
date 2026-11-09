@@ -1,4 +1,5 @@
-// Lab bookings (LAB-03). Safe to import from client components.
+// Lab bookings (LAB-03) and their status moves (LAB-04). Safe to import from
+// client components.
 // Design: docs/lab-booking.md.
 
 import type { CareRecipientRelation } from "@/features/family/lib/relations";
@@ -37,6 +38,77 @@ export const progressSteps = [
   "processing",
   "report_ready",
 ] as const satisfies readonly LabBookingStatus[];
+
+// The moves a lab can make from each status. Match move_lab_booking.
+export const nextStatuses: Record<LabBookingStatus, LabBookingStatus[]> = {
+  booked: ["sample_collected", "cancelled"],
+  recollection_needed: ["sample_collected", "cancelled"],
+  sample_collected: ["processing", "recollection_needed", "cancelled"],
+  processing: ["report_ready", "recollection_needed", "cancelled"],
+  report_ready: [],
+  cancelled: [],
+};
+
+// The lab's working lists.
+export const labBookingStages = ["to-collect", "in-lab", "finished"] as const;
+export type LabBookingStage = (typeof labBookingStages)[number];
+
+export const stageStatuses: Record<LabBookingStage, LabBookingStatus[]> = {
+  "to-collect": ["booked", "recollection_needed"],
+  "in-lab": ["sample_collected", "processing"],
+  finished: ["report_ready", "cancelled"],
+};
+
+export const stageLabels: Record<LabBookingStage, string> = {
+  "to-collect": "To collect",
+  "in-lab": "In the lab",
+  finished: "Finished",
+};
+
+// The forward step's button.
+export const forwardLabels: Partial<Record<LabBookingStatus, string>> = {
+  sample_collected: "Sample collected",
+  processing: "Start processing",
+  report_ready: "Report ready",
+};
+
+export const recollectionReasons = [
+  "sample_haemolysed",
+  "sample_clotted",
+  "not_enough_sample",
+  "label_problem",
+  "sample_delayed",
+  "other",
+] as const;
+
+export const cancelReasons = [
+  "patient_request",
+  "patient_unreachable",
+  "patient_absent",
+  "test_unavailable",
+  "collection_unavailable",
+  "other",
+] as const;
+
+export type StatusReason =
+  (typeof recollectionReasons)[number] | (typeof cancelReasons)[number];
+
+// Shown to the lab and the patient alike, so worded for the patient.
+export const reasonLabels: Record<StatusReason, string> = {
+  sample_haemolysed: "The sample was damaged (haemolysed)",
+  sample_clotted: "The sample clotted",
+  not_enough_sample: "There wasn't enough sample",
+  label_problem: "The sample label couldn't be matched",
+  sample_delayed: "The sample took too long to reach the lab",
+  patient_request: "Cancelled at the patient's request",
+  patient_unreachable: "The lab couldn't reach the patient",
+  patient_absent: "Nobody was there for the visit or collection",
+  test_unavailable: "The lab can't run this test right now",
+  collection_unavailable: "The lab couldn't send a collector",
+  other: "Other",
+};
+
+export const MAX_STATUS_NOTE = 500;
 
 // A test or package the patient can add to a booking.
 export type BookableItem = {
@@ -125,8 +197,14 @@ export type LabBooking = {
   total: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  statusReason: StatusReason | null;
+  statusNote: string | null;
+  statusChangedAt: string;
   createdAt: string;
   items: LabBookingItem[];
+  // When each step happened, newest move per status. Only on the patient's
+  // list, which shows the tracker.
+  steps: Partial<Record<LabBookingStatus, string>>;
 };
 
 export type LabBookingRow = {
@@ -157,7 +235,11 @@ export type LabBookingRow = {
   total: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  status_reason: StatusReason | null;
+  status_note: string | null;
+  status_changed_at: string;
   created_at: string;
+  lab_booking_events?: { status: LabBookingStatus; created_at: string }[];
   lab_booking_items: {
     id: string;
     name: string;
@@ -171,8 +253,23 @@ export const LAB_BOOKING_COLUMNS = `id, status, collection, visit_date, slot_sta
   lab_name, lab_address, lab_phone, patient_name, patient_phone, care_recipient_name,
   care_recipient_relation, care_recipient_date_of_birth, care_recipient_gender,
   street_address, area, city, landmark, contact_name, contact_phone, subtotal,
-  collection_fee, total, payment_method, payment_status, created_at,
+  collection_fee, total, payment_method, payment_status, status_reason,
+  status_note, status_changed_at, created_at,
   lab_booking_items (id, name, price, test_names, package_id)`;
+
+export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
+  lab_booking_events (status, created_at)`;
+
+// The newest time each status was reached.
+function stepTimes(events: LabBookingRow["lab_booking_events"]) {
+  const steps: Partial<Record<LabBookingStatus, string>> = {};
+  for (const event of events ?? []) {
+    const seen = steps[event.status];
+    if (!seen || seen < event.created_at)
+      steps[event.status] = event.created_at;
+  }
+  return steps;
+}
 
 export function toLabBooking(row: LabBookingRow): LabBooking {
   return {
@@ -208,7 +305,11 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     total: row.total,
     paymentMethod: row.payment_method,
     paymentStatus: row.payment_status,
+    statusReason: row.status_reason,
+    statusNote: row.status_note,
+    statusChangedAt: row.status_changed_at,
     createdAt: row.created_at,
+    steps: stepTimes(row.lab_booking_events),
     items: [...row.lab_booking_items]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => ({
@@ -260,6 +361,19 @@ export const labBookingErrorMessages: Record<string, string> = {
   slot_unavailable:
     "That time is no longer available. Please pick another window.",
   slot_full: "Someone just took the last visit in that window. Pick another.",
+};
+
+export const labBookingMoveErrorMessages: Record<string, string> = {
+  not_lab: "Only lab accounts can update bookings.",
+  booking_not_found: "This booking isn't in your list.",
+  status_changed:
+    "This booking was already updated, perhaps from another tab. The list now shows where it is.",
+  invalid_move: "That step isn't possible from where this booking is now.",
+  too_early: "The sample can be marked collected from the booked day.",
+  reason_required: "Choose a reason.",
+  invalid_reason: "Choose one of the listed reasons.",
+  note_required: "Add a note saying what happened.",
+  invalid_note: `Keep the note under ${MAX_STATUS_NOTE} characters.`,
 };
 
 // Codes meaning our copy of the windows or catalog is stale: fetch fresh ones.
