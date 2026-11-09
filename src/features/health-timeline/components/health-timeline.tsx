@@ -24,7 +24,7 @@ export function HealthTimeline({ entries, type }: HealthTimelineProps) {
   return (
     <PanelCard
       title="Timeline"
-      description="Your visits, prescriptions and documents, newest first."
+      description="Your visits, prescriptions, lab reports and documents, newest first."
     >
       <div className="grid gap-5 p-5">
         <TimelineFilter active={type} />
@@ -36,7 +36,7 @@ export function HealthTimeline({ entries, type }: HealthTimelineProps) {
                 ? `No ${timelineTypeLabels[type].toLowerCase()} yet`
                 : "Nothing here yet"
             }
-            description="Visits appear once they've taken place, along with your prescriptions and the documents you upload."
+            description="Visits appear once they've taken place, along with your prescriptions, reports from labs you book through MedEase and the documents you upload."
           />
         ) : (
           months.map(({ month, entries: monthEntries }) => (

@@ -4128,13 +4128,137 @@ async function testLabBooking({ patient, secondPatient }) {
   for (const [from, to] of [
     ["recollection_needed", "sample_collected"],
     ["sample_collected", "processing"],
-    ["processing", "report_ready"],
   ]) {
     succeeded(
       `the lab moves it from ${from} to ${to}`,
       await move(lab, todayId, from, to),
     );
   }
+
+  section("Publishing a lab report (LAB-05)");
+
+  // A report at the path the app makes, recorded as checked the way the
+  // server does after verifyUpload passes it.
+  const checkedReport = async (owner, bookingId, extension = "pdf") => {
+    const path = `${owner.id}/${bookingId}/${randomUUID()}.${extension}`;
+    await rpc({ role: "service_role" }, "mark_upload_checked", {
+      p_bucket: "lab-reports",
+      p_path: path,
+      p_owner_id: owner.id,
+    });
+    return path;
+  };
+  const publish = (caller, id, path) =>
+    rpc(caller, "publish_lab_report", { p_booking_id: id, p_path: path });
+  const reportsOf = async (id) =>
+    (
+      await db.query(
+        `select id, version, storage_path, uploaded_by, replaced_at
+         from public.lab_reports where booking_id = $1`,
+        [id],
+      )
+    ).rows;
+
+  refused(
+    "report ready can't be marked without a report",
+    {
+      ...(await move(lab, todayId, "processing", "report_ready")),
+      fn: "require_lab_report",
+    },
+    "report_required",
+  );
+  const reportPath = await checkedReport(lab, todayId);
+  denied(
+    "a guest can't publish a report",
+    await publish(null, todayId, reportPath),
+  );
+  refused(
+    "a patient can't publish a report",
+    await publish(patient, todayId, reportPath),
+    "not_lab",
+  );
+  refused(
+    "another lab can't publish to this booking",
+    await publish(otherLab, todayId, await checkedReport(otherLab, todayId)),
+    "booking_not_found",
+  );
+  refused(
+    "a booking not yet being processed can't take a report",
+    await publish(lab, visitId, await checkedReport(lab, visitId)),
+    "status_changed",
+  );
+  refused(
+    "a report filed under another booking is refused",
+    await publish(lab, todayId, await checkedReport(lab, visitId)),
+    "invalid_path",
+  );
+  refused(
+    "only a PDF is taken",
+    await publish(lab, todayId, await checkedReport(lab, todayId, "jpg")),
+    "invalid_path",
+  );
+  refused(
+    "a file the server didn't check is refused",
+    await publish(lab, todayId, `${lab.id}/${todayId}/${randomUUID()}.pdf`),
+    "upload_not_checked",
+  );
+  check(
+    "a lab without two-factor can't publish",
+    (await publish({ ...lab, aal: "aal1" }, todayId, reportPath)).error
+      ?.message === "second_factor_required",
+  );
+  const published = await publish(lab, todayId, reportPath);
+  succeeded("the lab publishes the report", published);
+  const [report] = await reportsOf(todayId);
+  check(
+    "the report is filed as the booking's first version, by the lab",
+    report?.id === published.data?.[0]?.publish_lab_report &&
+      report.version === 1 &&
+      report.storage_path === reportPath &&
+      report.uploaded_by === lab.id &&
+      report.replaced_at === null,
+  );
+  refused(
+    "a second click doesn't publish twice",
+    await publish(lab, todayId, await checkedReport(lab, todayId)),
+    "status_changed",
+  );
+  check(
+    "publishing is audited, ids only",
+    (
+      await db.query(
+        `select details from public.audit_log
+         where action = 'lab_report.published' and target_id = $1`,
+        [todayId],
+      )
+    ).rows[0]?.details?.report_id === report?.id,
+  );
+  const reportsSeenBy = async (caller) =>
+    (
+      await as(
+        caller,
+        `select count(*)::int as n from public.lab_reports where booking_id = $1`,
+        [todayId],
+      )
+    ).data?.[0]?.n ?? 0;
+  check(
+    "the patient and the lab read the report; others don't",
+    (await reportsSeenBy(patient)) === 1 &&
+      (await reportsSeenBy(lab)) === 1 &&
+      (await reportsSeenBy(secondPatient)) === 0 &&
+      (await reportsSeenBy(otherLab)) === 0 &&
+      (await reportsSeenBy({ ...lab, aal: "aal1" })) === 0,
+  );
+  denied(
+    "nobody files a report directly",
+    await as(
+      lab,
+      `insert into public.lab_reports (booking_id, lab_id, patient_id, care_recipient_id, storage_path)
+       select id, lab_id, patient_id, care_recipient_id, $2 from public.lab_bookings where id = $1`,
+      [visitId, `${lab.id}/${visitId}/${randomUUID()}.pdf`],
+    ),
+  );
+
   const ready = await bookingRow(todayId);
   check(
     "a forward move clears the reason and note",
@@ -4263,15 +4387,36 @@ async function testLabBooking({ patient, secondPatient }) {
 
   const gone = await createPatient();
   await book(gone);
-  await db.query(`delete from auth.users where id = $1`, [gone.id]);
+  const goneReported = idOf(
+    await book(gone, { p_visit_date: localToday() }),
+  );
+  for (const [from, to] of [
+    ["booked", "sample_collected"],
+    ["sample_collected", "processing"],
+  ]) {
+    await move(lab, goneReported, from, to);
+  }
+  succeeded(
+    "a report is published for the account about to go",
+    await publish(lab, goneReported, await checkedReport(lab, goneReported)),
+  );
+  const goneError = await db
+    .query(`delete from auth.users where id = $1`, [gone.id])
+    .then(
+      () => null,
+      (error) => error.message,
+    );
   check(
-    "deleting an account removes its bookings",
-    (
-      await db.query(
-        `select count(*)::int as n from public.lab_bookings where patient_id = $1`,
-        [gone.id],
-      )
-    ).rows[0].n === 0,
+    "deleting an account removes its bookings and reports",
+    goneError === null &&
+      (
+        await db.query(
+          `select ((select count(*) from public.lab_bookings where patient_id = $1)
+             + (select count(*) from public.lab_reports where patient_id = $1))::int as n`,
+          [gone.id],
+        )
+      ).rows[0].n === 0,
+    goneError ?? "",
   );
 
   const labGone = await db
@@ -4281,11 +4426,12 @@ async function testLabBooking({ patient, secondPatient }) {
       (error) => error.message,
     );
   check(
-    "a lab with bookings can delete its account, taking its bookings",
+    "a lab with bookings can delete its account, taking its bookings and reports",
     labGone === null &&
       (
         await db.query(
-          `select count(*)::int as n from public.lab_bookings where lab_id = $1`,
+          `select ((select count(*) from public.lab_bookings where lab_id = $1)
+             + (select count(*) from public.lab_reports where lab_id = $1))::int as n`,
           [lab.id],
         )
       ).rows[0].n === 0,

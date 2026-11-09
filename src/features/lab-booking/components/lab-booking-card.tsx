@@ -1,5 +1,6 @@
 import { CalendarIcon, HouseIcon, PhoneIcon, StoreIcon } from "lucide-react";
 
+import { patientRoutes } from "@/config/routes";
 import { BookedForBadge } from "@/features/family/components/booked-for-badge";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
@@ -8,6 +9,7 @@ import {
   formatBookingWhen,
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
+import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
 import { formatFee, telHref } from "@/lib/format";
 
 type LabBookingCardProps = {
@@ -92,12 +94,22 @@ export function LabBookingCard({ booking }: LabBookingCardProps) {
             steps={{ booked: booking.createdAt, ...booking.steps }}
             timezone={booking.timezone}
           />
-          {booking.status === "report_ready" && (
-            <p className="mt-4 text-xs text-muted-foreground">
-              Collect your report from the lab or ask them how they&apos;ll send
-              it.
-            </p>
-          )}
+          {booking.status === "report_ready" &&
+            (booking.reportId ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <LabReportLink
+                  href={patientRoutes.labReport(booking.reportId)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Also in your health records.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Collect your report from the lab or ask them how they&apos;ll
+                send it.
+              </p>
+            ))}
         </div>
       )}
     </article>

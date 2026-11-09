@@ -10,6 +10,7 @@ import {
   toLabBooking,
   type LabBookingRow,
   type LabBookingStage,
+  type LabBookingStatus,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { toDateKey } from "@/lib/datetime";
 import { createClient } from "@/lib/supabase/server";
@@ -40,12 +41,12 @@ export const getPatientLabBookings = cache(
 
 type DayRange = { from?: string; before?: string };
 
-// One page of a lab's bookings at a stage, by visit day, forwards or
+// One page of a lab's bookings in some statuses, by visit day, forwards or
 // backwards along the stage's index. One extra row says whether there are
 // more, without counting them all.
 async function readLabBookings(
   labId: string,
-  stage: LabBookingStage,
+  statuses: LabBookingStatus[],
   ascending: boolean,
   { from, before }: DayRange,
   shown: number,
@@ -55,7 +56,7 @@ async function readLabBookings(
     .from("lab_bookings")
     .select(LAB_BOOKING_COLUMNS)
     .eq("lab_id", labId)
-    .in("status", stageStatuses[stage]);
+    .in("status", statuses);
   if (from) query = query.gte("visit_date", from);
   if (before) query = query.lt("visit_date", before);
   const { data, error } = await query
@@ -83,10 +84,16 @@ export async function getLabBookings(labId: string, stage: LabBookingStage) {
   if (stage === "to-collect") {
     const today = toDateKey(new Date(), LAB_TIMEZONE);
     const [current, earlier] = await Promise.all([
-      readLabBookings(labId, stage, true, { from: today }, LAB_BOOKINGS_SHOWN),
       readLabBookings(
         labId,
-        stage,
+        stageStatuses[stage],
+        true,
+        { from: today },
+        LAB_BOOKINGS_SHOWN,
+      ),
+      readLabBookings(
+        labId,
+        stageStatuses[stage],
         false,
         { before: today },
         EARLIER_BOOKINGS_SHOWN,
@@ -96,12 +103,17 @@ export async function getLabBookings(labId: string, stage: LabBookingStage) {
   }
   const list = await readLabBookings(
     labId,
-    stage,
+    stageStatuses[stage],
     stage === "in-lab",
     {},
     LAB_BOOKINGS_SHOWN,
   );
   return { ...list, earlier: null };
+}
+
+// Bookings waiting for their report, the longest-waiting visit first.
+export function getLabBookingsAwaitingReport(labId: string) {
+  return readLabBookings(labId, ["processing"], true, {}, LAB_BOOKINGS_SHOWN);
 }
 
 // How many bookings wait at each open stage, for the tabs.

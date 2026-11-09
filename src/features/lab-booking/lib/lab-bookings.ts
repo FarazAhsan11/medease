@@ -1,5 +1,5 @@
-// Lab bookings (LAB-03) and their status moves (LAB-04). Safe to import from
-// client components.
+// Lab bookings (LAB-03), their status moves (LAB-04) and reports (LAB-05).
+// Safe to import from client components.
 // Design: docs/lab-booking.md.
 
 import type { CareRecipientRelation } from "@/features/family/lib/relations";
@@ -39,7 +39,8 @@ export const progressSteps = [
   "report_ready",
 ] as const satisfies readonly LabBookingStatus[];
 
-// The moves a lab can make from each status. Match move_lab_booking.
+// The moves a lab can make from each status. Match move_lab_booking; report
+// ready comes only with the report (publish_lab_report).
 export const nextStatuses: Record<LabBookingStatus, LabBookingStatus[]> = {
   booked: ["sample_collected", "cancelled"],
   recollection_needed: ["sample_collected", "cancelled"],
@@ -69,7 +70,6 @@ export const stageLabels: Record<LabBookingStage, string> = {
 export const forwardLabels: Partial<Record<LabBookingStatus, string>> = {
   sample_collected: "Sample collected",
   processing: "Start processing",
-  report_ready: "Report ready",
 };
 
 export const recollectionReasons = [
@@ -202,6 +202,8 @@ export type LabBooking = {
   statusChangedAt: string;
   createdAt: string;
   items: LabBookingItem[];
+  // The current report, once the lab has published one (LAB-05).
+  reportId: string | null;
   // When each step happened, newest move per status. Only on the patient's
   // list, which shows the tracker.
   steps: Partial<Record<LabBookingStatus, string>>;
@@ -240,6 +242,7 @@ export type LabBookingRow = {
   status_changed_at: string;
   created_at: string;
   lab_booking_events?: { status: LabBookingStatus; created_at: string }[];
+  lab_reports: { id: string; replaced_at: string | null }[];
   lab_booking_items: {
     id: string;
     name: string;
@@ -255,7 +258,8 @@ export const LAB_BOOKING_COLUMNS = `id, status, collection, visit_date, slot_sta
   street_address, area, city, landmark, contact_name, contact_phone, subtotal,
   collection_fee, total, payment_method, payment_status, status_reason,
   status_note, status_changed_at, created_at,
-  lab_booking_items (id, name, price, test_names, package_id)`;
+  lab_booking_items (id, name, price, test_names, package_id),
+  lab_reports (id, replaced_at)`;
 
 export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
   lab_booking_events (status, created_at)`;
@@ -310,6 +314,8 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     statusChangedAt: row.status_changed_at,
     createdAt: row.created_at,
     steps: stepTimes(row.lab_booking_events),
+    reportId:
+      row.lab_reports.find((report) => report.replaced_at === null)?.id ?? null,
     items: [...row.lab_booking_items]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => ({
@@ -374,6 +380,7 @@ export const labBookingMoveErrorMessages: Record<string, string> = {
   invalid_reason: "Choose one of the listed reasons.",
   note_required: "Add a note saying what happened.",
   invalid_note: `Keep the note under ${MAX_STATUS_NOTE} characters.`,
+  report_required: "Upload the report to mark it ready.",
 };
 
 // Codes meaning our copy of the windows or catalog is stale: fetch fresh ones.

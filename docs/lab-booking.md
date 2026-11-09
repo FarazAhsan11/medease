@@ -1,4 +1,4 @@
-# Lab booking (LAB-03, LAB-04)
+# Lab booking (LAB-03, LAB-04, LAB-05)
 
 A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list and moves it through collection and processing (LAB-04, "Status moves" below). The patient cancelling or rescheduling in the app is LAB-20, paying online PAY-07; until PAY-07, every booking is paid in cash at the lab or to the collector.
 
@@ -46,8 +46,8 @@ A patient books one or more tests or packages at one lab, for themselves or a fa
 | booked | sample collected, cancelled |
 | new sample needed | sample collected, cancelled |
 | sample collected | processing, new sample needed, cancelled |
-| processing | report ready, new sample needed, cancelled |
-| report ready, cancelled | nothing (corrected reports are LAB-11) |
+| processing | report ready (with the report, see "Reports"), new sample needed, cancelled |
+| report ready, cancelled | nothing (corrected reports are LAB-18) |
 
 This follows the order lifecycle in HL7's Clinical Order Workflows guide: the filler takes the order, waits for the specimen, works on it, and completes it with a report; an unusable specimen fails the step and the placer is told. "New sample needed" is that failure: the booking returns to the lab's **To collect** list until a new sample is taken.
 
@@ -59,16 +59,30 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 
 **History in its own table.** `lab_booking_events` keeps every status a booking reaches, with the reason, note and who moved it, written by a trigger on `lab_bookings` (insert and status change), so no code path can change a status without leaving a row. The booking keeps the current reason, note and `status_changed_at`, so lists don't read the history; the patient's list reads it for the tracker's times. Same read rules as the booking: the patient and the lab, with a second factor; nobody writes it directly.
 
-**A notice at each step, no email yet.** Every move puts a notice in the patient's bell (`lab_booking_<status>`), worded in `notifications.ts`. The lab gets none for its own moves. Emails for "report ready" and "cancelled" wait for LAB-05 reports and the NTF-05 outbox, so an email links to something the patient can open.
-
-**Report ready before reports upload.** Until LAB-05, "report ready" means the lab has the result and gives it to the patient its usual way; the lab confirms before marking it, and the patient's card says to collect it from the lab. LAB-05 attaches the PDF to this step.
+**A notice at each step, no email yet.** Every move puts a notice in the patient's bell (`lab_booking_<status>`), worded in `notifications.ts`. The lab gets none for its own moves. Emails for "report ready" and "cancelled" wait for the NTF-05 outbox; the report is now there to link to.
 
 **Limits.** 600 moves an hour per lab account (`rateLimits.labBookingMoveUser`); notes up to 500 characters.
 
+## Reports (LAB-05)
+
+**The report is the last step.** For a booking it's processing, the lab presses **Upload report**, picks the PDF and publishes it; `publish_lab_report` files the report and moves the booking to report ready in one transaction, which tells the patient. A trigger on `lab_bookings` refuses report ready without a current report (`report_required`), so `move_lab_booking` can no longer mark a booking ready by itself and a patient told "your report is ready" can always open it. Bookings marked ready before this change keep the old wording ("collect it from the lab").
+
+**Confirm whose report it is.** The upload dialog names the person tested and the tests, and says the patient sees it straight away. Under CLIA (42 CFR 493.1291) a lab's report must identify the patient and the lab, and a corrected report keeps the original and says it was corrected. There's no unpublish: a wrong report is fixed by a corrected version (LAB-18), which adds a row with the next `version` and marks the old one `replaced_at`, keeping both files. The table already has these columns and a unique current report per booking, so LAB-18 adds the function, not a new table. Sign-off by a pathologist before release is LAB-17.
+
+**Upload path.** The browser uploads straight to Storage on a signed upload link, so the file never passes through a Server Action (Vercel's 4.5 MB body limit), as Supabase recommends for user uploads (`createSignedUploadUrl`, then `uploadToSignedUrl`). The link is issued only for the lab's own booking while it's processing, at `<lab id>/<booking id>/<uuid>.pdf`, a new path each time and no upsert, so a leftover link can't swap a file. The server then reads the bytes with `verifyUpload` (a real PDF, at most 10 MB), records it with `mark_upload_checked`, and `publish_lab_report` accepts only a recorded file at that booking's path. A file that fails, or isn't published, is deleted. Malware scanning before a patient opens a lab's file is SEC-06, a Phase 0 launch blocker.
+
+**Storage.** A private `lab-reports` bucket (PDF only, 10 MB) with no storage policies. To open a report, the patient's route (`/patient/lab-tests/reports/[id]`) or the lab's (`/lab/reports/[id]`) reads the report row with the user's own session, so row level security (the patient or the lab, with a second factor) is the permission check, and only then signs a 60-second link with the secret key and redirects to it. The browser shows the PDF in its own viewer. The report id is a random UUID and says nothing about the patient.
+
+**Where it shows.** Patient: **View report** on the booking card, a link on the dashboard card, and a **Lab reports** entry in the health records timeline (with a filter), named by tests and lab, and the person tested when it's a family member. Lab: **View report** on finished bookings, and `/lab/reports` lists bookings waiting for a report (oldest visit first, each with **Upload report**) and the 20 latest published.
+
+**Not yet.** The ordering doctor receives the report with LAB-08; structured results with LAB-10; an email when it's ready with NTF-05. Account deletion (AUTH-05) must also remove report files: rows go with the booking, files stay in Storage until then. It must also decide what a patient keeps when a lab closes its account: today the lab's bookings, and so their reports, go with it. A file uploaded but never published (the tab closed in between) stays in Storage too; a cleanup job for files older than a day with no row would remove both kinds.
+
+**Limits.** 300 upload links an hour per lab account (`rateLimits.labReportUploadUser`; the general 20 an hour is sized for a person's own files), and publishing counts with the 600 status moves an hour. Up to 20 versions per booking.
+
 ## Code
 
-- Migrations: `supabase/migrations/20261109120000_lab_bookings.sql`, `supabase/migrations/20261109150000_lab_booking_status.sql`
-- Feature: `src/features/lab-booking/`
+- Migrations: `supabase/migrations/20261109120000_lab_bookings.sql`, `supabase/migrations/20261109150000_lab_booking_status.sql`, `supabase/migrations/20261109180000_lab_reports.sql`
+- Features: `src/features/lab-booking/`, `src/features/lab-reports/`
 
 ## Sources
 
@@ -78,4 +92,7 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 - Chughtai Lab, [home sampling](https://chughtailab.com/services/chughtai-home-sampling/): booking a home visit at a chosen time.
 - HL7, Clinical Order Workflows: [simple lab order flow](https://build.fhir.org/ig/HL7/fhir-cow-ig/ex1-simple-lab-order-flow.html) and [specimen rejected](https://build.fhir.org/ig/HL7/fhir-cow-ig/ex5-lab-order-flow-specimen-rejected.html): accepted, in progress waiting for the specimen, completed with a report; a rejected specimen fails the task and the placer is told.
 - Specimen rejection policies, e.g. [Munson Healthcare](https://munsonhealthcare.org/sites/default/files/media/file/Physician%20Services/LabMed%20Report/Specimen%20Rejection%20Policy%20-%20Cliincal%20Laboratory%20Specimesn%20%20October%202021%20%2C%20Volume%2012.pdf) and [SUNY Downstate](https://www.downstate.edu/patient-care/lab-services/_documents/LAB_11.pdf): mislabelled, haemolysed, clotted or too-small samples are rejected and recollected, and the collecting side is told.
+- 42 CFR 493.1291, [Standard: Test report](https://www.law.cornell.edu/cfr/text/42/493.1291), and [eCFR part 493 subpart K](https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-493/subpart-K/subject-group-ECFR9482366886d579f): the report identifies the patient and the lab; a corrected report is marked as corrected and the original kept.
+- CDC CLIAC, [Addendum S](https://www.cdc.gov/cliac/docs/addenda/cliac0210/Addendum-S.pdf): giving patients their reports directly, and labelling corrected ones.
+- Supabase, [createSignedUploadUrl](https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl) and [serving downloads](https://supabase.com/docs/guides/storage/serving/downloads): signed upload links for direct uploads; short-lived signed links for private files.
 - thoughtbot, [Modeling state transitions in Postgres](https://thoughtbot.com/blog/modeling-state-transitions-in-postgres) and [Inserting state transitions in Postgres](https://thoughtbot.com/blog/inserting-state-transitions-in-postgres): validate transitions under a lock, keep an append-only history.

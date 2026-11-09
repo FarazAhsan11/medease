@@ -21,14 +21,6 @@ export type LabBooking = {
   status: BookingStatus;
 };
 
-export type PublishedReport = {
-  id: string;
-  patientName: string;
-  test: string;
-  publishedOn: string;
-  flagged: boolean;
-};
-
 export type LabProfile = {
   name: string;
   registrationNumber: string;
@@ -136,30 +128,6 @@ export const labBookings: LabBooking[] = [
     slot: "11:00 AM",
     area: "Cantt",
     status: "Pending",
-  },
-];
-
-export const publishedReports: PublishedReport[] = [
-  {
-    id: "RP-901",
-    patientName: "Bilal Ahmed",
-    test: "Thyroid Profile",
-    publishedOn: "Today, 1:10 PM",
-    flagged: false,
-  },
-  {
-    id: "RP-899",
-    patientName: "Ali Raza",
-    test: "Complete Blood Count",
-    publishedOn: "Oct 5, 4:45 PM",
-    flagged: false,
-  },
-  {
-    id: "RP-894",
-    patientName: "Sana Javed",
-    test: "HbA1c",
-    publishedOn: "Oct 5, 11:20 AM",
-    flagged: true,
   },
 ];
 

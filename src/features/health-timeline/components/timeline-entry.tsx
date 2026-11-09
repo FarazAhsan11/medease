@@ -1,6 +1,7 @@
 import {
   CalendarCheckIcon,
   FileTextIcon,
+  FlaskConicalIcon,
   PillIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -10,6 +11,7 @@ import type { ReactNode } from "react";
 import { IconTile } from "@/components/shared/icon-tile";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { patientRoutes } from "@/config/routes";
+import { itemsSummary } from "@/features/lab-booking/lib/lab-bookings";
 import type { TimelineEntry as Entry } from "@/features/health-timeline/lib/health-timeline";
 import { documentKindLabels } from "@/features/patient-documents/lib/document-rules";
 import { formatDateKey } from "@/lib/datetime";
@@ -63,6 +65,32 @@ function describe(entry: Entry): {
           >
             View prescription
           </Link>
+        ),
+      };
+    case "lab_report":
+      return {
+        icon: FlaskConicalIcon,
+        title: `Lab report: ${itemsSummary(
+          entry.testNames.map((name) => ({ name })),
+        )}`,
+        details: (
+          <>
+            <p>{entry.labName}</p>
+            {entry.careRecipientRelation !== "self" && (
+              <p>For {entry.careRecipientName}</p>
+            )}
+          </>
+        ),
+        // A plain link: the route answers with a redirect to the file.
+        link: (
+          <a
+            href={patientRoutes.labReport(entry.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClass}
+          >
+            Open report
+          </a>
         ),
       };
     case "document":

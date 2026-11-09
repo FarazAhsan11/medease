@@ -69,6 +69,14 @@ export const rateLimits = {
     limit: 600,
     windowSeconds: ONE_HOUR,
   },
+  // A lab asking for report upload links. Separate from uploadUser, which is
+  // sized for a person's own files: a lab publishes a report per booking, a
+  // few hundred on a busy day.
+  labReportUploadUser: {
+    name: "lab-report-upload-user",
+    limit: 300,
+    windowSeconds: ONE_HOUR,
+  },
   // Starting a conversation, or a doctor extending or closing one.
   conversationUser: {
     name: "conversation-user",

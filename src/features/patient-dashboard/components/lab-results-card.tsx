@@ -15,7 +15,8 @@ type LabResultsCardProps = {
   bookings: LabBooking[];
 };
 
-// The patient's latest lab bookings on their overview.
+// The patient's latest lab bookings on their overview, with a link to each
+// published report.
 export function LabResultsCard({ bookings }: LabResultsCardProps) {
   return (
     <PanelCard
@@ -39,7 +40,19 @@ export function LabResultsCard({ bookings }: LabResultsCardProps) {
                   {booking.labName} · {formatBookingWhen(booking)}
                 </p>
               </div>
-              <LabBookingStatusBadge status={booking.status} />
+              {booking.reportId ? (
+                // A plain link: the route redirects to the file.
+                <a
+                  href={patientRoutes.labReport(booking.reportId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  View report
+                </a>
+              ) : (
+                <LabBookingStatusBadge status={booking.status} />
+              )}
             </li>
           ))}
         </ul>

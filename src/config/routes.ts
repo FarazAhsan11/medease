@@ -23,6 +23,8 @@ export const patientRoutes = {
   appointments: "/patient/appointments",
   labTests: "/patient/lab-tests",
   bookLabTests: "/patient/lab-tests/book",
+  // Opens the report on a short-lived signed link.
+  labReport: (reportId: string) => `/patient/lab-tests/reports/${reportId}`,
   // One test compared across labs.
   labTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
   // Booking at one lab, starting with the test or package the patient picked.
@@ -95,6 +97,9 @@ export const labRoutes = {
   tests: "/lab/tests",
   homeCollection: "/lab/home-collection",
   bookings: "/lab/bookings",
+  reports: "/lab/reports",
+  // Opens the report on a short-lived signed link.
+  report: (reportId: string) => `/lab/reports/${reportId}`,
 } as const;
 
 export const adminRoutes = {

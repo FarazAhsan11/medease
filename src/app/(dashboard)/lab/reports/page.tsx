@@ -1,29 +1,35 @@
 import type { Metadata } from "next";
 
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
-import { PreviewNotice } from "@/components/shared/preview-notice";
-import { PendingReportsCard } from "@/features/lab-dashboard/components/pending-reports-card";
-import { PublishedReportsCard } from "@/features/lab-dashboard/components/published-reports-card";
-import {
-  labBookings,
-  publishedReports,
-} from "@/features/lab-dashboard/data/lab-dashboard";
+import { getLabBookingsAwaitingReport } from "@/features/lab-booking/data/lab-bookings";
+import { AwaitingReportsCard } from "@/features/lab-reports/components/awaiting-reports-card";
+import { PublishedReportsCard } from "@/features/lab-reports/components/published-reports-card";
+import { listPublishedLabReports } from "@/features/lab-reports/data/lab-reports";
+import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Reports",
 };
 
-export default function LabReportsPage() {
+export default async function LabReportsPage() {
+  const user = await requireRole("lab");
+  const [awaiting, published] = await Promise.all([
+    getLabBookingsAwaitingReport(user.id),
+    listPublishedLabReports(user.id),
+  ]);
+
   return (
     <>
-      <PreviewNotice feature="Lab reports" />
       <DashboardPageHeader
         title="Reports"
-        description="Upload results and publish them to patient dashboards."
+        description="Upload each report as a PDF. The patient is told and can open it in their records."
       />
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <PendingReportsCard bookings={labBookings} />
-        <PublishedReportsCard reports={publishedReports} />
+        <AwaitingReportsCard
+          bookings={awaiting.bookings}
+          more={awaiting.more}
+        />
+        <PublishedReportsCard reports={published} />
       </div>
     </>
   );

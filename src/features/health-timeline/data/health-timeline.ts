@@ -3,6 +3,7 @@ import "server-only";
 import { listPatientAppointments } from "@/features/appointments/data/appointments";
 import { hasTakenPlace } from "@/features/appointments/lib/appointments";
 import { buildTimeline } from "@/features/health-timeline/lib/health-timeline";
+import { listPatientLabReports } from "@/features/lab-reports/data/lab-reports";
 import type { PatientDocument } from "@/features/patient-documents/lib/patient-documents";
 import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
@@ -15,11 +16,13 @@ export async function getHealthTimeline(
   documentsLoading: Promise<PatientDocument[]>,
 ) {
   const now = Date.now();
-  const [appointments, prescriptions, documents] = await Promise.all([
-    listPatientAppointments(patientId),
-    listPatientPrescriptions(patientId),
-    documentsLoading,
-  ]);
+  const [appointments, prescriptions, documents, labReports] =
+    await Promise.all([
+      listPatientAppointments(patientId),
+      listPatientPrescriptions(patientId),
+      documentsLoading,
+      listPatientLabReports(patientId),
+    ]);
   const summaries = await getVisitSummaries(
     appointments
       .filter((appointment) => hasTakenPlace(appointment, now))
@@ -27,7 +30,7 @@ export async function getHealthTimeline(
   );
 
   return buildTimeline(
-    { appointments, summaries, prescriptions, documents },
+    { appointments, summaries, prescriptions, documents, labReports },
     now,
   );
 }

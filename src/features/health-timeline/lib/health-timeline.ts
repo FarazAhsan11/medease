@@ -2,6 +2,8 @@ import {
   hasTakenPlace,
   type Appointment,
 } from "@/features/appointments/lib/appointments";
+import type { CareRecipientRelation } from "@/features/family/lib/relations";
+import type { LabReportSummary } from "@/features/lab-reports/lib/lab-report-summary";
 import type { PatientDocumentKind } from "@/features/patient-documents/lib/document-rules";
 import type { PatientDocument } from "@/features/patient-documents/lib/patient-documents";
 import {
@@ -11,14 +13,19 @@ import {
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { CLINIC_TIMEZONE, toDateKey } from "@/lib/datetime";
 
-// Lab reports join when labs upload them (LAB-xx).
-export const timelineTypes = ["visit", "prescription", "document"] as const;
+export const timelineTypes = [
+  "visit",
+  "prescription",
+  "lab_report",
+  "document",
+] as const;
 
 export type TimelineType = (typeof timelineTypes)[number];
 
 export const timelineTypeLabels: Record<TimelineType, string> = {
   visit: "Visits",
   prescription: "Prescriptions",
+  lab_report: "Lab reports",
   document: "Documents",
 };
 
@@ -50,6 +57,13 @@ export type TimelineEntry =
       cancelled: boolean;
     })
   | (EntryBase & {
+      type: "lab_report";
+      labName: string;
+      testNames: string[];
+      careRecipientName: string;
+      careRecipientRelation: CareRecipientRelation;
+    })
+  | (EntryBase & {
       type: "document";
       title: string;
       kind: PatientDocumentKind;
@@ -60,12 +74,19 @@ type TimelineSources = {
   summaries: Record<string, VisitSummary>;
   prescriptions: Prescription[];
   documents: PatientDocument[];
+  labReports: LabReportSummary[];
 };
 
 // Everything in one list, newest first. Replaced prescription versions are
 // already left out by the loader.
 export function buildTimeline(
-  { appointments, summaries, prescriptions, documents }: TimelineSources,
+  {
+    appointments,
+    summaries,
+    prescriptions,
+    documents,
+    labReports,
+  }: TimelineSources,
   now = Date.now(),
 ): TimelineEntry[] {
   const visits = appointments
@@ -104,7 +125,18 @@ export function buildTimeline(
     kind: document.kind,
   }));
 
-  return [...visits, ...issued, ...files].sort(
+  const reports = labReports.map((report): TimelineEntry => ({
+    type: "lab_report",
+    id: report.id,
+    dateKey: toDateKey(report.publishedAt, report.timezone),
+    at: report.publishedAt,
+    labName: report.labName,
+    testNames: report.testNames,
+    careRecipientName: report.careRecipientName,
+    careRecipientRelation: report.careRecipientRelation,
+  }));
+
+  return [...visits, ...issued, ...reports, ...files].sort(
     (a, b) => b.dateKey.localeCompare(a.dateKey) || b.at.localeCompare(a.at),
   );
 }
