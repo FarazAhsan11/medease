@@ -25,6 +25,9 @@ export const patientRoutes = {
   bookLabTests: "/patient/lab-tests/book",
   // Opens the report on a short-lived signed link.
   labReport: (reportId: string) => `/patient/lab-tests/reports/${reportId}`,
+  // A new day or window for one booking (LAB-20).
+  rescheduleLabBooking: (bookingId: string) =>
+    `/patient/lab-tests/bookings/${bookingId}/reschedule`,
   // One test compared across labs.
   labTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
   // Booking at one lab, starting with the test or package the patient picked.

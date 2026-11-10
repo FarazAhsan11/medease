@@ -10,13 +10,19 @@ import { cn } from "@/lib/utils";
 type LabBookingStatusReasonProps = {
   booking: Pick<
     LabBooking,
-    "status" | "statusReason" | "statusNote" | "statusChangedAt" | "timezone"
+    | "status"
+    | "statusReason"
+    | "statusNote"
+    | "statusChangedAt"
+    | "timezone"
+    | "cancelledBy"
   >;
   // Who reads it: the patient gets what happens next.
   audience: "patient" | "lab";
 };
 
-// Why a booking was cancelled or needs a new sample, with the lab's note.
+// Why a booking was cancelled or needs a new sample, with the note from
+// whoever did it: the lab, or the patient cancelling (LAB-20).
 export function LabBookingStatusReason({
   booking,
   audience,
@@ -24,6 +30,14 @@ export function LabBookingStatusReason({
   if (!booking.statusReason) return null;
   const recollect = booking.status === "recollection_needed";
   const reason = reasonLabels[booking.statusReason];
+  const byPatient = booking.cancelledBy === "patient";
+  const title = recollect
+    ? "New sample needed"
+    : byPatient
+      ? audience === "patient"
+        ? "You cancelled"
+        : "Cancelled by the patient"
+      : "Cancelled";
 
   return (
     <div
@@ -38,7 +52,7 @@ export function LabBookingStatusReason({
       />
       <div className="min-w-0 space-y-1">
         <p className="font-medium">
-          {recollect ? "New sample needed" : "Cancelled"}
+          {title}
           <span className="font-normal text-muted-foreground">
             {" "}
             · {formatDateTime(booking.statusChangedAt, booking.timezone)}

@@ -10,7 +10,7 @@ export const refundPolicy: LegalDocument = {
   summary:
     "How to cancel an appointment, what happens if your doctor cancels, and how refunds will work.",
   version: "1.1",
-  updated: "8 November 2026",
+  updated: "10 November 2026",
   sections: [
     {
       title: "Payments today",
@@ -51,7 +51,7 @@ export const refundPolicy: LegalDocument = {
     {
       title: "Lab tests and medicines",
       body: [
-        `Lab bookings are paid in cash to the lab, at the lab or to its collector, so ${name} takes no payment and makes no refund for them. To cancel or change a lab booking, call the lab before your visit or collection.`,
+        `Lab bookings are paid in cash to the lab, at the lab or to its collector, so ${name} takes no payment and makes no refund for them. Until the sample is taken, you can cancel a lab booking, or move it to another day or collection window, from your lab tests page, and the lab is told. You can also call the lab. If you have already paid the lab, ask the lab for your money back.`,
         "Medicine ordering is not available yet, so nothing can be bought or refunded for it.",
       ],
     },

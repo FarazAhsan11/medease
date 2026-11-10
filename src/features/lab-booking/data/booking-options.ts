@@ -80,7 +80,8 @@ function toCollectionDays(rows: SlotRow[]): BookingDay[] {
   );
 }
 
-function toVisitDays(): DateOption[] {
+// Days a lab visit can be booked for: today and the next 13.
+export function getVisitDays(): DateOption[] {
   const today = toDateKey(new Date(), LAB_TIMEZONE);
   return Array.from({ length: VISIT_WINDOW_DAYS }, (_, index) => {
     const key = addDaysToDateKey(today, index);
@@ -90,6 +91,18 @@ function toVisitDays(): DateOption[] {
       note: index === 0 ? "Today" : undefined,
     };
   });
+}
+
+// The lab's collection windows for the next two weeks, full ones marked.
+// Empty when the lab isn't collecting.
+export async function getCollectionDays(labId: string): Promise<BookingDay[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_lab_collection_slots", {
+    p_lab_id: labId,
+    p_days: VISIT_WINDOW_DAYS,
+  });
+  if (error) throw new Error(`get_lab_collection_slots: ${error.message}`);
+  return toCollectionDays((data ?? []) as SlotRow[]);
 }
 
 export async function getLabBookingOptions(
@@ -137,17 +150,8 @@ export async function getLabBookingOptions(
   }
   if (!lab.data) return null;
 
-  let collectionDays: BookingDay[] = [];
-  if (areas.data.length > 0) {
-    const slots = await supabase.rpc("get_lab_collection_slots", {
-      p_lab_id: labId,
-      p_days: VISIT_WINDOW_DAYS,
-    });
-    if (slots.error) {
-      throw new Error(`get_lab_collection_slots: ${slots.error.message}`);
-    }
-    collectionDays = toCollectionDays((slots.data ?? []) as SlotRow[]);
-  }
+  const collectionDays =
+    areas.data.length > 0 ? await getCollectionDays(labId) : [];
 
   return {
     lab: {
@@ -181,6 +185,6 @@ export async function getLabBookingOptions(
     areas: areas.data.map(({ city, fee, note }) => ({ city, fee, note })),
     freeAbove: areas.data[0]?.free_above ?? null,
     collectionDays,
-    visitDays: toVisitDays(),
+    visitDays: getVisitDays(),
   };
 }

@@ -6,6 +6,7 @@ import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-bo
 import { bookedByLabel } from "@/features/family/lib/relations";
 import {
   ageOn,
+  canPatientChange,
   paymentLabels,
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
@@ -76,6 +77,11 @@ export function LabBookingEntry({ booking }: LabBookingEntryProps) {
                 : "Lab visit"}
             </span>
           </p>
+          {booking.rescheduleCount > 0 && canPatientChange(booking) && (
+            <p className="mt-1 text-xs font-medium text-foreground">
+              The patient moved this to a new {home ? "window" : "day"}.
+            </p>
+          )}
         </div>
 
         <div className="flex items-start justify-between gap-3 md:flex-col md:items-end">

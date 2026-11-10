@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import {
   AlertDialog,
@@ -14,17 +14,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
 import { moveLabBooking } from "@/features/lab-booking/actions/move-lab-booking";
+import { LabBookingReasonFields } from "@/features/lab-booking/components/lab-booking-reason-fields";
 import {
   cancelReasons,
-  MAX_STATUS_NOTE,
-  reasonLabels,
   recollectionReasons,
   type LabBookingStatus,
 } from "@/features/lab-booking/lib/lab-bookings";
@@ -95,7 +88,6 @@ function ReasonForm({
   summary,
   onDone,
 }: LabBookingReasonDialogProps & { onDone: () => void }) {
-  const id = useId();
   const [reason, setReason] = useState("");
   const { pending, onSubmit, fieldError } = useFormAction(
     moveLabBooking,
@@ -104,8 +96,6 @@ function ReasonForm({
   );
   const text = copy[toStatus];
   const cancelling = toStatus === "cancelled";
-  const reasonError = fieldError("reason");
-  const noteError = fieldError("note");
 
   return (
     <form method="post" onSubmit={onSubmit} className="grid gap-4">
@@ -118,52 +108,20 @@ function ReasonForm({
           {summary}. {text.description}
         </AlertDialogDescription>
       </AlertDialogHeader>
-      <div className="grid gap-1.5">
-        <Label htmlFor={`${id}-reason`}>Reason</Label>
-        <NativeSelect
-          id={`${id}-reason`}
-          name="reason"
-          required
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          aria-invalid={reasonError ? true : undefined}
-          className="w-full"
-        >
-          <NativeSelectOption value="" disabled>
-            Choose a reason
-          </NativeSelectOption>
-          {text.reasons.map((value) => (
-            <NativeSelectOption key={value} value={value}>
-              {reasonLabels[value]}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        {reasonError && (
-          <p className="text-xs text-destructive">{reasonError}</p>
-        )}
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor={`${id}-note`}>
-          Note for the patient{" "}
-          {reason !== "other" && (
-            <span className="text-muted-foreground">(optional)</span>
-          )}
-        </Label>
-        <Textarea
-          id={`${id}-note`}
-          name="note"
-          rows={3}
-          maxLength={MAX_STATUS_NOTE}
-          required={reason === "other"}
-          aria-invalid={noteError ? true : undefined}
-          placeholder={
-            cancelling
-              ? "e.g. Called on Monday; the patient will book again next week."
-              : "e.g. We'll call you to arrange a visit tomorrow morning."
-          }
-        />
-        {noteError && <p className="text-xs text-destructive">{noteError}</p>}
-      </div>
+      <LabBookingReasonFields
+        reasons={text.reasons}
+        reason={reason}
+        onReasonChange={setReason}
+        noteLabel="Note for the patient"
+        noteRequired={reason === "other"}
+        placeholder={
+          cancelling
+            ? "e.g. Called on Monday; the patient will book again next week."
+            : "e.g. We'll call you to arrange a visit tomorrow morning."
+        }
+        reasonError={fieldError("reason")}
+        noteError={fieldError("note")}
+      />
       <AlertDialogFooter>
         <AlertDialogCancel disabled={pending}>Back</AlertDialogCancel>
         <Button

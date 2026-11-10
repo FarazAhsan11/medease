@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 
 import { DatePickerChips } from "@/components/shared/date-picker-chips";
 import { SelectField } from "@/components/shared/select-field";
-import { TimeSlotPicker } from "@/components/shared/time-slot-picker";
 import type { PatientAddress } from "@/features/addresses/lib/addresses";
 import { bookLabTest } from "@/features/lab-booking/actions/book-lab-test";
 import { BookingItemPicker } from "@/features/lab-booking/components/booking-item-picker";
 import { CollectionAddressPicker } from "@/features/lab-booking/components/collection-address-picker";
 import { CollectionMethodPicker } from "@/features/lab-booking/components/collection-method-picker";
+import { CollectionWindowPicker } from "@/features/lab-booking/components/collection-window-picker";
 import { LabBookingSummary } from "@/features/lab-booking/components/lab-booking-summary";
+import { useCollectionWindow } from "@/features/lab-booking/hooks/use-collection-window";
 import {
   collectionFee,
   repeatedTests,
@@ -56,13 +57,7 @@ export function LabBookingForm({
   const [selected, setSelected] = useState(initialSelected);
   const [method, setMethod] = useState<"lab" | "home">("lab");
   const [visitDate, setVisitDate] = useState<string | null>(null);
-  const [collectionDate, setCollectionDate] = useState(
-    () =>
-      collectionDays.find((day) => day.openCount > 0)?.value ??
-      collectionDays[0]?.value ??
-      null,
-  );
-  const [slot, setSlot] = useState<string | null>(null);
+  const selection = useCollectionWindow(collectionDays);
   const [addressId, setAddressId] = useState<string | null>(
     () =>
       (
@@ -90,12 +85,7 @@ export function LabBookingForm({
           : null;
   const home = method === "home" && homeUnavailable === null;
 
-  const day = collectionDays.find((item) => item.value === collectionDate);
-  // Drop a window that a refresh has since marked as full.
-  const chosenSlot =
-    slot && day?.slots.some((item) => item.value === slot && !item.disabled)
-      ? slot
-      : null;
+  const chosenSlot = selection.slot;
   const address = addresses.find(
     (item) => item.id === addressId && cities.includes(item.city),
   );
@@ -194,24 +184,10 @@ export function LabBookingForm({
             onChange={setAddressId}
             error={fieldError("addressId")}
           />
-          <DatePickerChips
-            dates={collectionDays}
-            value={collectionDate}
-            onChange={(date) => {
-              setCollectionDate(date.value);
-              setSlot(null);
-            }}
-          />
-          <TimeSlotPicker
-            slots={day?.slots ?? []}
-            value={chosenSlot}
-            onChange={(item) => setSlot(item.value)}
-            hint={
-              day && day.openCount === 0
-                ? "Every window on this day is full. Try another date."
-                : (fieldError("slotStartsAt") ??
-                  "The collector arrives during the window that starts at this time.")
-            }
+          <CollectionWindowPicker
+            days={collectionDays}
+            selection={selection}
+            error={fieldError("slotStartsAt")}
           />
         </>
       ) : (

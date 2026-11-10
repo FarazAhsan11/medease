@@ -5,6 +5,7 @@ import {
   labBookingStatuses,
   MAX_BOOKING_ITEMS,
   MAX_STATUS_NOTE,
+  patientCancelReasons,
   recollectionReasons,
 } from "@/features/lab-booking/lib/lab-bookings";
 
@@ -79,6 +80,20 @@ export const bookLabTestSchema = z
     }
   });
 
+const statusNote = z
+  .string()
+  .optional()
+  .transform((value) => value?.replace(/\r\n/g, "\n").trim() || null)
+  .pipe(
+    z
+      .string()
+      .max(
+        MAX_STATUS_NOTE,
+        `Keep the note under ${MAX_STATUS_NOTE} characters.`,
+      )
+      .nullable(),
+  );
+
 // A lab moving a booking on (LAB-04). The database checks the move itself.
 export const moveLabBookingSchema = z
   .object({
@@ -94,19 +109,7 @@ export const moveLabBookingSchema = z
           .enum([...recollectionReasons, ...cancelReasons], "Choose a reason.")
           .nullable(),
       ),
-    note: z
-      .string()
-      .optional()
-      .transform((value) => value?.replace(/\r\n/g, "\n").trim() || null)
-      .pipe(
-        z
-          .string()
-          .max(
-            MAX_STATUS_NOTE,
-            `Keep the note under ${MAX_STATUS_NOTE} characters.`,
-          )
-          .nullable(),
-      ),
+    note: statusNote,
   })
   .superRefine((value, context) => {
     const needsReason =
@@ -124,6 +127,62 @@ export const moveLabBookingSchema = z
         code: "custom",
         path: ["note"],
         message: "Add a note saying what happened.",
+      });
+    }
+  });
+
+// The patient cancelling a booking (LAB-20). "Other" needs a note, so the lab
+// learns why.
+export const cancelLabBookingSchema = z
+  .object({
+    bookingId: z.uuid(),
+    reason: z.enum(patientCancelReasons, "Choose a reason."),
+    note: statusNote,
+  })
+  .superRefine((value, context) => {
+    if (value.reason === "other" && !value.note) {
+      context.addIssue({
+        code: "custom",
+        path: ["note"],
+        message: "Add a note for the lab saying why.",
+      });
+    }
+  });
+
+// The patient moving a booking to a new day (lab visit) or window (home
+// collection).
+export const rescheduleLabBookingSchema = z
+  .object({
+    bookingId: z.uuid(),
+    collection: z.enum(["lab", "home"]),
+    visitDate: z
+      .string()
+      .optional()
+      .transform((value) => value || null)
+      .pipe(z.iso.date("Pick a day for your visit.").nullable()),
+    slotStartsAt: z
+      .string()
+      .optional()
+      .transform((value) => value || null)
+      .pipe(
+        z.iso
+          .datetime({ offset: true, message: "Pick a collection window." })
+          .nullable(),
+      ),
+  })
+  .superRefine((value, context) => {
+    if (value.collection === "lab" && !value.visitDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["visitDate"],
+        message: "Pick a day for your visit.",
+      });
+    }
+    if (value.collection === "home" && !value.slotStartsAt) {
+      context.addIssue({
+        code: "custom",
+        path: ["slotStartsAt"],
+        message: "Pick a collection window.",
       });
     }
   });

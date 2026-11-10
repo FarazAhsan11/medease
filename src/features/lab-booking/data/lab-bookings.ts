@@ -39,6 +39,20 @@ export const getPatientLabBookings = cache(
   },
 );
 
+// One of the patient's bookings, or null when it isn't theirs.
+export async function getPatientLabBooking(userId: string, bookingId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("lab_bookings")
+    .select(LAB_BOOKING_COLUMNS)
+    .eq("id", bookingId)
+    .eq("patient_id", userId)
+    .maybeSingle<LabBookingRow>();
+
+  if (error) throw new Error(`lab_bookings: ${error.message}`);
+  return data ? toLabBooking(data) : null;
+}
+
 type DayRange = { from?: string; before?: string };
 
 // One page of a lab's bookings in some statuses, by visit day, forwards or

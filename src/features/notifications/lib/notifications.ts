@@ -21,6 +21,7 @@ const titles = {
   lab_booking_report_ready: "Your lab report is ready",
   lab_booking_recollection_needed: "The lab needs a new sample",
   lab_booking_cancelled: "A lab booking was cancelled",
+  lab_booking_rescheduled: "A lab booking moved to a new time",
 } as const;
 
 export type NotificationKind = keyof typeof titles;

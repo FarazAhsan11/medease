@@ -1,4 +1,5 @@
-// Lab bookings (LAB-03), their status moves (LAB-04) and reports (LAB-05).
+// Lab bookings (LAB-03), their status moves (LAB-04), reports (LAB-05) and
+// the patient's changes (LAB-20).
 // Safe to import from client components.
 // Design: docs/lab-booking.md.
 
@@ -90,8 +91,19 @@ export const cancelReasons = [
   "other",
 ] as const;
 
+// The patient's own reasons for cancelling. Match the table's check.
+export const patientCancelReasons = [
+  "no_longer_needed",
+  "booked_by_mistake",
+  "another_lab",
+  "time_unsuitable",
+  "other",
+] as const;
+
 export type StatusReason =
-  (typeof recollectionReasons)[number] | (typeof cancelReasons)[number];
+  | (typeof recollectionReasons)[number]
+  | (typeof cancelReasons)[number]
+  | (typeof patientCancelReasons)[number];
 
 // Shown to the lab and the patient alike, so worded for the patient.
 export const reasonLabels: Record<StatusReason, string> = {
@@ -105,8 +117,28 @@ export const reasonLabels: Record<StatusReason, string> = {
   patient_absent: "Nobody was there for the visit or collection",
   test_unavailable: "The lab can't run this test right now",
   collection_unavailable: "The lab couldn't send a collector",
+  no_longer_needed: "The test is no longer needed",
+  booked_by_mistake: "Booked by mistake",
+  another_lab: "Going to another lab",
+  time_unsuitable: "None of the times suit",
   other: "Other",
 };
+
+// The patient can cancel or move a booking until the sample is taken, and
+// move it up to MAX_RESCHEDULES times. Match cancel_lab_booking and
+// reschedule_lab_booking.
+export const MAX_RESCHEDULES = 3;
+export const patientChangeableStatuses: LabBookingStatus[] = [
+  "booked",
+  "recollection_needed",
+];
+
+export const canPatientChange = (booking: Pick<LabBooking, "status">) =>
+  patientChangeableStatuses.includes(booking.status);
+
+export const canReschedule = (
+  booking: Pick<LabBooking, "status" | "rescheduleCount">,
+) => canPatientChange(booking) && booking.rescheduleCount < MAX_RESCHEDULES;
 
 export const MAX_STATUS_NOTE = 500;
 
@@ -169,6 +201,7 @@ export const paymentLabels: Record<PaymentMethod | PaymentStatus, string> = {
 
 export type LabBooking = {
   id: string;
+  labId: string;
   status: LabBookingStatus;
   collection: "lab" | "home";
   visitDate: string;
@@ -200,6 +233,10 @@ export type LabBooking = {
   statusReason: StatusReason | null;
   statusNote: string | null;
   statusChangedAt: string;
+  // Who cancelled, once cancelled.
+  cancelledBy: "patient" | "lab" | null;
+  // Times the patient moved it to a new day or window.
+  rescheduleCount: number;
   createdAt: string;
   items: LabBookingItem[];
   // The current report, once the lab has published one (LAB-05).
@@ -211,6 +248,7 @@ export type LabBooking = {
 
 export type LabBookingRow = {
   id: string;
+  lab_id: string;
   status: LabBookingStatus;
   collection: "lab" | "home";
   visit_date: string;
@@ -240,8 +278,14 @@ export type LabBookingRow = {
   status_reason: StatusReason | null;
   status_note: string | null;
   status_changed_at: string;
+  cancelled_by: "patient" | "lab" | null;
+  reschedule_count: number;
   created_at: string;
-  lab_booking_events?: { status: LabBookingStatus; created_at: string }[];
+  lab_booking_events?: {
+    status: LabBookingStatus;
+    kind: "status" | "rescheduled";
+    created_at: string;
+  }[];
   lab_reports: { id: string; replaced_at: string | null }[];
   lab_booking_items: {
     id: string;
@@ -252,22 +296,23 @@ export type LabBookingRow = {
   }[];
 };
 
-export const LAB_BOOKING_COLUMNS = `id, status, collection, visit_date, slot_starts_at, slot_ends_at, timezone,
+export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, slot_starts_at, slot_ends_at, timezone,
   lab_name, lab_address, lab_phone, patient_name, patient_phone, care_recipient_name,
   care_recipient_relation, care_recipient_date_of_birth, care_recipient_gender,
   street_address, area, city, landmark, contact_name, contact_phone, subtotal,
   collection_fee, total, payment_method, payment_status, status_reason,
-  status_note, status_changed_at, created_at,
+  status_note, status_changed_at, cancelled_by, reschedule_count, created_at,
   lab_booking_items (id, name, price, test_names, package_id),
   lab_reports (id, replaced_at)`;
 
 export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
-  lab_booking_events (status, created_at)`;
+  lab_booking_events (status, kind, created_at)`;
 
-// The newest time each status was reached.
+// The newest time each status was reached. A move to a new time isn't a step.
 function stepTimes(events: LabBookingRow["lab_booking_events"]) {
   const steps: Partial<Record<LabBookingStatus, string>> = {};
   for (const event of events ?? []) {
+    if (event.kind !== "status") continue;
     const seen = steps[event.status];
     if (!seen || seen < event.created_at)
       steps[event.status] = event.created_at;
@@ -278,6 +323,7 @@ function stepTimes(events: LabBookingRow["lab_booking_events"]) {
 export function toLabBooking(row: LabBookingRow): LabBooking {
   return {
     id: row.id,
+    labId: row.lab_id,
     status: row.status,
     collection: row.collection,
     visitDate: row.visit_date,
@@ -312,6 +358,8 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     statusReason: row.status_reason,
     statusNote: row.status_note,
     statusChangedAt: row.status_changed_at,
+    cancelledBy: row.cancelled_by,
+    rescheduleCount: row.reschedule_count,
     createdAt: row.created_at,
     steps: stepTimes(row.lab_booking_events),
     reportId:
@@ -382,6 +430,39 @@ export const labBookingMoveErrorMessages: Record<string, string> = {
   invalid_note: `Keep the note under ${MAX_STATUS_NOTE} characters.`,
   report_required: "Upload the report to mark it ready.",
 };
+
+// The patient cancelling or moving a booking (LAB-20).
+export const labBookingChangeErrorMessages: Record<string, string> = {
+  not_patient: "Only patient accounts can change lab bookings.",
+  booking_not_found: "This booking isn't in your list.",
+  not_changeable:
+    "The lab has already taken the sample or closed this booking, so it can't be changed here. Call the lab.",
+  reason_required: "Choose a reason.",
+  invalid_reason: "Choose one of the listed reasons.",
+  note_required: "Add a note for the lab saying why.",
+  invalid_note: `Keep the note under ${MAX_STATUS_NOTE} characters.`,
+  invalid_visit_date: "Choose a day in the next two weeks.",
+  no_home_collection:
+    "One of these tests can no longer be collected at home. Cancel and book a lab visit instead.",
+  lab_not_found:
+    "This lab isn't taking bookings on MedEase right now. You can still cancel.",
+  not_collecting:
+    "This lab has stopped home collection. Cancel and book a lab visit instead.",
+  area_not_served:
+    "This lab no longer collects in your city. Cancel and book a lab visit instead.",
+  reschedule_limit: `A booking can be moved ${MAX_RESCHEDULES} times. Cancel it and book again, or call the lab.`,
+  slot_unavailable:
+    "That time is no longer available. Please pick another window.",
+  slot_full: "Someone just took the last visit in that window. Pick another.",
+};
+
+// Codes meaning the booking can no longer move as it is: reload to show why.
+export const staleChangeCodes = new Set([
+  "not_changeable",
+  "reschedule_limit",
+  "lab_not_found",
+  "no_home_collection",
+]);
 
 // Codes meaning our copy of the windows or catalog is stale: fetch fresh ones.
 export const staleBookingCodes = new Set([

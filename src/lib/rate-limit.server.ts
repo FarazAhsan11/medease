@@ -63,6 +63,13 @@ export const rateLimits = {
     limit: 20,
     windowSeconds: ONE_HOUR,
   },
+  // A patient cancelling or moving their lab bookings. Each booking moves at
+  // most 3 times; this stops a script cycling bookings to hold windows.
+  labBookingChangeUser: {
+    name: "lab-booking-change-user",
+    limit: 30,
+    windowSeconds: ONE_HOUR,
+  },
   // A lab moving bookings along: a busy day is a few hundred moves.
   labBookingMoveUser: {
     name: "lab-booking-move-user",

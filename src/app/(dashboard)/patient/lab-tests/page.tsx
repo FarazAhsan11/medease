@@ -29,7 +29,7 @@ export default async function PatientLabTestsPage() {
     <>
       <DashboardPageHeader
         title="Lab tests"
-        description="Your lab bookings and how far along each one is. To cancel or change one, call the lab."
+        description="Your lab bookings and how far along each one is. Until the sample is taken, you can change the time or cancel."
         actions={
           <Link
             href={patientRoutes.bookLabTests}

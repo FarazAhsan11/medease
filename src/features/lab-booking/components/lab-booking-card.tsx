@@ -5,6 +5,7 @@ import { BookedForBadge } from "@/features/family/components/booked-for-badge";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
 import { OrderTracker } from "@/features/lab-booking/components/order-tracker";
+import { PatientLabBookingActions } from "@/features/lab-booking/components/patient-lab-booking-actions";
 import {
   formatBookingWhen,
   type LabBooking,
@@ -86,6 +87,8 @@ export function LabBookingCard({ booking }: LabBookingCardProps) {
           <LabBookingStatusReason booking={booking} audience="patient" />
         </div>
       )}
+
+      <PatientLabBookingActions booking={booking} />
 
       {booking.status !== "cancelled" && (
         <div className="mt-5 border-t pt-5">

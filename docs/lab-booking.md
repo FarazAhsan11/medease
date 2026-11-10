@@ -1,6 +1,6 @@
-# Lab booking (LAB-03, LAB-04, LAB-05)
+# Lab booking (LAB-03, LAB-04, LAB-05, LAB-20)
 
-A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list and moves it through collection and processing (LAB-04, "Status moves" below). The patient cancelling or rescheduling in the app is LAB-20, paying online PAY-07; until PAY-07, every booking is paid in cash at the lab or to the collector.
+A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list and moves it through collection and processing (LAB-04, "Status moves" below). Until the sample is taken, the patient can cancel or move the booking in the app (LAB-20, "Patient changes" below). Paying online is PAY-07; until PAY-07, every booking is paid in cash at the lab or to the collector.
 
 ## Choices
 
@@ -55,7 +55,7 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 
 **Not before the day.** A sample can be marked collected from the booking's visit day on (the lab's local day), which catches a click on the wrong row among future bookings. Later steps have no date rule.
 
-**Reasons from a list, with an optional note.** A new sample and a cancellation each need a reason from a fixed list; "other" needs a note. The lists follow common specimen rejection policies (haemolysed, clotted, too little sample, a label that can't be matched, too long in transit) and the ways a booking falls through (the patient asked, couldn't be reached or wasn't there; the lab can't run the test or send a collector). The patient sees the reason and note in the app, behind sign-in. Patients cancel by phoning the lab until LAB-20, and the lab records it here with "patient asked", which frees the window's place.
+**Reasons from a list, with an optional note.** A new sample and a cancellation each need a reason from a fixed list; "other" needs a note. The lists follow common specimen rejection policies (haemolysed, clotted, too little sample, a label that can't be matched, too long in transit) and the ways a booking falls through (the patient asked, couldn't be reached or wasn't there; the lab can't run the test or send a collector). The patient sees the reason and note in the app, behind sign-in. A patient who phones to cancel is recorded here with "patient asked"; patients can also cancel in the app (LAB-20).
 
 **History in its own table.** `lab_booking_events` keeps every status a booking reaches, with the reason, note and who moved it, written by a trigger on `lab_bookings` (insert and status change), so no code path can change a status without leaving a row. The booking keeps the current reason, note and `status_changed_at`, so lists don't read the history; the patient's list reads it for the tracker's times. Same read rules as the booking: the patient and the lab, with a second factor; nobody writes it directly.
 
@@ -79,9 +79,25 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 
 **Limits.** 300 upload links an hour per lab account (`rateLimits.labReportUploadUser`; the general 20 an hour is sized for a person's own files), and publishing counts with the 600 status moves an hour. Up to 20 versions per booking.
 
+## Patient changes (LAB-20)
+
+**Until the sample is taken.** The patient can cancel or move a booking while it's booked or waiting for a new sample, the same stretch in which the lab can still collect it. Once a sample is taken the lab has started work, and only the lab can cancel (LAB-04). There's no time cut-off before the visit: bookings are paid in cash, so a late change costs the patient nothing, and the lab is told at once. Services that take payment up front set a cut-off and charge for late changes (Quest: free up to 24 hours before a home collection, a fee after); the refund policy already says those rules come with online payment (PAY-07).
+
+**Cancel with a reason.** `cancel_lab_booking` takes a reason from the patient's own list (no longer needed, booked by mistake, going to another lab, none of the times suit, other) and a note for the lab, trimmed as the lab's are, which "other" needs so the lab learns why. The booking records `cancelled_by` (`patient` or `lab`); the table requires it on every cancelled booking and pairs each reason list with its side, so neither can use the other's reasons. A home collection frees its place in the window. Cancelling again returns quietly, so a double click is harmless. The lab gets a `lab_booking_cancelled` notice linking to its Finished list; the patient gets none for their own action, as with appointments.
+
+**Move to a new time.** `reschedule_lab_booking` moves a lab visit to another day (today to 13 days ahead) or a home collection to another window. It locks the booking row, then takes the same advisory lock on the new window as `book_lab_test` and counts its places through `get_lab_collection_slots`, as booking does (one lab's two weeks of windows, so the lock is held briefly; a narrower copy of the window rules could drift from it), so a move and a new booking can't both take the last one. The old window frees by itself, since capacity counts bookings by their current window. The tests, address, fee and way of collection stay as booked, because changing any of them changes the price or the lab's work: that's a cancellation and a new booking. A home collection can move only while the lab still collects, still serves the booking's city, and still draws every booked test at home, as booking checks; its new day is taken in the lab's collection time zone, the one its windows are built in. Moving to the time it already has returns quietly.
+
+**Three moves per booking.** `reschedule_count` stops at 3 (a table check), after which the patient calls the lab. This keeps a booking from holding window after window, and a script from cycling places, alongside 30 changes an hour per account (`rateLimits.labBookingChangeUser`).
+
+**History and notices.** A move adds a `rescheduled` row to `lab_booking_events` (new day and window, who moved it) from a trigger on the booking's time columns, so no path can move a booking without a record; status rows keep `kind = 'status'`, and the patient's tracker reads only those. The lab gets a `lab_booking_rescheduled` notice, and its booking shows "The patient moved this to a new day/window" while still to collect.
+
+**Screens.** The patient's booking card has **Change time** and **Cancel booking** while the booking can change. Change time opens `/patient/lab-tests/bookings/[id]/reschedule`: the booking on one side, days or windows on the other, with the current one marked "Yours" and the moves left. A booking that can't move shows why. Cancelled bookings say "You cancelled" to the patient and "Cancelled by the patient" to the lab.
+
+**Not yet.** Refunds for paid bookings come with PAY-07, along with any late-change rule. Changing the address of a home collection is cancel and rebook.
+
 ## Code
 
-- Migrations: `supabase/migrations/20261109120000_lab_bookings.sql`, `supabase/migrations/20261109150000_lab_booking_status.sql`, `supabase/migrations/20261109180000_lab_reports.sql`
+- Migrations: `supabase/migrations/20261109120000_lab_bookings.sql`, `supabase/migrations/20261109150000_lab_booking_status.sql`, `supabase/migrations/20261109180000_lab_reports.sql`, `supabase/migrations/20261110120000_lab_booking_changes.sql`
 - Features: `src/features/lab-booking/`, `src/features/lab-reports/`
 
 ## Sources
@@ -95,4 +111,5 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 - 42 CFR 493.1291, [Standard: Test report](https://www.law.cornell.edu/cfr/text/42/493.1291), and [eCFR part 493 subpart K](https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-493/subpart-K/subject-group-ECFR9482366886d579f): the report identifies the patient and the lab; a corrected report is marked as corrected and the original kept.
 - CDC CLIAC, [Addendum S](https://www.cdc.gov/cliac/docs/addenda/cliac0210/Addendum-S.pdf): giving patients their reports directly, and labelling corrected ones.
 - Supabase, [createSignedUploadUrl](https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl) and [serving downloads](https://supabase.com/docs/guides/storage/serving/downloads): signed upload links for direct uploads; short-lived signed links for private files.
+- Quest Health, [How do I reschedule or cancel my in-home sample collection?](https://www.questhealth.com/faqs-how-do-i-reschedule-or-cancel-my-in-home-sample-collection.html): changes free up to 24 hours before, a fee after, for a prepaid collection.
 - thoughtbot, [Modeling state transitions in Postgres](https://thoughtbot.com/blog/modeling-state-transitions-in-postgres) and [Inserting state transitions in Postgres](https://thoughtbot.com/blog/inserting-state-transitions-in-postgres): validate transitions under a lock, keep an append-only history.

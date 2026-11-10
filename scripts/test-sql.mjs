@@ -4356,6 +4356,367 @@ async function testLabBooking({ patient, secondPatient }) {
     ),
   );
 
+  section("The patient changes or cancels a lab booking (LAB-20)");
+
+  check(
+    "a lab's cancellation is marked as the lab's",
+    (await bookingRow(homeId)).cancelled_by === "lab",
+  );
+  const cancel = (caller, id, fields = {}) =>
+    rpc(caller, "cancel_lab_booking", {
+      p_booking_id: id,
+      p_reason: "no_longer_needed",
+      p_note: null,
+      ...fields,
+    });
+  const reschedule = (caller, id, fields = {}) =>
+    rpc(caller, "reschedule_lab_booking", {
+      p_booking_id: id,
+      p_visit_date: null,
+      p_slot_starts_at: null,
+      ...fields,
+    });
+  const timing = async (id) =>
+    (
+      await db.query(
+        `select visit_date::text as day, slot_starts_at, slot_ends_at, reschedule_count
+         from public.lab_bookings where id = $1`,
+        [id],
+      )
+    ).rows[0];
+  const moves = async (id) =>
+    (
+      await db.query(
+        `select visit_date::text as day, changed_by from public.lab_booking_events
+         where booking_id = $1 and kind = 'rescheduled' order by created_at, id`,
+        [id],
+      )
+    ).rows;
+
+  const visitChange = idOf(await book(patient));
+  const inDays = (days) => ({ p_visit_date: addDays(localToday(), days) });
+  refused(
+    "a lab can't reschedule as the patient",
+    await reschedule(lab, visitChange, inDays(2)),
+    "not_patient",
+  );
+  refused(
+    "another patient can't reschedule it",
+    await reschedule(secondPatient, visitChange, inDays(2)),
+    "booking_not_found",
+  );
+  refused(
+    "a reschedule needs a booking",
+    await reschedule(patient, null, inDays(2)),
+    "booking_not_found",
+  );
+  refused(
+    "a day past two weeks is refused",
+    await reschedule(patient, visitChange, inDays(14)),
+    "invalid_visit_date",
+  );
+  refused(
+    "a lab visit can't take a window",
+    await reschedule(patient, visitChange, {
+      ...inDays(2),
+      p_slot_starts_at: nextSlot.starts_at,
+    }),
+    "invalid_visit_date",
+  );
+  succeeded(
+    "the patient moves a lab visit to another day",
+    await reschedule(patient, visitChange, inDays(3)),
+  );
+  succeeded(
+    "the same day again is accepted",
+    await reschedule(patient, visitChange, inDays(3)),
+  );
+  const movedVisit = await timing(visitChange);
+  const visitMoves = await moves(visitChange);
+  check(
+    "the new day is kept once, by the patient",
+    movedVisit.day === addDays(localToday(), 3) &&
+      movedVisit.reschedule_count === 1 &&
+      visitMoves.length === 1 &&
+      visitMoves[0].day === movedVisit.day &&
+      visitMoves[0].changed_by === patient.id,
+  );
+  check(
+    "the lab is told",
+    (await kindsFor(lab.id)).includes("lab_booking_rescheduled"),
+  );
+  check(
+    "the tracker's steps aren't moved",
+    (await eventsOf(visitChange)).filter((event) => event.status === "booked")
+      .length === 2 &&
+      (
+        await db.query(
+          `select count(*)::int as n from public.lab_booking_events
+           where booking_id = $1 and kind = 'status'`,
+          [visitChange],
+        )
+      ).rows[0].n === 1,
+  );
+
+  await db.query(
+    `update public.lab_profiles set verification_status = 'pending' where id = $1`,
+    [lab.id],
+  );
+  refused(
+    "a lab that's no longer listed takes no new day",
+    await reschedule(patient, visitChange, inDays(4)),
+    "lab_not_found",
+  );
+  await db.query(
+    `update public.lab_profiles set verification_status = 'approved' where id = $1`,
+    [lab.id],
+  );
+  succeeded("a second move", await reschedule(patient, visitChange, inDays(4)));
+  succeeded("a third move", await reschedule(patient, visitChange, inDays(5)));
+  refused(
+    "a fourth is refused",
+    await reschedule(patient, visitChange, inDays(6)),
+    "reschedule_limit",
+  );
+
+  const windows = await slots();
+  const [, , fromWindow, fullWindow, toWindow] = windows;
+  const homeChange = idOf(
+    await home(patient, { p_slot_starts_at: fromWindow.starts_at }),
+  );
+  refused(
+    "a home collection can't take a day",
+    await reschedule(patient, homeChange, inDays(2)),
+    "slot_unavailable",
+  );
+  refused(
+    "a time that isn't a window is refused",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: new Date(
+        new Date(toWindow.starts_at).getTime() + 17 * 60_000,
+      ).toISOString(),
+    }),
+    "slot_unavailable",
+  );
+  for (let i = 0; i < 2; i++) {
+    await home(secondPatient, {
+      p_address_id: otherHome,
+      p_slot_starts_at: fullWindow.starts_at,
+    });
+  }
+  refused(
+    "a full window is refused",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: fullWindow.starts_at,
+    }),
+    "slot_full",
+  );
+
+  await db.query(
+    `update public.lab_collection_settings set accepting = false where lab_id = $1`,
+    [lab.id],
+  );
+  refused(
+    "no new window once the lab stops collecting",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: toWindow.starts_at,
+    }),
+    "not_collecting",
+  );
+  await db.query(
+    `update public.lab_collection_settings set accepting = true where lab_id = $1`,
+    [lab.id],
+  );
+  await db.query(
+    `update public.lab_bookings set city = 'Karachi' where id = $1`,
+    [homeChange],
+  );
+  refused(
+    "no new window once the lab stops collecting in the city",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: toWindow.starts_at,
+    }),
+    "area_not_served",
+  );
+  await db.query(
+    `update public.lab_bookings set city = 'Lahore' where id = $1`,
+    [homeChange],
+  );
+
+  await db.query(
+    `update public.lab_tests set home_collection = false where id = $1`,
+    [cbc],
+  );
+  refused(
+    "no new window once a test can't be collected at home",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: toWindow.starts_at,
+    }),
+    "no_home_collection",
+  );
+  await db.query(
+    `update public.lab_tests set home_collection = true where id = $1`,
+    [cbc],
+  );
+
+  succeeded(
+    "the patient moves a home collection to another window",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: toWindow.starts_at,
+    }),
+  );
+  const movedHome = await timing(homeChange);
+  check(
+    "the window, its end and its day move together, and the old place frees",
+    new Date(movedHome.slot_starts_at).getTime() ===
+      new Date(toWindow.starts_at).getTime() &&
+      new Date(movedHome.slot_ends_at).getTime() ===
+        new Date(toWindow.ends_at).getTime() &&
+      movedHome.day ===
+        new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(
+          new Date(toWindow.starts_at),
+        ) &&
+      (await spotsAt(fromWindow.starts_at)) === 2 &&
+      (await spotsAt(toWindow.starts_at)) === 1,
+  );
+
+  refused(
+    "a lab can't cancel as the patient",
+    await cancel(lab, homeChange),
+    "not_patient",
+  );
+  refused(
+    "another patient can't cancel it",
+    await cancel(secondPatient, homeChange),
+    "booking_not_found",
+  );
+  refused(
+    "a cancellation needs a booking",
+    await cancel(patient, null),
+    "booking_not_found",
+  );
+  refused(
+    "a cancellation needs a reason",
+    await cancel(patient, homeChange, { p_reason: null }),
+    "reason_required",
+  );
+  refused(
+    "the lab's reasons aren't the patient's",
+    await cancel(patient, homeChange, { p_reason: "patient_absent" }),
+    "invalid_reason",
+  );
+  refused(
+    "nor the patient's the lab's",
+    await move(lab, visitChange, "booked", "cancelled", {
+      p_reason: "no_longer_needed",
+    }),
+    "invalid_reason",
+  );
+  refused(
+    "a long note is refused",
+    await cancel(patient, homeChange, { p_note: "x".repeat(501) }),
+    "invalid_note",
+  );
+  refused(
+    "other needs a note",
+    await cancel(patient, homeChange, { p_reason: "other", p_note: "  " }),
+    "note_required",
+  );
+  const unsigned = await db
+    .query(
+      `update public.lab_bookings
+       set status = 'cancelled', status_reason = 'no_longer_needed', cancelled_by = null
+       where id = $1`,
+      [homeChange],
+    )
+    .then(
+      () => null,
+      (error) => error.message,
+    );
+  check(
+    "a cancellation always says who cancelled",
+    unsigned?.includes("check constraint") ?? false,
+    unsigned ?? "accepted",
+  );
+  const labCancelNotices = (await kindsFor(lab.id)).filter(
+    (kind) => kind === "lab_booking_cancelled",
+  ).length;
+  const patientCancelNotices = (await kindsFor(patient.id)).filter(
+    (kind) => kind === "lab_booking_cancelled",
+  ).length;
+  succeeded(
+    "the patient cancels a home collection",
+    await cancel(patient, homeChange, {
+      p_reason: "other",
+      p_note: "  Travelling that week \r\n",
+    }),
+  );
+  succeeded("cancelling again is accepted", await cancel(patient, homeChange));
+  const cancelled = await bookingRow(homeChange);
+  check(
+    "it's cancelled by the patient, with the note trimmed, once",
+    cancelled.status === "cancelled" &&
+      cancelled.cancelled_by === "patient" &&
+      cancelled.status_reason === "other" &&
+      cancelled.status_note === "Travelling that week" &&
+      (await eventsOf(homeChange)).filter(
+        (event) => event.status === "cancelled",
+      ).length === 1,
+  );
+  check(
+    "its place in the window frees",
+    (await spotsAt(toWindow.starts_at)) === 2,
+  );
+  check(
+    "the lab is told, with a link to its finished list",
+    labCancelNotices === 0 &&
+      (
+        await db.query(
+          `select count(*)::int as n from public.notifications
+           where user_id = $1 and kind = 'lab_booking_cancelled'
+             and href = '/lab/bookings?stage=finished'`,
+          [lab.id],
+        )
+      ).rows[0].n === 1,
+  );
+  check(
+    "the patient gets no notice for their own cancellation",
+    (await kindsFor(patient.id)).filter(
+      (kind) => kind === "lab_booking_cancelled",
+    ).length === patientCancelNotices,
+  );
+  refused(
+    "a cancelled booking can't be moved",
+    await reschedule(patient, homeChange, {
+      p_slot_starts_at: fromWindow.starts_at,
+    }),
+    "not_changeable",
+  );
+
+  const takenId = idOf(await book(patient, { p_visit_date: localToday() }));
+  await move(lab, takenId, "booked", "sample_collected");
+  refused(
+    "once the sample is taken, the patient can't cancel",
+    await cancel(patient, takenId),
+    "not_changeable",
+  );
+  refused(
+    "or move it",
+    await reschedule(patient, takenId, inDays(2)),
+    "not_changeable",
+  );
+  await move(lab, takenId, "sample_collected", "recollection_needed", {
+    p_reason: "sample_clotted",
+  });
+  succeeded(
+    "when a new sample is needed, the patient picks a new day",
+    await reschedule(patient, takenId, inDays(1)),
+  );
+  succeeded(
+    "or cancels",
+    await cancel(patient, takenId, { p_reason: "another_lab" }),
+  );
+
   section("What bookings hold on to (LAB-03)");
 
   refused(
@@ -4387,9 +4748,7 @@ async function testLabBooking({ patient, secondPatient }) {
 
   const gone = await createPatient();
   await book(gone);
-  const goneReported = idOf(
-    await book(gone, { p_visit_date: localToday() }),
-  );
+  const goneReported = idOf(await book(gone, { p_visit_date: localToday() }));
   for (const [from, to] of [
     ["booked", "sample_collected"],
     ["sample_collected", "processing"],

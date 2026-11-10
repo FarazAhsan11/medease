@@ -9,7 +9,7 @@ export const termsOfUse: LegalDocument = {
   title: "Terms of Use",
   summary: `The agreement between you and ${name}.`,
   version: "1.1",
-  updated: "8 November 2026",
+  updated: "10 November 2026",
   sections: [
     {
       title: "These terms",
@@ -34,7 +34,7 @@ export const termsOfUse: LegalDocument = {
       title: "What is available today",
       body: [
         "You can find doctors, book and cancel appointments, have video consultations and receive prescriptions. You can also compare lab test prices and book a test at a verified lab, for a lab visit or home collection.",
-        "A lab booking is between you and the lab. The lab carries out the test, is responsible for it and its report, and is paid in cash, at the lab or to its collector. To cancel or change a lab booking, call the lab.",
+        "A lab booking is between you and the lab. The lab carries out the test, is responsible for it and its report, and is paid in cash, at the lab or to its collector. Until the sample is taken, you can cancel a lab booking or move it to another time in the app, or call the lab.",
         "Lab reports, medicine ordering, health records and the AI assistant are still being built. Pages about them are previews. Nothing shown there is an offer, a price you can rely on or medical advice.",
       ],
     },
