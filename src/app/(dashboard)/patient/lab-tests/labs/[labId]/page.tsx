@@ -15,6 +15,7 @@ import { BookingLabCard } from "@/features/lab-booking/components/booking-lab-ca
 import { LabBookingForm } from "@/features/lab-booking/components/lab-booking-form";
 import { getLabBookingOptions } from "@/features/lab-booking/data/booking-options";
 import { itemKey } from "@/features/lab-booking/lib/lab-bookings";
+import { onlinePaymentsEnabled } from "@/features/payments/lib/payment-provider.server";
 import { requireRole } from "@/lib/auth/session";
 import { searchParam } from "@/lib/directory-search";
 
@@ -72,6 +73,7 @@ export default async function PatientBookLabPage({
               value: member.id,
               label: `${familyMemberName(member)} (${relationLabels[member.relation].toLowerCase()})`,
             }))}
+            onlinePayments={onlinePaymentsEnabled()}
           />
         ) : (
           <EmptyState

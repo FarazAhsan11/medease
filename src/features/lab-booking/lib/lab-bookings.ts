@@ -1,5 +1,5 @@
-// Lab bookings (LAB-03), their status moves (LAB-04), reports (LAB-05) and
-// the patient's changes (LAB-20).
+// Lab bookings (LAB-03), their status moves (LAB-04), reports (LAB-05), the
+// patient's changes (LAB-20) and online payment (PAY-07, docs/payments.md).
 // Safe to import from client components.
 // Design: docs/lab-booking.md.
 
@@ -13,6 +13,8 @@ export const VISIT_WINDOW_DAYS = 14;
 export const LAB_TIMEZONE = "Asia/Karachi";
 
 export const labBookingStatuses = [
+  // Held while the patient pays online; the lab doesn't see it yet.
+  "awaiting_payment",
   "booked",
   "sample_collected",
   "processing",
@@ -24,6 +26,7 @@ export const labBookingStatuses = [
 export type LabBookingStatus = (typeof labBookingStatuses)[number];
 
 export const statusLabels: Record<LabBookingStatus, string> = {
+  awaiting_payment: "Awaiting payment",
   booked: "Booked",
   sample_collected: "Sample collected",
   processing: "Processing",
@@ -43,6 +46,7 @@ export const progressSteps = [
 // The moves a lab can make from each status. Match move_lab_booking; report
 // ready comes only with the report (publish_lab_report).
 export const nextStatuses: Record<LabBookingStatus, LabBookingStatus[]> = {
+  awaiting_payment: [],
   booked: ["sample_collected", "cancelled"],
   recollection_needed: ["sample_collected", "cancelled"],
   sample_collected: ["processing", "recollection_needed", "cancelled"],
@@ -103,7 +107,9 @@ export const patientCancelReasons = [
 export type StatusReason =
   | (typeof recollectionReasons)[number]
   | (typeof cancelReasons)[number]
-  | (typeof patientCancelReasons)[number];
+  | (typeof patientCancelReasons)[number]
+  // The system's, when a hold ends unpaid.
+  | "payment_not_completed";
 
 // Shown to the lab and the patient alike, so worded for the patient.
 export const reasonLabels: Record<StatusReason, string> = {
@@ -121,12 +127,13 @@ export const reasonLabels: Record<StatusReason, string> = {
   booked_by_mistake: "Booked by mistake",
   another_lab: "Going to another lab",
   time_unsuitable: "None of the times suit",
+  payment_not_completed: "The payment wasn't completed in time",
   other: "Other",
 };
 
 // The patient can cancel or move a booking until the sample is taken, and
-// move it up to MAX_RESCHEDULES times. Match cancel_lab_booking and
-// reschedule_lab_booking.
+// move it up to MAX_RESCHEDULES times; one waiting for payment can only be
+// dropped. Match cancel_lab_booking and reschedule_lab_booking.
 export const MAX_RESCHEDULES = 3;
 export const patientChangeableStatuses: LabBookingStatus[] = [
   "booked",
@@ -135,6 +142,9 @@ export const patientChangeableStatuses: LabBookingStatus[] = [
 
 export const canPatientChange = (booking: Pick<LabBooking, "status">) =>
   patientChangeableStatuses.includes(booking.status);
+
+export const canPatientCancel = (booking: Pick<LabBooking, "status">) =>
+  booking.status === "awaiting_payment" || canPatientChange(booking);
 
 export const canReschedule = (
   booking: Pick<LabBooking, "status" | "rescheduleCount">,
@@ -189,15 +199,21 @@ export type LabBookingItem = {
   isPackage: boolean;
 };
 
-// Cash only until online payment (PAY-07).
-export type PaymentMethod = "cash";
-export type PaymentStatus = "unpaid" | "paid";
+export const paymentMethods = ["cash", "online"] as const;
+export type PaymentMethod = (typeof paymentMethods)[number];
+export type PaymentStatus = "unpaid" | "paid" | "refund_pending" | "refunded";
 
 export const paymentLabels: Record<PaymentMethod | PaymentStatus, string> = {
   cash: "Cash",
+  online: "Online",
   unpaid: "unpaid",
   paid: "paid",
+  refund_pending: "refund on its way",
+  refunded: "refunded",
 };
+
+// How long an online booking is held for payment. Match book_lab_test.
+export const PAYMENT_HOLD_MINUTES = 15;
 
 export type LabBooking = {
   id: string;
@@ -230,11 +246,13 @@ export type LabBooking = {
   total: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  // Online only: when the hold for payment ends.
+  paymentDueAt: string | null;
   statusReason: StatusReason | null;
   statusNote: string | null;
   statusChangedAt: string;
-  // Who cancelled, once cancelled.
-  cancelledBy: "patient" | "lab" | null;
+  // Who cancelled, once cancelled: "system" when a hold ended unpaid.
+  cancelledBy: "patient" | "lab" | "system" | null;
   // Times the patient moved it to a new day or window.
   rescheduleCount: number;
   createdAt: string;
@@ -275,10 +293,11 @@ export type LabBookingRow = {
   total: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  payment_due_at: string | null;
   status_reason: StatusReason | null;
   status_note: string | null;
   status_changed_at: string;
-  cancelled_by: "patient" | "lab" | null;
+  cancelled_by: "patient" | "lab" | "system" | null;
   reschedule_count: number;
   created_at: string;
   lab_booking_events?: {
@@ -300,7 +319,7 @@ export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, 
   lab_name, lab_address, lab_phone, patient_name, patient_phone, care_recipient_name,
   care_recipient_relation, care_recipient_date_of_birth, care_recipient_gender,
   street_address, area, city, landmark, contact_name, contact_phone, subtotal,
-  collection_fee, total, payment_method, payment_status, status_reason,
+  collection_fee, total, payment_method, payment_status, payment_due_at, status_reason,
   status_note, status_changed_at, cancelled_by, reschedule_count, created_at,
   lab_booking_items (id, name, price, test_names, package_id),
   lab_reports (id, replaced_at)`;
@@ -355,6 +374,7 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     total: row.total,
     paymentMethod: row.payment_method,
     paymentStatus: row.payment_status,
+    paymentDueAt: row.payment_due_at,
     statusReason: row.status_reason,
     statusNote: row.status_note,
     statusChangedAt: row.status_changed_at,
@@ -374,6 +394,29 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
         isPackage: item.package_id !== null,
       })),
   };
+}
+
+// How the booking is paid, for the patient's card.
+export function paymentSummary(
+  booking: Pick<
+    LabBooking,
+    "paymentMethod" | "paymentStatus" | "paymentDueAt" | "status" | "timezone"
+  >,
+) {
+  if (booking.paymentMethod === "cash") return "pay in cash";
+  if (booking.status === "awaiting_payment" && booking.paymentDueAt) {
+    return `pay online by ${formatTime(booking.paymentDueAt, booking.timezone)}`;
+  }
+  switch (booking.paymentStatus) {
+    case "paid":
+      return "paid online";
+    case "refund_pending":
+      return "refund on its way";
+    case "refunded":
+      return "refunded";
+    default:
+      return "not paid";
+  }
 }
 
 // "CBC, HbA1c and 2 more"

@@ -6,6 +6,7 @@ import {
   MAX_BOOKING_ITEMS,
   MAX_STATUS_NOTE,
   patientCancelReasons,
+  paymentMethods,
   recollectionReasons,
 } from "@/features/lab-booking/lib/lab-bookings";
 
@@ -45,6 +46,11 @@ export const bookLabTestSchema = z
     addressId: optionalId("Choose an address."),
     // Empty means the account holder; otherwise one of their family members.
     careRecipientId: optionalId("Choose who the test is for."),
+    // Cash when online payment is off and the choice isn't shown.
+    paymentMethod: z
+      .enum(paymentMethods, "Choose how to pay.")
+      .optional()
+      .default("cash"),
   })
   .superRefine((value, context) => {
     const count = value.labTestIds.length + value.packageIds.length;
@@ -186,3 +192,7 @@ export const rescheduleLabBookingSchema = z
       });
     }
   });
+
+export const payLabBookingSchema = z.object({
+  bookingId: z.uuid(),
+});

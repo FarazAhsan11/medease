@@ -12,6 +12,7 @@ import { CollectionAddressPicker } from "@/features/lab-booking/components/colle
 import { CollectionMethodPicker } from "@/features/lab-booking/components/collection-method-picker";
 import { CollectionWindowPicker } from "@/features/lab-booking/components/collection-window-picker";
 import { LabBookingSummary } from "@/features/lab-booking/components/lab-booking-summary";
+import { PaymentMethodPicker } from "@/features/lab-booking/components/payment-method-picker";
 import { useCollectionWindow } from "@/features/lab-booking/hooks/use-collection-window";
 import {
   collectionFee,
@@ -19,6 +20,7 @@ import {
   staleBookingCodes,
   type BookableItem,
   type CollectionArea,
+  type PaymentMethod,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { useFormAction } from "@/hooks/use-form-action";
 import { useRefreshOnVisible } from "@/hooks/use-refresh-on-visible";
@@ -37,6 +39,8 @@ type LabBookingFormProps = {
   addresses: PatientAddress[];
   // Family members the test can be for, besides the account holder.
   recipients: { value: string; label: string }[];
+  // Whether patients can pay online (PAY-07); otherwise cash only.
+  onlinePayments: boolean;
 };
 
 export function LabBookingForm({
@@ -49,6 +53,7 @@ export function LabBookingForm({
   visitDays,
   addresses,
   recipients,
+  onlinePayments,
 }: LabBookingFormProps) {
   const router = useRouter();
   const cities = areas.map((area) => area.city);
@@ -57,6 +62,9 @@ export function LabBookingForm({
   const [selected, setSelected] = useState(initialSelected);
   const [method, setMethod] = useState<"lab" | "home">("lab");
   const [visitDate, setVisitDate] = useState<string | null>(null);
+  const [payment, setPayment] = useState<PaymentMethod>(
+    onlinePayments ? "online" : "cash",
+  );
   const selection = useCollectionWindow(collectionDays);
   const [addressId, setAddressId] = useState<string | null>(
     () =>
@@ -132,6 +140,11 @@ export function LabBookingForm({
         type="hidden"
         name="slotStartsAt"
         value={home ? (chosenSlot ?? "") : ""}
+      />
+      <input
+        type="hidden"
+        name="paymentMethod"
+        value={onlinePayments ? payment : "cash"}
       />
       <input
         type="hidden"
@@ -216,9 +229,18 @@ export function LabBookingForm({
         />
       )}
 
+      {onlinePayments && (
+        <PaymentMethodPicker
+          value={payment}
+          onChange={setPayment}
+          home={home}
+        />
+      )}
+
       <LabBookingSummary
         subtotal={subtotal}
         home={home}
+        payOnline={onlinePayments && payment === "online"}
         collectionFee={fee}
         missing={missing}
         pending={pending}

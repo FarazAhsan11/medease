@@ -1,9 +1,11 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 
 import { labBookingChangeErrorMessages } from "@/features/lab-booking/lib/lab-bookings";
 import { cancelLabBookingSchema } from "@/features/lab-booking/schemas/lab-booking";
+import { sendDueRefunds } from "@/features/payments/lib/process-payments.server";
 import { requireRole } from "@/lib/auth/session";
 import { databaseErrorState } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
@@ -30,11 +32,14 @@ export const cancelLabBooking = withFormErrors(
     }
 
     const supabase = await createClient();
-    const { error } = await supabase.rpc("cancel_lab_booking", {
-      p_booking_id: parsed.data.bookingId,
-      p_reason: parsed.data.reason,
-      p_note: parsed.data.note,
-    });
+    const { data: refundQueued, error } = await supabase.rpc(
+      "cancel_lab_booking",
+      {
+        p_booking_id: parsed.data.bookingId,
+        p_reason: parsed.data.reason,
+        p_note: parsed.data.note,
+      },
+    );
     if (error) {
       // The lab moved it meanwhile: show where it is now.
       if (error.message === "not_changeable") refresh();
@@ -43,6 +48,12 @@ export const cancelLabBooking = withFormErrors(
         labBookingChangeErrorMessages,
         "Lab booking cancel",
       );
+    }
+
+    // A paid booking's refund was queued with the cancellation: send it now
+    // rather than at the next scheduled run.
+    if (refundQueued === true) {
+      after(() => sendDueRefunds().catch(() => undefined));
     }
 
     refresh();

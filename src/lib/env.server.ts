@@ -89,6 +89,46 @@ export function getCronSecret() {
   return process.env.CRON_SECRET || null;
 }
 
+// Online payments (PAY-07). Unset, patients pay in cash only. The stand-in
+// "test" provider lets anyone pay without money, so it only loads on a
+// developer's machine, never on any Vercel deployment (preview or
+// production). docs/payments.md.
+const paymentEnvSchema = z.object({
+  PAYMENT_PROVIDER: z.literal("test"),
+  PAYMENT_TEST_SECRET: z.string().min(32),
+});
+
+export type PaymentEnv = z.infer<typeof paymentEnvSchema>;
+
+// Read once per server: settings don't change while it runs.
+let paymentEnv: PaymentEnv | null | undefined;
+
+export function getPaymentEnv(): PaymentEnv | null {
+  if (paymentEnv === undefined) paymentEnv = readPaymentEnv();
+  return paymentEnv;
+}
+
+function readPaymentEnv(): PaymentEnv | null {
+  if (!process.env.PAYMENT_PROVIDER) return null;
+  if (process.env.PAYMENT_PROVIDER === "test" && process.env.VERCEL) {
+    console.error("The test payment provider is off on Vercel deployments.");
+    return null;
+  }
+
+  const result = paymentEnvSchema.safeParse({
+    PAYMENT_PROVIDER: process.env.PAYMENT_PROVIDER,
+    PAYMENT_TEST_SECRET: process.env.PAYMENT_TEST_SECRET,
+  });
+  if (!result.success) {
+    console.error(
+      `Online payments are off: invalid payment settings.\n${z.prettifyError(result.error)}`,
+    );
+    return null;
+  }
+
+  return result.data;
+}
+
 // Optional TURN relay for video calls on networks that block direct
 // connections. Without it calls use free public STUN servers only.
 const turnEnvSchema = z.object({

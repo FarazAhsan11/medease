@@ -5,6 +5,7 @@ import {
 } from "@/features/lab-booking/lib/lab-bookings";
 
 const tones: Record<LabBookingStatus, StatusTone> = {
+  awaiting_payment: "warning",
   booked: "info",
   sample_collected: "info",
   processing: "warning",

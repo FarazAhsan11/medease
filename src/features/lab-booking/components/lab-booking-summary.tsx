@@ -6,6 +6,8 @@ import { formatFee } from "@/lib/format";
 type LabBookingSummaryProps = {
   subtotal: number;
   home: boolean;
+  // Paying online: the button goes on to the checkout.
+  payOnline: boolean;
   // Home collection only: null until an address is chosen, 0 when waived.
   collectionFee: number | null;
   // What's still missing before booking, or null when ready.
@@ -16,6 +18,7 @@ type LabBookingSummaryProps = {
 export function LabBookingSummary({
   subtotal,
   home,
+  payOnline,
   collectionFee,
   missing,
   pending,
@@ -47,8 +50,11 @@ export function LabBookingSummary({
         </div>
       </dl>
       <p className="text-xs text-muted-foreground">
-        {home ? "Pay the collector in cash." : "Pay in cash at the lab."} Online
-        payment is coming soon.
+        {payOnline
+          ? "You'll pay on a secure payment page. The booking is confirmed once the payment goes through, and refunded in full if it's cancelled."
+          : home
+            ? "Pay the collector in cash."
+            : "Pay in cash at the lab."}
       </p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-muted-foreground">{missing}</p>
@@ -58,7 +64,11 @@ export function LabBookingSummary({
           className="h-9 gap-2 px-5"
         >
           {pending && <Loader2Icon className="animate-spin" aria-hidden />}
-          {pending ? "Booking…" : "Confirm booking"}
+          {pending
+            ? "Booking…"
+            : payOnline
+              ? `Pay ${formatFee(total)}`
+              : "Confirm booking"}
         </Button>
       </div>
     </div>

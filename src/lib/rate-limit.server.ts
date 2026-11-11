@@ -70,6 +70,12 @@ export const rateLimits = {
     limit: 30,
     windowSeconds: ONE_HOUR,
   },
+  // Opening a checkout: a few tries per booking, at most 20 bookings held.
+  paymentStartUser: {
+    name: "payment-start-user",
+    limit: 30,
+    windowSeconds: ONE_HOUR,
+  },
   // A lab moving bookings along: a busy day is a few hundred moves.
   labBookingMoveUser: {
     name: "lab-booking-move-user",

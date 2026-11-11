@@ -24,6 +24,9 @@ type CancelLabBookingDialogProps = {
   bookingId: string;
   // "Chughtai Lab · CBC, HbA1c"
   summary: string;
+  // What cancelling means for this booking: who is told, what happens to
+  // the money.
+  consequence: string;
 };
 
 // The patient cancels a booking before the sample is taken (LAB-20).
@@ -54,6 +57,7 @@ export function CancelLabBookingDialog(props: CancelLabBookingDialogProps) {
 function CancelForm({
   bookingId,
   summary,
+  consequence,
   onDone,
 }: CancelLabBookingDialogProps & { onDone: () => void }) {
   const [reason, setReason] = useState("");
@@ -69,8 +73,7 @@ function CancelForm({
       <AlertDialogHeader>
         <AlertDialogTitle>Cancel this lab booking?</AlertDialogTitle>
         <AlertDialogDescription>
-          {summary}. We&apos;ll let the lab know, and this can&apos;t be undone.
-          If you&apos;ve already paid the lab, ask them for your money back.
+          {summary}. {consequence}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <LabBookingReasonFields

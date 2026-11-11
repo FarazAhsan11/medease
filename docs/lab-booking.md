@@ -1,6 +1,6 @@
 # Lab booking (LAB-03, LAB-04, LAB-05, LAB-20)
 
-A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list and moves it through collection and processing (LAB-04, "Status moves" below). Until the sample is taken, the patient can cancel or move the booking in the app (LAB-20, "Patient changes" below). Paying online is PAY-07; until PAY-07, every booking is paid in cash at the lab or to the collector.
+A patient books one or more tests or packages at one lab, for themselves or a family member, either visiting the lab on a chosen day or having a collector come to a saved address in a time window. The lab sees the booking in its list and moves it through collection and processing (LAB-04, "Status moves" below). Until the sample is taken, the patient can cancel or move the booking in the app (LAB-20, "Patient changes" below). The patient pays in cash at the lab or to the collector, or online when a payment provider is set up (PAY-07, `docs/payments.md`).
 
 ## Choices
 
@@ -16,7 +16,7 @@ A patient books one or more tests or packages at one lab, for themselves or a fa
 
 **A retried submit can't book twice.** The form makes a request id when it opens, and the booking stores it under a unique key per account. Sending the same request again, from a double click, a slow network or a retry, returns the booking already made instead of a second one. This is the idempotency key pattern used by booking and payment APIs (Square's `CreateBooking`, Stripe), with the unique constraint deciding rather than a check followed by an insert.
 
-**Payment is cash until PAY-07.** `payment_method` is `cash` and `payment_status` `unpaid`; online payment adds values without changing the table's shape.
+**Payment.** `payment_method` is `cash` or `online`. A cash booking is `booked` and `unpaid` from the start. An online booking starts `awaiting_payment`, hidden from the lab until `confirmed_at` is set by a paid webhook, and moves through `paid`, `refund_pending` and `refunded` (`docs/payments.md`).
 
 **Limits.** 1 to 20 items, at most 20 open bookings per account with a visit still to come (bookings left behind on past days don't count, since status moves come with LAB-04), and 20 bookings an hour per account (`rateLimits.labBookingUser`), which stops a script without bothering a family booking for everyone.
 
@@ -81,7 +81,7 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 
 ## Patient changes (LAB-20)
 
-**Until the sample is taken.** The patient can cancel or move a booking while it's booked or waiting for a new sample, the same stretch in which the lab can still collect it. Once a sample is taken the lab has started work, and only the lab can cancel (LAB-04). There's no time cut-off before the visit: bookings are paid in cash, so a late change costs the patient nothing, and the lab is told at once. Services that take payment up front set a cut-off and charge for late changes (Quest: free up to 24 hours before a home collection, a fee after); the refund policy already says those rules come with online payment (PAY-07).
+**Until the sample is taken.** The patient can cancel or move a booking while it's booked or waiting for a new sample, the same stretch in which the lab can still collect it. Once a sample is taken the lab has started work, and only the lab can cancel (LAB-04). There's no time cut-off before the visit: a cash booking costs nothing to change and an online one is refunded in full, so a late change costs the patient nothing, and the lab is told at once. Services that take payment up front set a cut-off and charge for late changes (Quest: free up to 24 hours before a home collection, a fee after); the refund policy already says those rules come with online payment (PAY-07).
 
 **Cancel with a reason.** `cancel_lab_booking` takes a reason from the patient's own list (no longer needed, booked by mistake, going to another lab, none of the times suit, other) and a note for the lab, trimmed as the lab's are, which "other" needs so the lab learns why. The booking records `cancelled_by` (`patient` or `lab`); the table requires it on every cancelled booking and pairs each reason list with its side, so neither can use the other's reasons. A home collection frees its place in the window. Cancelling again returns quietly, so a double click is harmless. The lab gets a `lab_booking_cancelled` notice linking to its Finished list; the patient gets none for their own action, as with appointments.
 
@@ -93,7 +93,7 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 
 **Screens.** The patient's booking card has **Change time** and **Cancel booking** while the booking can change. Change time opens `/patient/lab-tests/bookings/[id]/reschedule`: the booking on one side, days or windows on the other, with the current one marked "Yours" and the moves left. A booking that can't move shows why. Cancelled bookings say "You cancelled" to the patient and "Cancelled by the patient" to the lab.
 
-**Not yet.** Refunds for paid bookings come with PAY-07, along with any late-change rule. Changing the address of a home collection is cancel and rebook.
+**Refunds.** A booking paid online is refunded in full when cancelled, by the patient, the lab or the system (`docs/payments.md`). **Not yet.** A late-change rule waits for a real provider and the refund policy update. Changing the address of a home collection is cancel and rebook.
 
 ## Code
 

@@ -8,6 +8,7 @@ import { OrderTracker } from "@/features/lab-booking/components/order-tracker";
 import { PatientLabBookingActions } from "@/features/lab-booking/components/patient-lab-booking-actions";
 import {
   formatBookingWhen,
+  paymentSummary,
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
@@ -15,10 +16,15 @@ import { formatFee, telHref } from "@/lib/format";
 
 type LabBookingCardProps = {
   booking: LabBooking;
+  // Off where the page has its own (the payment page).
+  actions?: boolean;
 };
 
 // One of the patient's lab bookings, with its progress.
-export function LabBookingCard({ booking }: LabBookingCardProps) {
+export function LabBookingCard({
+  booking,
+  actions = true,
+}: LabBookingCardProps) {
   const home = booking.collection === "home";
   const PlaceIcon = home ? HouseIcon : StoreIcon;
 
@@ -77,7 +83,7 @@ export function LabBookingCard({ booking }: LabBookingCardProps) {
             ` incl. ${formatFee(booking.collectionFee)} collection`}
           <span className="font-normal text-muted-foreground">
             {" "}
-            · pay in cash
+            · {paymentSummary(booking)}
           </span>
         </li>
       </ul>
@@ -88,33 +94,34 @@ export function LabBookingCard({ booking }: LabBookingCardProps) {
         </div>
       )}
 
-      <PatientLabBookingActions booking={booking} />
+      {actions && <PatientLabBookingActions booking={booking} />}
 
-      {booking.status !== "cancelled" && (
-        <div className="mt-5 border-t pt-5">
-          <OrderTracker
-            status={booking.status}
-            steps={{ booked: booking.createdAt, ...booking.steps }}
-            timezone={booking.timezone}
-          />
-          {booking.status === "report_ready" &&
-            (booking.reportId ? (
-              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <LabReportLink
-                  href={patientRoutes.labReport(booking.reportId)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Also in your health records.
+      {booking.status !== "cancelled" &&
+        booking.status !== "awaiting_payment" && (
+          <div className="mt-5 border-t pt-5">
+            <OrderTracker
+              status={booking.status}
+              steps={{ booked: booking.createdAt, ...booking.steps }}
+              timezone={booking.timezone}
+            />
+            {booking.status === "report_ready" &&
+              (booking.reportId ? (
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <LabReportLink
+                    href={patientRoutes.labReport(booking.reportId)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Also in your health records.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Collect your report from the lab or ask them how they&apos;ll
+                  send it.
                 </p>
-              </div>
-            ) : (
-              <p className="mt-4 text-xs text-muted-foreground">
-                Collect your report from the lab or ask them how they&apos;ll
-                send it.
-              </p>
-            ))}
-        </div>
-      )}
+              ))}
+          </div>
+        )}
     </article>
   );
 }

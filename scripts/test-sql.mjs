@@ -7452,6 +7452,747 @@ async function testMedicineReminders() {
 
 // The rules that must hold for everything in the schema, including tables and
 // functions that don't exist yet.
+async function testLabPayments() {
+  section("Paying online for a lab booking (PAY-07)");
+
+  const patient = await createPatient();
+  const secondPatient = await createPatient();
+  const lab = await createLab({ status: "approved" });
+  const secretKey = { role: "service_role" };
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const cbc = idOf(
+    await rpc(lab, "save_lab_test", {
+      p_test_type_id: "cbc",
+      p_price: 900,
+      p_turnaround_hours: 24,
+      p_home_collection: true,
+      p_preparation: null,
+      p_listed: true,
+    }),
+  );
+  await rpc(lab, "save_lab_service_area", {
+    p_id: null,
+    p_city: "Lahore",
+    p_fee: 0,
+    p_note: null,
+  });
+  await rpc(lab, "save_lab_collection_schedule", {
+    p_ranges: JSON.stringify(
+      [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+        weekday,
+        start: "00:00",
+        end: "23:00",
+      })),
+    ),
+    p_slot_minutes: 60,
+    p_capacity: 1,
+    p_notice_hours: 1,
+    p_free_above: null,
+    p_accepting: true,
+  });
+  const address = async (caller) =>
+    idOf(
+      await rpc(caller, "save_patient_address", {
+        p_id: null,
+        p_label: "Home",
+        p_street_address: "House 1, Street 2",
+        p_area: "Model Town",
+        p_city: "Lahore",
+        p_contact_phone: "+92 300 1234567",
+      }),
+    );
+  const homeAddress = await address(patient);
+  const otherAddress = await address(secondPatient);
+  check(
+    "the fixtures are in place",
+    [cbc, homeAddress, otherAddress].every(Boolean),
+  );
+
+  const tomorrow = new Date(Date.now() + DAY).toLocaleDateString("en-CA", {
+    timeZone: "Asia/Karachi",
+  });
+  const book = (caller, fields = {}) =>
+    rpc(caller, "book_lab_test", {
+      p_request_id: randomUUID(),
+      p_lab_id: lab.id,
+      p_lab_test_ids: [cbc],
+      p_package_ids: [],
+      p_collection: "lab",
+      p_visit_date: tomorrow,
+      p_slot_starts_at: null,
+      p_address_id: null,
+      p_care_recipient_id: null,
+      p_payment_method: "online",
+      ...fields,
+    });
+  const booking = async (id) =>
+    (await db.query(`select * from public.lab_bookings where id = $1`, [id]))
+      .rows[0];
+  const payment = async (id) =>
+    (await db.query(`select * from public.payments where id = $1`, [id]))
+      .rows[0];
+  const refundOf = async (paymentId) =>
+    (
+      await db.query(`select * from public.refunds where payment_id = $1`, [
+        paymentId,
+      ])
+    ).rows[0];
+  const notices = async (userId, kind) =>
+    (
+      await db.query(
+        `select count(*)::int as n from public.notifications
+         where user_id = $1 and kind = $2`,
+        [userId, kind],
+      )
+    ).rows[0].n;
+  const labSees = async (table, column, id) =>
+    ((await as(lab, `select 1 from public.${table} where ${column} = $1`, [id]))
+      .data?.length ?? 0) > 0;
+  const start = (caller, bookingId, provider = "test") =>
+    rpc(caller, "start_lab_payment", {
+      p_booking_id: bookingId,
+      p_provider: provider,
+    });
+  const started = (result) => result.data?.[0];
+  const attach = (caller, paymentId, ref = `ref_${randomUUID()}`) =>
+    rpc(caller, "attach_payment_checkout", {
+      p_payment_id: paymentId,
+      p_provider_ref: ref,
+      p_checkout_url: `https://pay.example/${ref}`,
+    });
+  const event = (caller, fields = {}) =>
+    rpc(caller, "record_payment_event", {
+      p_provider: "test",
+      p_event_id: `evt_${randomUUID()}`,
+      p_type: "payment.succeeded",
+      p_provider_ref: null,
+      p_amount: 900,
+      p_refund_id: null,
+      ...fields,
+    });
+  const outcome = (result) => result.data?.[0]?.record_payment_event;
+  // An attempt with its checkout made, as the server does.
+  const checkout = async (bookingId) => {
+    const attempt = started(await start(patient, bookingId));
+    const ref = `ref_${randomUUID()}`;
+    await attach(secretKey, attempt.payment_id, ref);
+    return { id: attempt.payment_id, ref };
+  };
+
+  refused(
+    "an unknown payment method is refused",
+    await book(patient, { p_payment_method: "card" }),
+    "invalid_booking",
+  );
+
+  const heldId = idOf(await book(patient));
+  const held = await booking(heldId);
+  check(
+    "an online booking waits for payment, unconfirmed",
+    held.status === "awaiting_payment" &&
+      held.payment_method === "online" &&
+      held.payment_status === "unpaid" &&
+      held.confirmed_at === null,
+  );
+  const holdMinutes = (new Date(held.payment_due_at) - Date.now()) / MINUTE;
+  check(
+    "it's held for 15 minutes",
+    holdMinutes > 14 && holdMinutes <= 15,
+    `${holdMinutes.toFixed(1)} min`,
+  );
+  check(
+    "nobody is told yet",
+    (await notices(lab.id, "lab_booking_new")) === 0 &&
+      (await notices(patient.id, "lab_booking_booked")) === 0,
+  );
+  check(
+    "the lab can't see it, its tests or its history",
+    !(await labSees("lab_bookings", "id", heldId)) &&
+      !(await labSees("lab_booking_items", "booking_id", heldId)) &&
+      !(await labSees("lab_booking_events", "booking_id", heldId)),
+  );
+  refused(
+    "a held booking can't be moved to another day",
+    await rpc(patient, "reschedule_lab_booking", {
+      p_booking_id: heldId,
+      p_visit_date: tomorrow,
+      p_slot_starts_at: null,
+    }),
+    "not_changeable",
+  );
+
+  // A home collection hold takes the window's only place.
+  const window = (
+    await as(
+      patient,
+      `select starts_at from public.get_lab_collection_slots($1, 3) limit 1`,
+      [lab.id],
+    )
+  ).data[0].starts_at;
+  const home = (caller, addressId, fields = {}) =>
+    book(caller, {
+      p_collection: "home",
+      p_visit_date: null,
+      p_slot_starts_at: window,
+      p_address_id: addressId,
+      ...fields,
+    });
+  const homeHoldId = idOf(await home(patient, homeAddress));
+  check("a home collection can be held", Boolean(homeHoldId));
+  refused(
+    "nobody else takes the window while the patient pays",
+    await home(secondPatient, otherAddress, { p_payment_method: "cash" }),
+    "slot_full",
+  );
+
+  section("Starting a payment (PAY-07)");
+
+  refused("a lab can't start one", await start(lab, heldId), "not_patient");
+  refused(
+    "an unknown provider is refused",
+    await start(patient, heldId, "paypal"),
+    "invalid_provider",
+  );
+  refused(
+    "another patient can't pay for it",
+    await start(secondPatient, heldId),
+    "booking_not_found",
+  );
+  const first = started(await start(patient, heldId));
+  check(
+    "the attempt is for the booking's total, until the hold ends",
+    first?.amount === 900 &&
+      new Date(first.expires_at).getTime() ===
+        new Date(held.payment_due_at).getTime() &&
+      first.checkout_url === null,
+  );
+  refused(
+    "a second click while the checkout is being made waits",
+    await start(patient, heldId),
+    "payment_in_progress",
+  );
+
+  denied(
+    "a patient can't attach a checkout",
+    await attach(patient, first.payment_id),
+  );
+  refused(
+    "a checkout needs a reference and an address",
+    await rpc(secretKey, "attach_payment_checkout", {
+      p_payment_id: first.payment_id,
+      p_provider_ref: "",
+      p_checkout_url: null,
+    }),
+    "invalid_checkout",
+  );
+  const firstRef = `ref_${randomUUID()}`;
+  succeeded(
+    "the server attaches the checkout",
+    await attach(secretKey, first.payment_id, firstRef),
+  );
+  refused(
+    "a checkout can't be attached twice",
+    await attach(secretKey, first.payment_id),
+    "payment_not_open",
+  );
+  const again = started(await start(patient, heldId));
+  check(
+    "clicking again reuses the open checkout",
+    again?.payment_id === first.payment_id &&
+      again.checkout_url === `https://pay.example/${firstRef}`,
+  );
+  check(
+    "the patient reads their payment, another patient doesn't",
+    (
+      await as(patient, `select id from public.payments where id = $1`, [
+        first.payment_id,
+      ])
+    ).data?.length === 1 &&
+      (
+        await as(
+          secondPatient,
+          `select id from public.payments where id = $1`,
+          [first.payment_id],
+        )
+      ).data?.length === 0,
+  );
+
+  section("Provider events (PAY-02, PAY-07)");
+
+  denied(
+    "a patient can't report a payment",
+    await event(patient, { p_provider_ref: firstRef }),
+  );
+  refused(
+    "an unknown event type is refused",
+    await event(secretKey, { p_type: "payment.maybe" }),
+    "invalid_event",
+  );
+  refused(
+    "an unknown checkout is refused",
+    await event(secretKey, { p_provider_ref: "ref_nobody" }),
+    "payment_not_found",
+  );
+  check(
+    "a declined payment is recorded",
+    outcome(
+      await event(secretKey, {
+        p_type: "payment.failed",
+        p_provider_ref: firstRef,
+      }),
+    ) === "failed" && (await payment(first.payment_id)).status === "failed",
+  );
+  check(
+    "the booking still waits",
+    (await booking(heldId)).status === "awaiting_payment",
+  );
+
+  const second = await checkout(heldId);
+  check(
+    "paying again makes a new attempt",
+    second.id && second.id !== first.payment_id,
+  );
+  await db.query(`delete from realtime.messages`);
+  const paidEvent = `evt_${randomUUID()}`;
+  check(
+    "a successful payment confirms the booking",
+    outcome(
+      await event(secretKey, {
+        p_event_id: paidEvent,
+        p_provider_ref: second.ref,
+      }),
+    ) === "confirmed",
+  );
+  const confirmed = await booking(heldId);
+  check(
+    "it's booked, paid and confirmed",
+    confirmed.status === "booked" &&
+      confirmed.payment_status === "paid" &&
+      confirmed.confirmed_at !== null &&
+      (await payment(second.id)).paid_at !== null,
+  );
+  check(
+    "now the lab sees it and both are told",
+    (await labSees("lab_bookings", "id", heldId)) &&
+      (await labSees("lab_booking_items", "booking_id", heldId)) &&
+      (await notices(lab.id, "lab_booking_new")) === 1 &&
+      (await notices(patient.id, "lab_booking_booked")) === 1,
+  );
+  const live = (
+    await db.query(
+      `select event, payload from realtime.messages where topic = $1`,
+      [`user:${patient.id}`],
+    )
+  ).rows;
+  check(
+    "the patient's open page hears it, without details",
+    live.some(
+      (row) =>
+        row.event === "lab_booking" &&
+        row.payload.id === heldId &&
+        row.payload.payment_status === "paid" &&
+        Object.keys(row.payload).length === 3,
+    ),
+  );
+  check(
+    "the same event again does nothing",
+    outcome(
+      await event(secretKey, {
+        p_event_id: paidEvent,
+        p_provider_ref: second.ref,
+      }),
+    ) === "duplicate",
+  );
+  refused(
+    "a paid booking can't be paid again",
+    await start(patient, heldId),
+    "already_paid",
+  );
+  check(
+    "a decline after payment is ignored",
+    outcome(
+      await event(secretKey, {
+        p_type: "payment.failed",
+        p_provider_ref: second.ref,
+      }),
+    ) === "ignored" && (await payment(second.id)).status === "paid",
+  );
+
+  check(
+    "the declined attempt turning out paid after all is refunded",
+    outcome(await event(secretKey, { p_provider_ref: firstRef })) ===
+      "refunding" &&
+      (await refundOf(first.payment_id))?.reason === "duplicate_payment",
+  );
+  check(
+    "and the booking stays paid",
+    (await booking(heldId)).payment_status === "paid",
+  );
+
+  const mismatchBookingId = idOf(await book(patient));
+  const mismatch = await checkout(mismatchBookingId);
+  check(
+    "a payment for a different amount is taken back in full",
+    outcome(
+      await event(secretKey, { p_provider_ref: mismatch.ref, p_amount: 1 }),
+    ) === "refunding" &&
+      (await payment(mismatch.id)).captured_amount === 1 &&
+      (await refundOf(mismatch.id))?.amount === 1 &&
+      (await refundOf(mismatch.id))?.reason === "amount_mismatch",
+  );
+  check(
+    "and doesn't confirm the booking",
+    (await booking(mismatchBookingId)).status === "awaiting_payment" &&
+      !(await labSees("lab_bookings", "id", mismatchBookingId)),
+  );
+
+  const cashId = idOf(await book(patient, { p_payment_method: "cash" }));
+  const cash = await booking(cashId);
+  check(
+    "a cash booking is confirmed at once",
+    cash.status === "booked" && cash.confirmed_at !== null,
+  );
+  refused(
+    "a cash booking isn't paid online",
+    await start(patient, cashId),
+    "not_awaiting_payment",
+  );
+
+  const closingId = idOf(await book(patient));
+  await db.query(
+    `update public.lab_bookings set payment_due_at = now() + interval '30 seconds' where id = $1`,
+    [closingId],
+  );
+  refused(
+    "with under a minute left, no new attempt starts",
+    await start(patient, closingId),
+    "payment_window_closed",
+  );
+
+  const triedId = idOf(await book(patient));
+  await db.query(
+    `insert into public.payments (patient_id, lab_booking_id, provider, amount, expires_at, status, failure_code)
+     select $1, $2, 'test', 900, now() + interval '10 minutes', 'failed', 'provider_declined'
+     from generate_series(1, 5)`,
+    [patient.id, triedId],
+  );
+  refused(
+    "five attempts is the most",
+    await start(patient, triedId),
+    "too_many_attempts",
+  );
+
+  section("Holds that lapse (PAY-07)");
+
+  const lapsed = await checkout(homeHoldId);
+  await db.query(
+    `update public.lab_bookings set payment_due_at = now() - interval '3 minutes'
+     where id = $1`,
+    [homeHoldId],
+  );
+  await db.query(
+    `update public.lab_bookings set payment_due_at = now() + interval '1 minute'
+     where id = $1`,
+    [closingId],
+  );
+  await db.query(`select private.expire_lab_payment_holds()`);
+  const expired = await booking(homeHoldId);
+  check(
+    "a hold two minutes past due is cancelled by the system",
+    expired.status === "cancelled" &&
+      expired.cancelled_by === "system" &&
+      expired.status_reason === "payment_not_completed",
+  );
+  check(
+    "one still in time is kept",
+    (await booking(closingId)).status === "awaiting_payment",
+  );
+  check(
+    "its checkout is closed and the patient is told",
+    (await payment(lapsed.id)).status === "expired" &&
+      (await notices(patient.id, "lab_booking_payment_expired")) === 1,
+  );
+  check(
+    "the lab never saw it",
+    !(await labSees("lab_bookings", "id", homeHoldId)) &&
+      (await notices(lab.id, "lab_booking_cancelled")) === 0,
+  );
+  succeeded(
+    "the window is free again",
+    await home(secondPatient, otherAddress, { p_payment_method: "cash" }),
+  );
+  check(
+    "a payment that lands after the hold is refunded",
+    outcome(await event(secretKey, { p_provider_ref: lapsed.ref })) ===
+      "refunding" &&
+      (await refundOf(lapsed.id))?.reason === "late_payment" &&
+      (await booking(homeHoldId)).payment_status === "refund_pending",
+  );
+
+  const droppedId = idOf(await book(patient));
+  const dropped = await checkout(droppedId);
+  const droppedCancel = await rpc(patient, "cancel_lab_booking", {
+    p_booking_id: droppedId,
+    p_reason: "booked_by_mistake",
+    p_note: null,
+  });
+  check(
+    "the patient can drop a booking before paying, with no refund to send",
+    droppedCancel.data?.[0]?.cancel_lab_booking === false,
+  );
+  check(
+    "its checkout closes and the lab isn't told",
+    (await payment(dropped.id)).status === "expired" &&
+      (await notices(lab.id, "lab_booking_cancelled")) === 0,
+  );
+
+  section("Refunds (PAY-07, PAY-04)");
+
+  const patientCancelId = idOf(await book(patient));
+  const patientPaid = await checkout(patientCancelId);
+  await event(secretKey, { p_provider_ref: patientPaid.ref });
+  const paidCancel = await rpc(patient, "cancel_lab_booking", {
+    p_booking_id: patientCancelId,
+    p_reason: "no_longer_needed",
+    p_note: null,
+  });
+  check(
+    "a paid booking the patient cancels is refunded in full",
+    paidCancel.data?.[0]?.cancel_lab_booking === true &&
+      (await booking(patientCancelId)).payment_status === "refund_pending" &&
+      (await refundOf(patientPaid.id))?.amount === 900 &&
+      (await refundOf(patientPaid.id))?.reason === "booking_cancelled",
+  );
+
+  const labCancelId = idOf(await book(patient));
+  const labPaid = await checkout(labCancelId);
+  await event(secretKey, { p_provider_ref: labPaid.ref });
+  await rpc(lab, "move_lab_booking", {
+    p_booking_id: labCancelId,
+    p_from_status: "booked",
+    p_to_status: "cancelled",
+    p_reason: "test_unavailable",
+    p_note: null,
+  });
+  check(
+    "so is one the lab cancels",
+    (await booking(labCancelId)).payment_status === "refund_pending" &&
+      (await refundOf(labPaid.id))?.status === "pending",
+  );
+
+  denied(
+    "a patient can't claim refunds",
+    await rpc(patient, "claim_refunds", { p_provider: "test" }),
+  );
+  check(
+    "a worker only claims its own provider's refunds",
+    (await rpc(secretKey, "claim_refunds", { p_provider: "other" })).data
+      .length === 0,
+  );
+  const claimed = (
+    await rpc(secretKey, "claim_refunds", { p_provider: "test", p_limit: 50 })
+  ).data;
+  const claimedIds = new Set(claimed.map((row) => row.refund_id));
+  const patientRefund = await refundOf(patientPaid.id);
+  const labRefund = await refundOf(labPaid.id);
+  check(
+    "the worker claims what's due, with the provider's reference",
+    claimedIds.has(patientRefund.id) &&
+      claimedIds.has(labRefund.id) &&
+      claimed.find((row) => row.refund_id === labRefund.id)?.payment_ref ===
+        labPaid.ref,
+  );
+  check(
+    "a second worker gets none of them",
+    !(await rpc(secretKey, "claim_refunds", { p_provider: "test" })).data.some(
+      (row) => claimedIds.has(row.refund_id),
+    ),
+  );
+  check(
+    "and the next try is booked",
+    labRefund.attempts === 1 &&
+      new Date(labRefund.next_attempt_at) > Date.now(),
+  );
+
+  const result = (caller, refundId, fields = {}) =>
+    rpc(caller, "record_refund_result", {
+      p_refund_id: refundId,
+      p_outcome: "succeeded",
+      p_provider_ref: "rf_1",
+      p_error: null,
+      ...fields,
+    });
+  denied(
+    "a patient can't report a refund",
+    await result(patient, labRefund.id),
+  );
+  refused(
+    "an unknown outcome is refused",
+    await result(secretKey, labRefund.id, { p_outcome: "maybe" }),
+    "invalid_outcome",
+  );
+  refused(
+    "an unknown refund is refused",
+    await result(secretKey, randomUUID()),
+    "refund_not_found",
+  );
+  await result(secretKey, labRefund.id, {
+    p_outcome: "error",
+    p_error: "timeout",
+  });
+  check(
+    "a failed try waits for the next",
+    (await refundOf(labPaid.id)).status === "pending" &&
+      (await refundOf(labPaid.id)).last_error === "timeout",
+  );
+  succeeded(
+    "a refund that went through",
+    await result(secretKey, labRefund.id),
+  );
+  check(
+    "settles the refund, payment and booking, and tells the patient",
+    (await refundOf(labPaid.id)).status === "succeeded" &&
+      (await payment(labPaid.id)).status === "refunded" &&
+      (await payment(labPaid.id)).refunded_amount === 900 &&
+      (await booking(labCancelId)).payment_status === "refunded" &&
+      (await notices(patient.id, "lab_booking_refunded")) === 1,
+  );
+
+  await db.query(`update public.refunds set attempts = 5 where id = $1`, [
+    patientRefund.id,
+  ]);
+  await result(secretKey, patientRefund.id, { p_outcome: "error" });
+  check(
+    "after the fifth failed try it's left for an admin",
+    (await refundOf(patientPaid.id)).status === "failed" &&
+      (await booking(patientCancelId)).payment_status === "refund_pending",
+  );
+  await result(secretKey, patientRefund.id);
+  check(
+    "but a success reported after all still settles it",
+    (await refundOf(patientPaid.id)).status === "succeeded" &&
+      (await booking(patientCancelId)).payment_status === "refunded",
+  );
+
+  const mismatchRefund = await refundOf(mismatch.id);
+  await db.query(
+    `update public.refunds set attempts = 5, next_attempt_at = now() - interval '1 minute' where id = $1`,
+    [mismatchRefund.id],
+  );
+  await rpc(secretKey, "claim_refunds", { p_provider: "test" });
+  check(
+    "a fifth try that never reported back is marked failed",
+    (await refundOf(mismatch.id)).status === "failed" &&
+      (await refundOf(mismatch.id)).last_error === "no_answer",
+  );
+
+  const lateRefund = await refundOf(lapsed.id);
+  await result(secretKey, lateRefund.id, { p_outcome: "submitted" });
+  check(
+    "a refund the provider accepted waits a day for its webhook",
+    (await refundOf(lapsed.id)).status === "submitted" &&
+      new Date((await refundOf(lapsed.id)).next_attempt_at) >
+        Date.now() + 23 * 3600 * 1000,
+  );
+  refused(
+    "a refund event needs a refund we made",
+    await event(secretKey, {
+      p_type: "refund.succeeded",
+      p_refund_id: randomUUID(),
+    }),
+    "refund_not_found",
+  );
+  refused(
+    "a refund event for a different amount is refused",
+    await event(secretKey, {
+      p_type: "refund.succeeded",
+      p_refund_id: lateRefund.id,
+      p_amount: 5,
+    }),
+    "amount_mismatch",
+  );
+  check(
+    "its webhook completes it",
+    outcome(
+      await event(secretKey, {
+        p_type: "refund.succeeded",
+        p_refund_id: lateRefund.id,
+      }),
+    ) === "refunded" &&
+      (await booking(homeHoldId)).payment_status === "refunded",
+  );
+
+  const duplicateRefund = await refundOf(first.payment_id);
+  check(
+    "a refund the provider turns down is left for an admin",
+    outcome(
+      await event(secretKey, {
+        p_type: "refund.failed",
+        p_refund_id: duplicateRefund.id,
+      }),
+    ) === "refund_failed" &&
+      (await refundOf(first.payment_id)).status === "failed",
+  );
+
+  section("Reconciling and schedules (PAY-02)");
+
+  const quietId = idOf(await book(patient));
+  const quiet = await checkout(quietId);
+  await db.query(
+    `update public.payments set expires_at = now() - interval '11 minutes' where id = $1`,
+    [quiet.id],
+  );
+  denied(
+    "a patient can't claim payments to check",
+    await rpc(patient, "claim_payments_to_reconcile"),
+  );
+  const toCheck = (await rpc(secretKey, "claim_payments_to_reconcile")).data;
+  check(
+    "an attempt long past expiry is checked with the provider",
+    toCheck.some(
+      (row) => row.payment_id === quiet.id && row.provider_ref === quiet.ref,
+    ),
+  );
+  check(
+    "once",
+    !(await rpc(secretKey, "claim_payments_to_reconcile")).data.some(
+      (row) => row.payment_id === quiet.id,
+    ),
+  );
+
+  const { rows: jobs } = await db.query(
+    `select jobname, schedule, command from cron.job
+     where jobname in ('lab-payment-holds', 'payments') order by jobname`,
+  );
+  check(
+    "holds are released every minute and payments run every 5",
+    jobs.map((job) => `${job.jobname}:${job.schedule}`).join() ===
+      "lab-payment-holds:* * * * *,payments:*/5 * * * *",
+  );
+  await db.query(`delete from vault.decrypted_secrets`);
+  await db.query(
+    `insert into vault.decrypted_secrets values
+       ('reminders_site_url', 'https://medease.example/'),
+       ('reminders_cron_secret', 'test-cron-value')`,
+  );
+  await db.query(jobs[1].command);
+  const request = (
+    await db.query(
+      `select * from net.requests where url like '%/api/cron/payments'`,
+    )
+  ).rows[0];
+  check(
+    "the payments job calls its route with the cron secret",
+    request?.url === "https://medease.example/api/cron/payments" &&
+      request.headers.Authorization === "Bearer test-cron-value",
+  );
+  await db.query(`delete from vault.decrypted_secrets`);
+  denied(
+    "a user can't release holds",
+    await rpc(patient, "expire_lab_payment_holds", {}, "private"),
+  );
+}
+
 async function testSchemaRules() {
   section("Rules for the whole schema (SEC-01)");
 
@@ -7822,6 +8563,7 @@ try {
   await testNotificationPreferences();
   await testMessaging();
   await testMedicineReminders();
+  await testLabPayments();
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

@@ -3,6 +3,8 @@ export const twoFactorRoute = "/two-factor";
 export const consentRoute = "/consent";
 // Opened from an email, so it works without signing in.
 export const unsubscribeRoute = "/unsubscribe";
+// The stand-in payment provider's checkout page (development only).
+export const testCheckoutRoute = "/test-checkout";
 
 export const legalRoutes = {
   index: "/legal",
@@ -28,6 +30,9 @@ export const patientRoutes = {
   // A new day or window for one booking (LAB-20).
   rescheduleLabBooking: (bookingId: string) =>
     `/patient/lab-tests/bookings/${bookingId}/reschedule`,
+  // Paying online, and where the checkout sends the patient back (PAY-07).
+  labBookingPayment: (bookingId: string) =>
+    `/patient/lab-tests/bookings/${bookingId}/payment`,
   // One test compared across labs.
   labTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
   // Booking at one lab, starting with the test or package the patient picked.

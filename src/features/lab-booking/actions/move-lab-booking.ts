@@ -1,12 +1,14 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 
 import {
   labBookingMoveErrorMessages,
   statusLabels,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { moveLabBookingSchema } from "@/features/lab-booking/schemas/lab-booking";
+import { sendDueRefunds } from "@/features/payments/lib/process-payments.server";
 import { requireRole } from "@/lib/auth/session";
 import { databaseErrorState } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
@@ -48,6 +50,11 @@ export const moveLabBooking = withFormErrors(
         "Lab booking move",
       );
     }
+
+    // A paid booking's refund was queued with the cancellation: send it now
+    // rather than at the next scheduled run.
+    if (move.toStatus === "cancelled")
+      after(() => sendDueRefunds().catch(() => undefined));
 
     refresh();
     return {

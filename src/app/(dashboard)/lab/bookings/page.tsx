@@ -49,7 +49,7 @@ export default async function LabBookingsPage({
     <>
       <DashboardPageHeader
         title="Bookings"
-        description="Lab visits and home collections booked on MedEase. Move each one along as you work, and the patient follows it. Payment is in cash for now."
+        description="Lab visits and home collections booked on MedEase. Move each one along as you work, and the patient follows it. Each booking says whether it was paid online or is paid in cash."
       />
       <LabBookingStageLinks
         basePath={labRoutes.bookings}

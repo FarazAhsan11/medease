@@ -18,9 +18,17 @@ export type ReadReceipt = {
   count: number;
 };
 
+// A lab booking's status or payment changed (PAY-07): ids and statuses only.
+export type LabBookingChange = {
+  id: string;
+  status: string;
+  payment_status: string;
+};
+
 export type UserChannelListener = {
   onMessage?: (message: MessageRow) => void;
   onRead?: (receipt: ReadReceipt) => void;
+  onLabBooking?: (change: LabBookingChange) => void;
   // Called once the channel is live for this listener: "first" when it joins
   // (straight away if the channel was already up), "reconnect" after the
   // connection dropped and came back, when events may have been missed.
@@ -59,6 +67,11 @@ function open(userId: string, entry: Entry) {
       .on("broadcast", { event: "read" }, ({ payload }) => {
         for (const listener of entry.listeners) {
           listener.onRead?.(payload as ReadReceipt);
+        }
+      })
+      .on("broadcast", { event: "lab_booking" }, ({ payload }) => {
+        for (const listener of entry.listeners) {
+          listener.onLabBooking?.(payload as LabBookingChange);
         }
       })
       .subscribe((status) => {
