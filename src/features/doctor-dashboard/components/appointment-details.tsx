@@ -15,6 +15,8 @@ import { AppointmentNotesForm } from "@/features/doctor-dashboard/components/app
 import { AppointmentOutcomeButtons } from "@/features/doctor-dashboard/components/appointment-outcome-buttons";
 import { AppointmentPrescription } from "@/features/doctor-dashboard/components/appointment-prescription";
 import { bookedByLabel } from "@/features/family/lib/relations";
+import { DoctorLabOrder } from "@/features/lab-orders/components/doctor-lab-order";
+import type { LabOrder } from "@/features/lab-orders/lib/lab-orders";
 import { MedicalProfileDetails } from "@/features/medical-profile/components/medical-profile-details";
 import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
@@ -48,6 +50,7 @@ type AppointmentDetailsProps = {
   previousVisits: number;
   prescription: PrescriptionSummary | null;
   summary: VisitSummary | null;
+  labOrder: LabOrder | null;
   // Missing when the booking was cancelled and nothing else is booked.
   profile: MedicalProfile | null;
 };
@@ -58,6 +61,7 @@ export function AppointmentDetails({
   previousVisits,
   prescription,
   summary,
+  labOrder,
   profile,
 }: AppointmentDetailsProps) {
   const { timezone } = appointment;
@@ -158,6 +162,8 @@ export function AppointmentDetails({
         appointment={appointment}
         prescription={prescription}
       />
+
+      <DoctorLabOrder appointment={appointment} order={labOrder} />
 
       {needsOutcome(appointment) && (
         <div className="grid gap-2 border-t pt-5">

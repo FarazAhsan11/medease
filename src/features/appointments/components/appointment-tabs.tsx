@@ -12,6 +12,8 @@ import { UpcomingAppointmentCard } from "@/features/appointments/components/upco
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { MessageButton } from "@/features/messaging/components/message-button";
 import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
+import { PatientLabOrder } from "@/features/lab-orders/components/patient-lab-order";
+import type { LabOrder } from "@/features/lab-orders/lib/lab-orders";
 import { PatientVisitSummary } from "@/features/visit-summaries/components/patient-visit-summary";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 
@@ -22,6 +24,7 @@ type AppointmentTabsProps = {
   // Appointment id -> prescription id, for appointments that have one.
   prescriptionIds: Record<string, string>;
   summaries: Record<string, VisitSummary>;
+  labOrders: Record<string, LabOrder>;
 };
 
 function BookAgainLink({ doctorId }: { doctorId: string }) {
@@ -44,14 +47,17 @@ function HistoryList({
   appointments,
   prescriptionIds,
   summaries,
+  labOrders,
 }: {
   appointments: Appointment[];
   prescriptionIds: Record<string, string>;
   summaries: Record<string, VisitSummary>;
+  labOrders: Record<string, LabOrder>;
 }) {
   return appointments.map((appointment) => {
     const prescriptionId = prescriptionIds[appointment.id];
     const summary = summaries[appointment.id];
+    const labOrder = labOrders[appointment.id];
 
     return (
       <AppointmentCard
@@ -73,7 +79,12 @@ function HistoryList({
             <BookAgainLink doctorId={appointment.doctorId} />
           </>
         }
-        footer={summary && <PatientVisitSummary summary={summary} />}
+        footer={
+          <>
+            {summary && <PatientVisitSummary summary={summary} />}
+            {labOrder && <PatientLabOrder order={labOrder} />}
+          </>
+        }
       />
     );
   });
@@ -85,6 +96,7 @@ export function AppointmentTabs({
   cancelled,
   prescriptionIds,
   summaries,
+  labOrders,
 }: AppointmentTabsProps) {
   return (
     <Tabs defaultValue="upcoming" className="gap-6">
@@ -111,6 +123,7 @@ export function AppointmentTabs({
               appointment={appointment}
               prescriptionId={prescriptionIds[appointment.id]}
               summary={summaries[appointment.id]}
+              labOrder={labOrders[appointment.id]}
             />
           ))
         ) : (
@@ -136,6 +149,7 @@ export function AppointmentTabs({
             appointments={past}
             prescriptionIds={prescriptionIds}
             summaries={summaries}
+            labOrders={labOrders}
           />
         ) : (
           <EmptyState
@@ -152,6 +166,7 @@ export function AppointmentTabs({
             appointments={cancelled}
             prescriptionIds={prescriptionIds}
             summaries={summaries}
+            labOrders={labOrders}
           />
         ) : (
           <EmptyState

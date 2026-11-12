@@ -29,7 +29,7 @@ export default async function DoctorPatientChartPage({
       <BackLink href={doctorRoutes.patients}>All patients</BackLink>
       <DashboardPageHeader
         title="Patient chart"
-        description="Your visits with this patient, newest first, with your notes, the summaries you wrote and your prescriptions."
+        description="Your visits with this patient, newest first, with your notes, the summaries you wrote, your prescriptions and the lab tests you ordered."
         actions={<MessageButton otherId={patientId} label="Message patient" />}
       />
       <ChartHeader chart={chart} />
@@ -43,6 +43,7 @@ export default async function DoctorPatientChartPage({
             previousVisits={chart.previousVisits[appointment.id] ?? 0}
             prescription={chart.prescriptions[appointment.id] ?? null}
             summary={chart.summaries[appointment.id] ?? null}
+            labOrder={chart.labOrders[appointment.id] ?? null}
             profile={chart.profiles[appointment.careRecipientId] ?? null}
           />
         ))}

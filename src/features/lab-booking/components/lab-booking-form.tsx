@@ -39,6 +39,8 @@ type LabBookingFormProps = {
   addresses: PatientAddress[];
   // Family members the test can be for, besides the account holder.
   recipients: { value: string; label: string }[];
+  // Who to start with, e.g. the person a doctor's order is for.
+  initialRecipientId?: string | null;
   // Whether patients can pay online (PAY-07); otherwise cash only.
   onlinePayments: boolean;
 };
@@ -53,6 +55,7 @@ export function LabBookingForm({
   visitDays,
   addresses,
   recipients,
+  initialRecipientId,
   onlinePayments,
 }: LabBookingFormProps) {
   const router = useRouter();
@@ -224,6 +227,7 @@ export function LabBookingForm({
           label="Who is this test for?"
           emptyLabel="Myself"
           options={recipients}
+          defaultValue={initialRecipientId}
           hint="The lab sees this person's name, age and sex for the report."
           error={fieldError("careRecipientId")}
         />

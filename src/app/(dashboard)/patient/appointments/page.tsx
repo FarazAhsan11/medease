@@ -10,6 +10,7 @@ import { listPatientAppointments } from "@/features/appointments/data/appointmen
 import { groupAppointments } from "@/features/appointments/lib/appointments";
 import { listPatientPrescriptions } from "@/features/prescriptions/data/prescriptions";
 import { prescriptionIdsByAppointment } from "@/features/prescriptions/lib/prescriptions";
+import { getLabOrders } from "@/features/lab-orders/data/lab-orders";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 
@@ -23,11 +24,13 @@ export default async function PatientAppointmentsPage() {
     listPatientAppointments(user.id),
     listPatientPrescriptions(user.id),
   ]);
-  const summaries = await getVisitSummaries(
-    appointments
-      .filter((item) => item.status !== "cancelled")
-      .map((item) => item.id),
-  );
+  const visitIds = appointments
+    .filter((item) => item.status !== "cancelled")
+    .map((item) => item.id);
+  const [summaries, labOrders] = await Promise.all([
+    getVisitSummaries(visitIds),
+    getLabOrders(visitIds),
+  ]);
 
   return (
     <>
@@ -48,6 +51,7 @@ export default async function PatientAppointmentsPage() {
         {...groupAppointments(appointments)}
         prescriptionIds={prescriptionIdsByAppointment(prescriptions)}
         summaries={summaries}
+        labOrders={labOrders}
       />
     </>
   );

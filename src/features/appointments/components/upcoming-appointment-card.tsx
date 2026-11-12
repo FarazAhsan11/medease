@@ -10,6 +10,8 @@ import { patientRoutes } from "@/config/routes";
 import { MessageButton } from "@/features/messaging/components/message-button";
 import { ViewPrescriptionLink } from "@/features/prescriptions/components/view-prescription-link";
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
+import { PatientLabOrder } from "@/features/lab-orders/components/patient-lab-order";
+import type { LabOrder } from "@/features/lab-orders/lib/lab-orders";
 import { PatientVisitSummary } from "@/features/visit-summaries/components/patient-visit-summary";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDateTime } from "@/lib/datetime";
@@ -20,12 +22,14 @@ type UpcomingAppointmentCardProps = {
   prescriptionId?: string;
   // Also possible during the call.
   summary?: VisitSummary;
+  labOrder?: LabOrder;
 };
 
 export function UpcomingAppointmentCard({
   appointment,
   prescriptionId,
   summary,
+  labOrder,
 }: UpcomingAppointmentCardProps) {
   return (
     <AppointmentCard
@@ -64,7 +68,12 @@ export function UpcomingAppointmentCard({
           )}
         </>
       }
-      footer={summary && <PatientVisitSummary summary={summary} />}
+      footer={
+        <>
+          {summary && <PatientVisitSummary summary={summary} />}
+          {labOrder && <PatientLabOrder order={labOrder} />}
+        </>
+      }
     />
   );
 }

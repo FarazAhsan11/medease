@@ -39,6 +39,7 @@ export type LabBookingOptions = {
 
 type TestRow = {
   id: string;
+  test_type_id: string;
   test_name: string;
   price: number;
   turnaround_hours: number;
@@ -122,7 +123,9 @@ export async function getLabBookingOptions(
       }>(),
     supabase
       .from("lab_test_offers")
-      .select("id, test_name, price, turnaround_hours, home_collection")
+      .select(
+        "id, test_type_id, test_name, price, turnaround_hours, home_collection",
+      )
       .eq("lab_id", labId)
       .order("test_name")
       .returns<TestRow[]>(),
@@ -180,6 +183,7 @@ export async function getLabBookingOptions(
         turnaroundHours: row.turnaround_hours,
         homeCollection: row.home_collection,
         testNames: [row.test_name],
+        testTypeId: row.test_type_id,
       })),
     ],
     areas: areas.data.map(({ city, fee, note }) => ({ city, fee, note })),

@@ -90,6 +90,9 @@ export const rateLimits = {
     limit: 300,
     windowSeconds: ONE_HOUR,
   },
+  // A doctor ordering, changing or cancelling lab tests: a full clinic day
+  // with room for edits.
+  labOrderUser: { name: "lab-order-user", limit: 120, windowSeconds: ONE_HOUR },
   // Starting a conversation, or a doctor extending or closing one.
   conversationUser: {
     name: "conversation-user",

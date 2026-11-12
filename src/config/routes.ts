@@ -35,13 +35,21 @@ export const patientRoutes = {
     `/patient/lab-tests/bookings/${bookingId}/payment`,
   // One test compared across labs.
   labTest: (testId: string) => `/patient/lab-tests/book/${testId}`,
-  // Booking at one lab, starting with the test or package the patient picked.
-  bookLab: (labId: string, start?: { test?: string; package?: string }) => {
+  // Labs compared for the tests a doctor ordered (RX-04).
+  labOrder: (orderId: string) => `/patient/lab-tests/orders/${orderId}`,
+  // Booking at one lab, starting with the test or package the patient picked,
+  // or with the tests of a doctor's order.
+  bookLab: (
+    labId: string,
+    start?: { test?: string; package?: string; order?: string },
+  ) => {
     const query = start?.test
       ? `?test=${start.test}`
       : start?.package
         ? `?package=${start.package}`
-        : "";
+        : start?.order
+          ? `?order=${start.order}`
+          : "";
     return `/patient/lab-tests/labs/${labId}${query}`;
   },
   medicines: "/patient/medicines",
@@ -97,6 +105,8 @@ export const doctorRoutes = {
     `/doctor/consultation/${appointmentId}`,
   prescription: (appointmentId: string) =>
     `/doctor/appointments/${appointmentId}/prescription`,
+  labOrder: (appointmentId: string) =>
+    `/doctor/appointments/${appointmentId}/lab-tests`,
 } as const;
 
 export const labRoutes = {

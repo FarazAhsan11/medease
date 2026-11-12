@@ -164,6 +164,8 @@ export type BookableItem = {
   homeCollection: boolean;
   // The test itself, or every test in the package: no test twice per booking.
   testNames: string[];
+  // The shared list's id, for tests: matches a doctor's order (RX-04).
+  testTypeId?: string;
 };
 
 export const itemKey = (kind: BookableItem["kind"], id: string) =>

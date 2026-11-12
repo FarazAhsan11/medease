@@ -1338,6 +1338,342 @@ async function testVisitSummaries({ patient, secondPatient }) {
   );
 }
 
+async function testLabOrders({ patient, secondPatient }) {
+  section("Lab orders (RX-04)");
+
+  const doctor = await createDoctor();
+  const otherDoctor = await createDoctor();
+  const visit = await startedVisit(doctor, patient);
+  const save = (caller, appointmentId, fields = {}) =>
+    rpc(caller, "save_lab_order", {
+      p_appointment_id: appointmentId,
+      p_test_ids: ["cbc", "hba1c"],
+      ...fields,
+    });
+  const cancel = (caller, appointmentId) =>
+    rpc(caller, "cancel_lab_order", { p_appointment_id: appointmentId });
+  const orderOf = async (appointmentId) =>
+    (
+      await db.query(
+        `select o.*, array(select test_type_id from public.lab_order_items i
+           where i.order_id = o.id order by test_type_id) as tests
+         from public.lab_orders o where appointment_id = $1`,
+        [appointmentId],
+      )
+    ).rows[0];
+  const kinds = async (userId) =>
+    (
+      await db.query(
+        `select kind from public.notifications
+         where user_id = $1 and kind like 'lab_order%' order by created_at, id`,
+        [userId],
+      )
+    ).rows.map((row) => row.kind);
+  const audits = async (orderId) =>
+    (
+      await db.query(
+        `select action, actor_id from public.audit_log
+         where target_id = $1 and action like 'lab_order%' order by id`,
+        [orderId],
+      )
+    ).rows;
+
+  denied("a guest can't order tests", await save(null, visit));
+  refused(
+    "a patient can't order tests",
+    await save(patient, visit),
+    "not_doctor",
+  );
+  refused(
+    "another doctor can't order for the visit",
+    await save(otherDoctor, visit),
+    "appointment_not_found",
+  );
+  refused(
+    "a visit that hasn't started can't have an order",
+    await save(doctor, await createAppointment(doctor, patient, { from: 120 })),
+    "lab_order_not_started",
+  );
+  refused(
+    "a cancelled visit can't have one",
+    await save(
+      doctor,
+      await createAppointment(doctor, patient, {
+        from: -300,
+        to: -270,
+        status: "cancelled",
+      }),
+    ),
+    "appointment_cancelled",
+  );
+  refused(
+    "a no-show can't have one",
+    await save(
+      doctor,
+      await createAppointment(doctor, patient, {
+        from: -400,
+        to: -370,
+        status: "no_show",
+      }),
+    ),
+    "appointment_no_show",
+  );
+  refused(
+    "the window closes 14 days after the visit",
+    await save(
+      doctor,
+      await createAppointment(doctor, patient, {
+        from: -15 * 24 * 60,
+        to: -15 * 24 * 60 + 30,
+      }),
+    ),
+    "lab_order_window_closed",
+  );
+
+  const invalid = {
+    "an order with no tests": { p_test_ids: [] },
+    "an unknown test": { p_test_ids: ["cbc", "not-a-test"] },
+    "a test twice": { p_test_ids: ["cbc", "cbc"] },
+    "more than 20 tests": {
+      p_test_ids: (
+        await db.query(`select id from public.lab_test_types limit 21`)
+      ).rows.map((row) => row.id),
+    },
+    "an unknown priority": { p_priority: "stat" },
+    "an overlong note": { p_note: "n".repeat(501) },
+  };
+  for (const [label, fields] of Object.entries(invalid)) {
+    refused(
+      `${label} is refused`,
+      await save(doctor, visit, fields),
+      "invalid_lab_order",
+    );
+  }
+  check("nothing was saved by refusals", !(await orderOf(visit)));
+
+  const first = await save(doctor, visit, {
+    p_priority: "urgent",
+    p_note: "  Fasting sample.  ",
+  });
+  succeeded("the doctor orders tests", first);
+  const orderId = first.data?.[0]?.save_lab_order;
+  const saved = await orderOf(visit);
+  const { rows: appointmentRows } = await db.query(
+    `select care_recipient_id from public.appointments where id = $1`,
+    [visit],
+  );
+  check(
+    "the order names the visit's person, tests, priority and trimmed note",
+    saved?.id === orderId &&
+      saved?.tests.join() === "cbc,hba1c" &&
+      saved?.priority === "urgent" &&
+      saved?.note === "Fasting sample." &&
+      saved?.status === "active" &&
+      saved?.patient_id === patient.id &&
+      saved?.care_recipient_id === appointmentRows[0].care_recipient_id,
+  );
+  const { rows: names } = await db.query(
+    `select test_name from public.lab_order_items where order_id = $1
+     order by test_type_id`,
+    [orderId],
+  );
+  check(
+    "each item keeps the test's name",
+    names.length === 2 && names.every((row) => row.test_name.length > 1),
+  );
+  check(
+    "the patient is told",
+    (await kinds(patient.id)).join() === "lab_order_issued",
+  );
+
+  succeeded(
+    "saving the same order again works",
+    await save(doctor, visit, {
+      p_test_ids: ["hba1c", "cbc"],
+      p_priority: "urgent",
+      p_note: "Fasting sample.",
+    }),
+  );
+  check(
+    "but tells nobody",
+    (await kinds(patient.id)).length === 1 &&
+      (await audits(orderId)).length === 1,
+  );
+
+  succeeded(
+    "the doctor changes the tests and drops the note",
+    await save(doctor, visit, {
+      p_test_ids: ["hba1c", "lipid-profile"],
+      p_note: " ",
+    }),
+  );
+  const edited = await orderOf(visit);
+  check(
+    "the edit replaces the tests, priority and note",
+    edited?.id === orderId &&
+      edited?.tests.join() === "hba1c,lipid-profile" &&
+      edited?.priority === "routine" &&
+      edited?.note === null,
+  );
+  check(
+    "the patient is told it changed",
+    (await kinds(patient.id)).join() === "lab_order_issued,lab_order_updated",
+  );
+
+  refused(
+    "another doctor can't cancel it",
+    await cancel(otherDoctor, visit),
+    "lab_order_not_found",
+  );
+  refused(
+    "a patient can't cancel it",
+    await cancel(patient, visit),
+    "not_doctor",
+  );
+  refused(
+    "a visit without an order has nothing to cancel",
+    await cancel(doctor, await startedVisit(doctor, patient, { from: -90, to: -60 })),
+    "lab_order_not_found",
+  );
+  succeeded("the doctor cancels it", await cancel(doctor, visit));
+  succeeded("cancelling again is quiet", await cancel(doctor, visit));
+  const cancelled = await orderOf(visit);
+  check(
+    "the order is cancelled, once",
+    cancelled?.status === "cancelled" &&
+      cancelled?.cancelled_at !== null &&
+      (await kinds(patient.id)).join() ===
+        "lab_order_issued,lab_order_updated,lab_order_cancelled",
+  );
+
+  succeeded(
+    "saving a cancelled order issues it again",
+    await save(doctor, visit, { p_test_ids: ["hba1c", "lipid-profile"] }),
+  );
+  check(
+    "it's active and the patient is told it's issued",
+    (await orderOf(visit))?.status === "active" &&
+      (await kinds(patient.id)).at(-1) === "lab_order_issued",
+  );
+  const trail = await audits(orderId);
+  check(
+    "the audit log has every step, by the doctor",
+    trail.map((row) => row.action).join() ===
+      "lab_order.issued,lab_order.edited,lab_order.cancelled,lab_order.issued" &&
+      trail.every((row) => row.actor_id === doctor.id),
+  );
+
+  const read = async (caller, table) =>
+    (await as(caller, `select 1 from public.${table}`)).data?.length ?? 0;
+  for (const table of ["lab_orders", "lab_order_items"]) {
+    check(`the patient reads ${table}`, (await read(patient, table)) > 0);
+    check(`the doctor reads ${table}`, (await read(doctor, table)) > 0);
+    check(
+      `another patient reads no ${table}`,
+      (await read(secondPatient, table)) === 0,
+    );
+    check(
+      `another doctor reads no ${table}`,
+      (await read(otherDoctor, table)) === 0,
+    );
+    check(
+      `a doctor with only a password reads no ${table}`,
+      (await read({ ...doctor, aal: "aal1" }, table)) === 0,
+    );
+  }
+  refused(
+    "a doctor with only a password can't order",
+    {
+      ...(await save({ ...doctor, aal: "aal1" }, visit, {
+        p_test_ids: ["cbc"],
+      })),
+      fn: "require_second_factor",
+    },
+    "second_factor_required",
+  );
+  denied(
+    "nobody writes the table directly",
+    await as(
+      doctor,
+      `update public.lab_orders set note = 'x' where id = $1`,
+      [orderId],
+    ),
+  );
+  denied(
+    "nobody adds items directly",
+    await as(
+      doctor,
+      `insert into public.lab_order_items
+         (order_id, patient_id, doctor_id, test_type_id, test_name)
+       values ($1, $2, $3, 'tsh', 'TSH')`,
+      [orderId, patient.id, doctor.id],
+    ),
+  );
+
+  section("Comparing labs for an order (RX-04)");
+
+  const addTest = (lab, testTypeId, price, fields = {}) =>
+    rpc(lab, "save_lab_test", {
+      p_test_type_id: testTypeId,
+      p_price: price,
+      p_turnaround_hours: 24,
+      p_home_collection: true,
+      p_preparation: null,
+      p_listed: true,
+      ...fields,
+    });
+  const both = await createLab({ status: "approved" });
+  const cheapBoth = await createLab({ status: "approved" });
+  const one = await createLab({ status: "approved" });
+  const pending = await createLab();
+  await addTest(both, "hba1c", 1500);
+  await addTest(both, "lipid-profile", 2200, { p_turnaround_hours: 48 });
+  await addTest(cheapBoth, "hba1c", 1000, { p_home_collection: false });
+  await addTest(cheapBoth, "lipid-profile", 2000);
+  await addTest(one, "hba1c", 500);
+  await addTest(one, "lipid-profile", 100, { p_listed: false });
+  await addTest(pending, "hba1c", 100);
+  await addTest(pending, "lipid-profile", 100);
+
+  const offers = async (caller, id = orderId) =>
+    (await rpc(caller, "get_lab_order_offers", { p_order_id: id })).data ?? [];
+  const mine = (rows) =>
+    rows.filter((row) => [both.id, cheapBoth.id, one.id, pending.id].includes(row.lab_id));
+  const seen = mine(await offers(patient));
+  check(
+    "labs with every test come first, cheapest first, then partial ones",
+    seen.map((row) => row.lab_id).join() ===
+      [cheapBoth.id, both.id, one.id].join(),
+    seen.map((row) => row.total_price).join(),
+  );
+  check(
+    // None of these labs has set up home collection, so the view says no.
+    "each lab shows its tests, total and slowest turnaround",
+    seen[0]?.total_price === 3000 &&
+      seen[0]?.home_collection === false &&
+      seen[1]?.total_price === 3700 &&
+      seen[1]?.turnaround_hours === 48 &&
+      seen[2]?.test_type_ids.join() === "hba1c",
+  );
+  check(
+    "the doctor can compare too",
+    mine(await offers(doctor)).length === 3,
+  );
+  check(
+    "another patient sees nothing for the order",
+    (await offers(secondPatient)).length === 0,
+  );
+  denied(
+    "a guest can't compare",
+    await rpc(null, "get_lab_order_offers", { p_order_id: orderId }),
+  );
+  await cancel(doctor, visit);
+  check(
+    "a cancelled order offers no labs",
+    (await offers(patient)).length === 0,
+  );
+}
+
 async function testPatientDocuments({ patient, secondPatient }) {
   section("Patient documents (REC-02)");
 
@@ -8538,6 +8874,7 @@ try {
   await testCalls(await freshPatients());
   await testPrescriptions(await freshPatients());
   await testVisitSummaries(await freshPatients());
+  await testLabOrders(await freshPatients());
   await testPatientDocuments(await freshPatients());
   await testVerification(await freshPatients());
   await testReview(await freshPatients());

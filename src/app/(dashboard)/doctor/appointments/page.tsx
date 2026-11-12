@@ -8,6 +8,7 @@ import {
 import { VisitsTabs } from "@/features/doctor-dashboard/components/visits-tabs";
 import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
+import { getLabOrders } from "@/features/lab-orders/data/lab-orders";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 
@@ -22,9 +23,10 @@ export default async function DoctorAppointmentsPage() {
     getDoctorPrescriptionSummaries(user.id),
   ]);
   const ids = appointments.map((item) => item.id);
-  const [notes, summaries, profiles] = await Promise.all([
+  const [notes, summaries, labOrders, profiles] = await Promise.all([
     getAppointmentNotes(ids),
     getVisitSummaries(ids),
+    getLabOrders(ids),
     getMedicalProfiles(appointments.map((item) => item.careRecipientId)),
   ]);
 
@@ -32,13 +34,14 @@ export default async function DoctorAppointmentsPage() {
     <>
       <DashboardPageHeader
         title="Appointments"
-        description="Everything booked with you. Open an appointment for patient details, notes, visit summaries, prescriptions and actions."
+        description="Everything booked with you. Open an appointment for patient details, notes, visit summaries, prescriptions, lab tests and actions."
       />
       <VisitsTabs
         appointments={appointments}
         notes={notes}
         prescriptions={prescriptions}
         summaries={summaries}
+        labOrders={labOrders}
         profiles={profiles}
       />
     </>

@@ -33,6 +33,7 @@ import {
 } from "@/features/messaging/components/recent-messages-card";
 import { listConversations } from "@/features/messaging/data/messaging";
 import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
+import { getLabOrders } from "@/features/lab-orders/data/lab-orders";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 import { formatTime } from "@/lib/datetime";
@@ -53,9 +54,10 @@ export default async function DoctorOverviewPage() {
   const nextToday = upcoming.find((item) => isToday(item));
   const thisWeek = startingWithin(upcoming, 7);
   const todayIds = today.map((item) => item.id);
-  const [notes, summaries, profiles] = await Promise.all([
+  const [notes, summaries, labOrders, profiles] = await Promise.all([
     getAppointmentNotes(todayIds),
     getVisitSummaries(todayIds),
+    getLabOrders(todayIds),
     getMedicalProfiles(today.map((item) => item.careRecipientId)),
   ]);
 
@@ -122,6 +124,7 @@ export default async function DoctorOverviewPage() {
         previousVisits={countPreviousVisits(appointments)}
         prescriptions={prescriptions}
         summaries={summaries}
+        labOrders={labOrders}
         profiles={profiles}
         nextAppointment={upcoming[0] ?? null}
       />

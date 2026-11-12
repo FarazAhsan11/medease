@@ -11,6 +11,8 @@ import {
   getPatientLabBookings,
   PATIENT_BOOKINGS_SHOWN,
 } from "@/features/lab-booking/data/lab-bookings";
+import { LabOrderCard } from "@/features/lab-orders/components/lab-order-card";
+import { getRecentLabOrders } from "@/features/lab-orders/data/lab-orders";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -19,11 +21,10 @@ export const metadata: Metadata = {
 
 export default async function PatientLabTestsPage() {
   const user = await requireRole("patient");
-  const bookings = await getPatientLabBookings(
-    user.id,
-    PATIENT_BOOKINGS_SHOWN,
-    true,
-  );
+  const [bookings, orders] = await Promise.all([
+    getPatientLabBookings(user.id, PATIENT_BOOKINGS_SHOWN, true),
+    getRecentLabOrders(user.id),
+  ]);
 
   return (
     <>
@@ -40,6 +41,22 @@ export default async function PatientLabTestsPage() {
           </Link>
         }
       />
+      {orders.length > 0 && (
+        <section className="grid gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Ordered by your doctor</h2>
+            <p className="text-sm text-muted-foreground">
+              Tests your doctors asked for in the last two months. Compare labs
+              and book them here.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {orders.map((order) => (
+              <LabOrderCard key={order.id} order={order} />
+            ))}
+          </div>
+        </section>
+      )}
       {bookings.length === 0 ? (
         <EmptyState
           icon={FlaskConicalIcon}

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetails } from "@/features/doctor-dashboard/components/appointment-details";
+import type { LabOrder } from "@/features/lab-orders/lib/lab-orders";
 import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
@@ -22,6 +23,7 @@ type AppointmentDetailsSheetProps = {
   previousVisits: number;
   prescription: PrescriptionSummary | null;
   summary: VisitSummary | null;
+  labOrder: LabOrder | null;
   profile: MedicalProfile | null;
 };
 

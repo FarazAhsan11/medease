@@ -16,6 +16,7 @@ import {
 import { JoinCallButton } from "@/features/video-call/components/join-call-button";
 import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
 import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
+import type { LabOrder } from "@/features/lab-orders/lib/lab-orders";
 import type { PrescriptionSummary } from "@/features/prescriptions/lib/prescriptions";
 import type { VisitSummary } from "@/features/visit-summaries/lib/visit-summaries";
 import { formatDate, formatTime } from "@/lib/datetime";
@@ -26,6 +27,7 @@ type VisitsTableProps = {
   previousVisits: Record<string, number>;
   prescriptions: Record<string, PrescriptionSummary>;
   summaries: Record<string, VisitSummary>;
+  labOrders: Record<string, LabOrder>;
   // By care recipient id.
   profiles: Record<string, MedicalProfile>;
 };
@@ -36,6 +38,7 @@ export function VisitsTable({
   previousVisits,
   prescriptions,
   summaries,
+  labOrders,
   profiles,
 }: VisitsTableProps) {
   return (
@@ -94,6 +97,7 @@ export function VisitsTable({
                     previousVisits={previousVisits[visit.id] ?? 0}
                     prescription={prescriptions[visit.id] ?? null}
                     summary={summaries[visit.id] ?? null}
+                    labOrder={labOrders[visit.id] ?? null}
                     profile={profiles[visit.careRecipientId] ?? null}
                   />
                 </div>

@@ -1,6 +1,9 @@
 import { AppointmentStatusBadge } from "@/features/appointments/components/appointment-status-badge";
 import type { Appointment } from "@/features/appointments/lib/appointments";
 import { AppointmentDetailsSheet } from "@/features/doctor-dashboard/components/appointment-details-sheet";
+import { LabOrderBadge } from "@/features/lab-orders/components/lab-order-badge";
+import { LabOrderTests } from "@/features/lab-orders/components/lab-order-tests";
+import type { LabOrder } from "@/features/lab-orders/lib/lab-orders";
 import type { MedicalProfile } from "@/features/medical-profile/lib/medical-profile";
 import { ChartSection } from "@/features/patient-chart/components/chart-section";
 import { PrescriptionStatusBadge } from "@/features/prescriptions/components/prescription-status-badge";
@@ -15,13 +18,15 @@ type ChartVisitCardProps = {
   previousVisits: number;
   prescription: PrescriptionSummary | null;
   summary: VisitSummary | null;
+  labOrder: LabOrder | null;
   profile: MedicalProfile | null;
 };
 
 // One visit in the chart, read at a glance. Details opens the same sheet as
-// the appointments page, for notes, the summary, the prescription and actions.
+// the appointments page, for notes, the summary, the prescription, lab tests
+// and actions.
 export function ChartVisitCard(props: ChartVisitCardProps) {
-  const { appointment, notes, prescription, summary } = props;
+  const { appointment, notes, prescription, summary, labOrder } = props;
   const { timezone } = appointment;
   const cancelled = appointment.status === "cancelled";
 
@@ -68,6 +73,15 @@ export function ChartVisitCard(props: ChartVisitCardProps) {
             <p className="text-sm break-words text-muted-foreground">
               {prescription.medicines.join(", ")}
             </p>
+          </div>
+        </ChartSection>
+      )}
+
+      {labOrder && (
+        <ChartSection title="Lab tests ordered">
+          <div className="grid gap-2">
+            <LabOrderBadge order={labOrder} />
+            <LabOrderTests order={labOrder} />
           </div>
         </ChartSection>
       )}

@@ -28,7 +28,7 @@ export const privacyPolicy: LegalDocument = {
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
           "Lab bookings: the lab, the tests or packages, the day of a lab visit or the window for home collection, the collection address and contact, the name, relation, date of birth and gender of the person being tested, the price paid in cash, and each step of the booking (sample collected, processing, report ready, a new sample needed or a cancellation), with when it happened and any reason or note the lab gives, or that you give when you cancel, and each new day or window you move it to. When the lab publishes the report, the PDF it uploads.",
-          "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date) and the private notes your doctor keeps.",
+          "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date), the lab tests your doctor orders (with how urgent they are and any note), and the private notes your doctor keeps.",
           "Messages: what you and a doctor write to each other, and when each message was sent and read.",
           "Documents you upload: the file (PDF, JPG or PNG), the name, type and date you give it, and its size. Only you can see them; doctors cannot.",
           "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
@@ -129,7 +129,7 @@ export const privacyPolicy: LegalDocument = {
               "Deleted",
             ],
             [
-              "Appointments, prescriptions, visit summaries and doctors' notes",
+              "Appointments, prescriptions, visit summaries, lab test orders and doctors' notes",
               "7 years after the last visit. For a minor, until they turn 25",
               "Kept, no longer linked to your identity",
             ],

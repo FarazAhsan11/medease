@@ -13,10 +13,11 @@ import {
 import { countPreviousVisits } from "@/features/doctor-dashboard/lib/practice";
 import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
 import { getDoctorPrescriptionSummaries } from "@/features/prescriptions/data/prescriptions";
+import { getLabOrders } from "@/features/lab-orders/data/lab-orders";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 
 // What one doctor has for one patient: their visits together, with the notes,
-// summaries and prescriptions the doctor wrote. Every read goes through row
+// summaries, prescriptions and lab orders the doctor wrote. Every read goes through row
 // level security, so another doctor's records never appear. Only for a patient
 // the doctor has seen: an upcoming booking alone opens nothing.
 // Documents the patient uploads join once they can share them (REC-03).
@@ -33,9 +34,10 @@ export async function getPatientChart(doctorId: string, patientId: string) {
   if (seen.length === 0) return null;
 
   const ids = appointments.map((appointment) => appointment.id);
-  const [notes, summaries, profiles] = await Promise.all([
+  const [notes, summaries, labOrders, profiles] = await Promise.all([
     getAppointmentNotes(ids),
     getVisitSummaries(ids),
+    getLabOrders(ids),
     getMedicalProfiles(appointments.map((item) => item.careRecipientId)),
   ]);
 
@@ -61,6 +63,7 @@ export async function getPatientChart(doctorId: string, patientId: string) {
     notes,
     prescriptions,
     summaries,
+    labOrders,
     profiles,
     ownProfile,
     previousVisits: countPreviousVisits(appointments),
