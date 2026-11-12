@@ -49,22 +49,36 @@ const toLabOrderWithVisit = (row: LabOrderVisitRow): LabOrderWithVisit => ({
 });
 
 // Orders for these appointments, active or cancelled, by appointment id.
+// About 37 characters per uuid in the query string keeps a batch near 4 KB.
+const IDS_PER_REQUEST = 100;
+
 export async function getLabOrders(
   appointmentIds: string[],
 ): Promise<Record<string, LabOrder>> {
   if (appointmentIds.length === 0) return {};
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("lab_orders")
-    .select(LAB_ORDER_COLUMNS)
-    .in("appointment_id", appointmentIds)
-    .returns<LabOrderRow[]>();
-
-  if (error) throw new Error(`lab_orders: ${error.message}`);
-  return Object.fromEntries(
-    data.map((row) => [row.appointment_id, toLabOrder(row)]),
+  // Ids go in the URL, so long lists are read in batches at once.
+  const batches = [];
+  for (let i = 0; i < appointmentIds.length; i += IDS_PER_REQUEST) {
+    batches.push(appointmentIds.slice(i, i + IDS_PER_REQUEST));
+  }
+  const results = await Promise.all(
+    batches.map((ids) =>
+      supabase
+        .from("lab_orders")
+        .select(LAB_ORDER_COLUMNS)
+        .in("appointment_id", ids)
+        .returns<LabOrderRow[]>(),
+    ),
   );
+
+  const orders: Record<string, LabOrder> = {};
+  for (const { data, error } of results) {
+    if (error) throw new Error(`lab_orders: ${error.message}`);
+    for (const row of data) orders[row.appointment_id] = toLabOrder(row);
+  }
+  return orders;
 }
 
 export const getLabOrderForAppointment = cache(

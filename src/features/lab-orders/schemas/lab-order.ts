@@ -6,11 +6,8 @@ import {
   MAX_ORDER_TESTS,
 } from "@/features/lab-orders/lib/lab-orders";
 
-// Test ids are the shared list's slugs, e.g. "cbc" or "lipid-profile".
-const testId = z
-  .string()
-  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Choose tests from the list.")
-  .max(40, "Choose tests from the list.");
+// Ids from the shared test list; the database checks they exist.
+const testId = z.string().min(1).max(40, "Choose tests from the list.");
 
 export const labOrderSchema = z.object({
   appointmentId: z.uuid(),

@@ -26,6 +26,8 @@ const messages: Record<string, string> = {
     "You can record the outcome once the appointment time has started.",
   has_prescription:
     "You prescribed for this appointment, so it can't be a no-show. Mark it completed, or cancel the prescription first.",
+  has_lab_order:
+    "You ordered lab tests for this appointment, so it can't be a no-show. Mark it completed, or cancel the lab order first.",
   not_doctor: "Only doctors can change a schedule.",
   overlapping_hours: "Some of your hours overlap. Adjust them and try again.",
   consent_required:

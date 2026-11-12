@@ -1610,6 +1610,24 @@ async function testLabOrders({ patient, secondPatient }) {
     ),
   );
 
+  const ordered = await startedVisit(doctor, patient, { from: -500, to: -470 });
+  succeeded(
+    "tests are ordered for another visit",
+    await save(doctor, ordered, { p_test_ids: ["cbc"] }),
+  );
+  const setOutcome = (status) =>
+    rpc(doctor, "set_appointment_outcome", {
+      p_appointment_id: ordered,
+      p_status: status,
+    });
+  refused(
+    "a visit with tests ordered can't be a no-show",
+    await setOutcome("no_show"),
+    "has_lab_order",
+  );
+  succeeded("once cancelled, it can", await cancel(doctor, ordered));
+  succeeded("and then it's a no-show", await setOutcome("no_show"));
+
   section("Comparing labs for an order (RX-04)");
 
   const addTest = (lab, testTypeId, price, fields = {}) =>

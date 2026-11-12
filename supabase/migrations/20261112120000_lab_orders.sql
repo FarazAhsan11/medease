@@ -173,8 +173,11 @@ begin
     raise exception 'invalid_lab_order';
   end if;
 
+  -- Locked too, so a cancel running at the same time finishes first and this
+  -- save sees it: saving a cancelled order issues it again.
   select * into v_order from public.lab_orders
-  where appointment_id = v_appointment.id;
+  where appointment_id = v_appointment.id
+  for update;
 
   if not found then
     insert into public.lab_orders (
@@ -306,3 +309,57 @@ $$;
 
 revoke execute on function public.get_lab_order_offers(uuid) from public, anon;
 grant execute on function public.get_lab_order_offers(uuid) to authenticated;
+
+-- A visit with tests ordered took place ------------------------------------------------
+-- As with a prescription, a visit with an active lab order can't be a no-show:
+-- the patient would still be asked to book tests from a visit that didn't happen.
+-- Latest version before this: 20261020120000_prescriptions.sql.
+
+create or replace function public.set_appointment_outcome(
+  p_appointment_id uuid,
+  p_status text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row public.appointments;
+begin
+  if p_status not in ('completed', 'no_show') then
+    raise exception 'invalid_status';
+  end if;
+
+  select * into v_row from public.appointments
+  where id = p_appointment_id and doctor_id = auth.uid()
+  for update;
+
+  if not found then
+    raise exception 'appointment_not_found';
+  end if;
+  if v_row.status <> 'booked' then
+    raise exception 'not_open';
+  end if;
+  if v_row.starts_at > now() then
+    raise exception 'not_started';
+  end if;
+  if p_status = 'no_show' and exists (
+    select 1 from public.prescriptions
+    where appointment_id = v_row.id and status = 'active'
+  ) then
+    raise exception 'has_prescription';
+  end if;
+  if p_status = 'no_show' and exists (
+    select 1 from public.lab_orders
+    where appointment_id = v_row.id and status = 'active'
+  ) then
+    raise exception 'has_lab_order';
+  end if;
+
+  update public.appointments set status = p_status where id = v_row.id;
+end;
+$$;
+
+revoke execute on function public.set_appointment_outcome(uuid, text) from public, anon;
+grant execute on function public.set_appointment_outcome(uuid, text) to authenticated;

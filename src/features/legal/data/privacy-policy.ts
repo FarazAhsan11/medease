@@ -9,7 +9,7 @@ export const privacyPolicy: LegalDocument = {
   title: "Privacy Policy",
   summary: `What personal data ${name} holds, why we hold it, who can see it and how long we keep it.`,
   version: "1.0",
-  updated: "10 November 2026",
+  updated: "12 November 2026",
   sections: [
     {
       title: "Who we are",

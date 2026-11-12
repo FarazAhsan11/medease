@@ -173,7 +173,10 @@ export function AppointmentDetails({
           <AppointmentOutcomeButtons
             appointmentId={appointment.id}
             // Someone who was prescribed for attended.
-            allowNoShow={prescription?.status !== "active"}
+            allowNoShow={
+              prescription?.status !== "active" &&
+              labOrder?.status !== "active"
+            }
           />
         </div>
       )}
