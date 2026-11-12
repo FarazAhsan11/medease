@@ -1,4 +1,9 @@
-import { ClockIcon, FlaskConicalIcon, HomeIcon, MapPinIcon } from "lucide-react";
+import {
+  ClockIcon,
+  FlaskConicalIcon,
+  HomeIcon,
+  MapPinIcon,
+} from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";

@@ -27,9 +27,16 @@ type LabOrderFormProps = {
   // The shared list of tests labs price.
   tests: LabOrderTest[];
   order: LabOrder | null;
+  // Tests a booking holds (LAB-08): they stay on the order.
+  bookedTestIds: string[];
 };
 
-export function LabOrderForm({ appointmentId, tests, order }: LabOrderFormProps) {
+export function LabOrderForm({
+  appointmentId,
+  tests,
+  order,
+  bookedTestIds,
+}: LabOrderFormProps) {
   const active = order?.status === "active" ? order : null;
   const [selected, setSelected] = useState(
     () => active?.tests.map((test) => test.id) ?? [],
@@ -60,11 +67,21 @@ export function LabOrderForm({ appointmentId, tests, order }: LabOrderFormProps)
         id="lab-order-tests"
         legend="Tests"
         filterLabel="Search tests"
-        items={tests.map((test) => ({ key: test.id, label: test.name }))}
+        items={tests.map((test) => {
+          const booked = bookedTestIds.includes(test.id);
+          return {
+            key: test.id,
+            label: test.name,
+            detail: booked ? "Booked by the patient" : undefined,
+            disabled: booked,
+          };
+        })}
         selected={selected}
         onToggle={(id, checked) =>
           setSelected((current) =>
-            checked ? [...current, id] : current.filter((value) => value !== id),
+            checked
+              ? [...current, id]
+              : current.filter((value) => value !== id),
           )
         }
         error={

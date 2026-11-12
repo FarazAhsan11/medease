@@ -1532,7 +1532,10 @@ async function testLabOrders({ patient, secondPatient }) {
   );
   refused(
     "a visit without an order has nothing to cancel",
-    await cancel(doctor, await startedVisit(doctor, patient, { from: -90, to: -60 })),
+    await cancel(
+      doctor,
+      await startedVisit(doctor, patient, { from: -90, to: -60 }),
+    ),
     "lab_order_not_found",
   );
   succeeded("the doctor cancels it", await cancel(doctor, visit));
@@ -1593,11 +1596,9 @@ async function testLabOrders({ patient, secondPatient }) {
   );
   denied(
     "nobody writes the table directly",
-    await as(
-      doctor,
-      `update public.lab_orders set note = 'x' where id = $1`,
-      [orderId],
-    ),
+    await as(doctor, `update public.lab_orders set note = 'x' where id = $1`, [
+      orderId,
+    ]),
   );
   denied(
     "nobody adds items directly",
@@ -1656,7 +1657,9 @@ async function testLabOrders({ patient, secondPatient }) {
   const offers = async (caller, id = orderId) =>
     (await rpc(caller, "get_lab_order_offers", { p_order_id: id })).data ?? [];
   const mine = (rows) =>
-    rows.filter((row) => [both.id, cheapBoth.id, one.id, pending.id].includes(row.lab_id));
+    rows.filter((row) =>
+      [both.id, cheapBoth.id, one.id, pending.id].includes(row.lab_id),
+    );
   const seen = mine(await offers(patient));
   check(
     "labs with every test come first, cheapest first, then partial ones",
@@ -1673,10 +1676,7 @@ async function testLabOrders({ patient, secondPatient }) {
       seen[1]?.turnaround_hours === 48 &&
       seen[2]?.test_type_ids.join() === "hba1c",
   );
-  check(
-    "the doctor can compare too",
-    mine(await offers(doctor)).length === 3,
-  );
+  check("the doctor can compare too", mine(await offers(doctor)).length === 3);
   check(
     "another patient sees nothing for the order",
     (await offers(secondPatient)).length === 0,
@@ -1689,6 +1689,373 @@ async function testLabOrders({ patient, secondPatient }) {
   check(
     "a cancelled order offers no labs",
     (await offers(patient)).length === 0,
+  );
+}
+
+async function testLabOrderResults({ patient, secondPatient }) {
+  section("Booking a doctor's order and its results (LAB-08)");
+
+  const doctor = await createDoctor();
+  const otherDoctor = await createDoctor();
+  const visit = await startedVisit(doctor, patient);
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const orderId = idOf(
+    await rpc(doctor, "save_lab_order", {
+      p_appointment_id: visit,
+      p_test_ids: ["cbc", "hba1c", "lipid-profile"],
+    }),
+  );
+  const saveOrder = (caller, testIds) =>
+    rpc(caller, "save_lab_order", {
+      p_appointment_id: visit,
+      p_test_ids: testIds,
+    });
+  const cancelOrder = (caller) =>
+    rpc(caller, "cancel_lab_order", { p_appointment_id: visit });
+
+  const addTest = async (lab, testTypeId) =>
+    idOf(
+      await rpc(lab, "save_lab_test", {
+        p_test_type_id: testTypeId,
+        p_price: 1000,
+        p_turnaround_hours: 24,
+        p_home_collection: true,
+        p_preparation: null,
+        p_listed: true,
+      }),
+    );
+  const lab = await createLab({ status: "approved" });
+  const lipidLab = await createLab({ status: "approved" });
+  const cbc = await addTest(lab, "cbc");
+  const hba1c = await addTest(lab, "hba1c");
+  const lipid = await addTest(lipidLab, "lipid-profile");
+  const child = idOf(
+    await rpc(patient, "save_family_member", {
+      p_id: null,
+      p_first_name: "Little",
+      p_last_name: "One",
+      p_relation: "child",
+      p_date_of_birth: "2018-04-02",
+      p_gender: "Female",
+    }),
+  );
+  check(
+    "the fixtures are in place",
+    [orderId, cbc, hba1c, lipid, child].every(Boolean),
+  );
+
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+  }).format(new Date());
+  const book = (caller, fields = {}) =>
+    rpc(caller, "book_lab_test", {
+      p_request_id: randomUUID(),
+      p_lab_id: lab.id,
+      p_lab_test_ids: [cbc, hba1c],
+      p_package_ids: [],
+      p_collection: "lab",
+      p_visit_date: today,
+      p_slot_starts_at: null,
+      p_address_id: null,
+      p_care_recipient_id: null,
+      p_lab_order_id: orderId,
+      ...fields,
+    });
+  const link = async (id) =>
+    (
+      await db.query(
+        `select lab_order_id, ordered_test_ids
+         from public.lab_bookings where id = $1`,
+        [id],
+      )
+    ).rows[0];
+  const offerTests = async () =>
+    (
+      (await rpc(patient, "get_lab_order_offers", { p_order_id: orderId }))
+        .data ?? []
+    )
+      .filter((row) => [lab.id, lipidLab.id].includes(row.lab_id))
+      .flatMap((row) => row.test_type_ids)
+      .sort()
+      .join();
+
+  const bookingId = idOf(await book(patient));
+  const linked = await link(bookingId);
+  check(
+    "a booking from the order points at it",
+    linked?.lab_order_id === orderId &&
+      linked?.ordered_test_ids.join() === "cbc,hba1c",
+  );
+  check(
+    "the booked tests drop out of the comparison",
+    (await offerTests()) === "lipid-profile",
+    await offerTests(),
+  );
+  check(
+    "booking a covered test again isn't linked",
+    (await link(idOf(await book(patient, { p_lab_test_ids: [cbc] }))))
+      ?.lab_order_id === null,
+  );
+  check(
+    "booking for someone else isn't linked",
+    (await link(idOf(await book(patient, { p_care_recipient_id: child }))))
+      ?.lab_order_id === null,
+  );
+  check(
+    "another patient can't book against the order",
+    (await link(idOf(await book(secondPatient))))?.lab_order_id === null,
+  );
+  check(
+    "a booking without an order isn't linked",
+    (await link(idOf(await book(patient, { p_lab_order_id: null }))))
+      ?.lab_order_id === null,
+  );
+
+  refused(
+    "the doctor can't drop a booked test",
+    await saveOrder(doctor, ["cbc", "lipid-profile"]),
+    "lab_order_test_booked",
+  );
+  succeeded(
+    "but can add one",
+    await saveOrder(doctor, ["cbc", "hba1c", "lipid-profile", "tsh"]),
+  );
+  refused(
+    "nor cancel a booked order",
+    await cancelOrder(doctor),
+    "lab_order_booked",
+  );
+
+  const lipidBooking = idOf(
+    await book(patient, { p_lab_id: lipidLab.id, p_lab_test_ids: [lipid] }),
+  );
+  check(
+    "a second lab can take the rest of the order",
+    (await link(lipidBooking))?.ordered_test_ids.join() === "lipid-profile",
+  );
+  succeeded(
+    "the patient cancels that booking",
+    await rpc(patient, "cancel_lab_booking", {
+      p_booking_id: lipidBooking,
+      p_reason: "no_longer_needed",
+      p_note: null,
+    }),
+  );
+  check(
+    "and its test is open to book again",
+    (await offerTests()) === "lipid-profile",
+  );
+  succeeded(
+    "and the doctor can drop it",
+    await saveOrder(doctor, ["cbc", "hba1c"]),
+  );
+
+  const doctorBookings = (caller) =>
+    rpc(caller, "get_lab_order_bookings", { p_appointment_id: visit });
+  refused(
+    "a patient can't use the doctor's view",
+    await doctorBookings(patient),
+    "not_doctor",
+  );
+  refused(
+    "the doctor's view needs a second factor",
+    await doctorBookings({ ...doctor, aal: "aal1" }),
+    "second_factor_required",
+  );
+  denied("a guest can't use it", await doctorBookings(null));
+  const seen = (await doctorBookings(doctor)).data ?? [];
+  check(
+    "the doctor sees the open booking, without a report yet",
+    seen.length === 1 &&
+      seen[0].booking_id === bookingId &&
+      seen[0].ordered_test_ids.join() === "cbc,hba1c" &&
+      seen[0].report_id === null,
+    JSON.stringify(seen),
+  );
+  check(
+    "another doctor sees none of it",
+    ((await doctorBookings(otherDoctor)).data ?? []).length === 0,
+  );
+  check(
+    "the doctor can't read the booking itself",
+    ((await as(doctor, `select 1 from public.lab_bookings`)).data ?? [])
+      .length === 0,
+  );
+
+  const review = (caller, comment = null, id = bookingId) =>
+    rpc(caller, "review_lab_result", { p_booking_id: id, p_comment: comment });
+  refused(
+    "there's nothing to review before the report",
+    await review(doctor),
+    "report_not_ready",
+  );
+
+  const move = (from, to) =>
+    rpc(lab, "move_lab_booking", {
+      p_booking_id: bookingId,
+      p_from_status: from,
+      p_to_status: to,
+      p_reason: null,
+      p_note: null,
+    });
+  succeeded(
+    "the lab collects the sample",
+    await move("booked", "sample_collected"),
+  );
+  succeeded("and processes it", await move("sample_collected", "processing"));
+  const path = `${lab.id}/${bookingId}/${randomUUID()}.pdf`;
+  await rpc({ role: "service_role" }, "mark_upload_checked", {
+    p_bucket: "lab-reports",
+    p_path: path,
+    p_owner_id: lab.id,
+  });
+  const reportId = idOf(
+    await rpc(lab, "publish_lab_report", {
+      p_booking_id: bookingId,
+      p_path: path,
+    }),
+  );
+  const { rows: reportRows } = await db.query(
+    `select ordering_doctor_id from public.lab_reports where id = $1`,
+    [reportId],
+  );
+  check(
+    "the report goes to the ordering doctor",
+    reportRows[0]?.ordering_doctor_id === doctor.id,
+  );
+  const { rows: doctorNotices } = await db.query(
+    `select href from public.notifications
+     where user_id = $1 and kind = 'lab_result_ready'`,
+    [doctor.id],
+  );
+  check(
+    "who is told, with a link to the visit's lab tests",
+    doctorNotices.length === 1 &&
+      doctorNotices[0].href === `/doctor/appointments/${visit}/lab-tests`,
+  );
+  const readReport = async (caller) =>
+    (
+      (
+        await as(caller, `select 1 from public.lab_reports where id = $1`, [
+          reportId,
+        ])
+      ).data ?? []
+    ).length;
+  check("the doctor reads the report", (await readReport(doctor)) === 1);
+  check("another doctor doesn't", (await readReport(otherDoctor)) === 0);
+  check(
+    "nor the doctor with only a password",
+    (await readReport({ ...doctor, aal: "aal1" })) === 0,
+  );
+  check(
+    "the doctor's view shows the report",
+    (await doctorBookings(doctor)).data?.[0]?.report_id === reportId,
+  );
+
+  refused("a patient can't review it", await review(patient), "not_doctor");
+  refused(
+    "another doctor can't",
+    await review(otherDoctor),
+    "booking_not_found",
+  );
+  refused(
+    "reviewing needs a second factor",
+    await review({ ...doctor, aal: "aal1" }),
+    "second_factor_required",
+  );
+  refused(
+    "a comment over 1000 characters is refused",
+    await review(doctor, "c".repeat(1001)),
+    "invalid_comment",
+  );
+  denied("a guest can't review", await review(null));
+
+  const reviewRow = async () =>
+    (
+      await db.query(
+        `select * from public.lab_result_reviews where booking_id = $1`,
+        [bookingId],
+      )
+    ).rows[0];
+  const patientNotices = async () =>
+    (
+      await db.query(
+        `select 1 from public.notifications
+         where user_id = $1 and kind = 'lab_result_comment'`,
+        [patient.id],
+      )
+    ).rows.length;
+  const audits = async () =>
+    (
+      await db.query(
+        `select action from public.audit_log
+         where target_id = $1 and action like 'lab_result%' order by id`,
+        [bookingId],
+      )
+    ).rows.map((row) => row.action);
+
+  succeeded("the doctor marks it reviewed", await review(doctor, "  "));
+  const reviewed = await reviewRow();
+  check(
+    "reviewed, with no comment and no notice",
+    reviewed?.comment === null &&
+      reviewed?.doctor_id === doctor.id &&
+      reviewed?.doctor_name?.length > 0 &&
+      (await patientNotices()) === 0 &&
+      (await audits()).join() === "lab_result.reviewed",
+  );
+  succeeded(
+    "then comments",
+    await review(
+      doctor,
+      "  Sugar is a little high. Let's talk at the follow-up.  ",
+    ),
+  );
+  check(
+    "the patient is told and the comment is trimmed",
+    (await reviewRow())?.comment ===
+      "Sugar is a little high. Let's talk at the follow-up." &&
+      (await reviewRow())?.commented_at !== null &&
+      (await patientNotices()) === 1,
+  );
+  succeeded(
+    "the same comment again",
+    await review(
+      doctor,
+      "Sugar is a little high. Let's talk at the follow-up.",
+    ),
+  );
+  check("is quiet", (await patientNotices()) === 1);
+  succeeded("removing the comment", await review(doctor, null));
+  check(
+    "clears it without telling the patient",
+    (await reviewRow())?.comment === null &&
+      (await reviewRow())?.commented_at === null &&
+      (await patientNotices()) === 1 &&
+      (await audits()).join() ===
+        "lab_result.reviewed,lab_result.commented,lab_result.commented",
+  );
+  await review(doctor, "All normal.");
+  check(
+    "the doctor's view shows the comment",
+    (await doctorBookings(doctor)).data?.[0]?.comment === "All normal.",
+  );
+
+  const readReview = async (caller) =>
+    (
+      (await as(caller, `select comment from public.lab_result_reviews`))
+        .data ?? []
+    ).length;
+  check("the patient reads the review", (await readReview(patient)) === 1);
+  check("the doctor reads it", (await readReview(doctor)) === 1);
+  check("another patient doesn't", (await readReview(secondPatient)) === 0);
+  denied(
+    "nobody writes reviews directly",
+    await as(
+      doctor,
+      `update public.lab_result_reviews set comment = 'x' where booking_id = $1`,
+      [bookingId],
+    ),
   );
 }
 
@@ -8919,6 +9286,8 @@ try {
   await testMessaging();
   await testMedicineReminders();
   await testLabPayments();
+  // After the catalog and booking groups, which count every lab offering a test.
+  await testLabOrderResults(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

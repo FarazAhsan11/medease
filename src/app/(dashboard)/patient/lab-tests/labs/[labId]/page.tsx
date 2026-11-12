@@ -16,7 +16,11 @@ import { LabBookingForm } from "@/features/lab-booking/components/lab-booking-fo
 import { getLabBookingOptions } from "@/features/lab-booking/data/booking-options";
 import { itemKey } from "@/features/lab-booking/lib/lab-bookings";
 import { OrderPrefillNotice } from "@/features/lab-orders/components/order-prefill-notice";
-import { getLabOrder } from "@/features/lab-orders/data/lab-orders";
+import {
+  getLabOrder,
+  getOrderBookings,
+} from "@/features/lab-orders/data/lab-orders";
+import { remainingTests } from "@/features/lab-orders/lib/lab-orders";
 import { onlinePaymentsEnabled } from "@/features/payments/lib/payment-provider.server";
 import { requireRole } from "@/lib/auth/session";
 import { searchParam } from "@/lib/directory-search";
@@ -40,15 +44,21 @@ export default async function PatientBookLabPage({
   if (!isUuid(labId)) notFound();
 
   const orderId = searchParam(query.order);
-  const [options, addresses, familyMembers, foundOrder] = await Promise.all([
-    getLabBookingOptions(labId),
-    getPatientAddresses(user.id),
-    getFamilyMembers(user.id),
-    // Read through row level security: only the patient's own order.
-    isUuid(orderId) ? getLabOrder(orderId) : null,
-  ]);
+  const [options, addresses, familyMembers, foundOrder, orderBookings] =
+    await Promise.all([
+      getLabBookingOptions(labId),
+      getPatientAddresses(user.id),
+      getFamilyMembers(user.id),
+      // Read through row level security: only the patient's own order.
+      isUuid(orderId) ? getLabOrder(orderId) : null,
+      isUuid(orderId) ? getOrderBookings([orderId]) : [],
+    ]);
   if (!options) notFound();
-  const order = foundOrder?.status === "active" ? foundOrder : null;
+  const activeOrder = foundOrder?.status === "active" ? foundOrder : null;
+  // The ordered tests not booked yet. Once every one is booked, this is an
+  // ordinary booking.
+  const toBook = activeOrder ? remainingTests(activeOrder, orderBookings) : [];
+  const order = toBook.length > 0 ? activeOrder : null;
 
   // Start with what the patient picked, if this lab still offers it, or with
   // the tests of their doctor's order that this lab does.
@@ -57,17 +67,16 @@ export default async function PatientBookLabPage({
         .filter(
           (item) =>
             item.testTypeId &&
-            order.tests.some((test) => test.id === item.testTypeId),
+            toBook.some((test) => test.id === item.testTypeId),
         )
         .map((item) => item.key)
     : [
         itemKey("test", searchParam(query.test)),
         itemKey("package", searchParam(query.package)),
       ].filter((key) => options.items.some((item) => item.key === key));
-  const notOffered =
-    order?.tests.filter(
-      (test) => !options.items.some((item) => item.testTypeId === test.id),
-    ) ?? [];
+  const notOffered = toBook.filter(
+    (test) => !options.items.some((item) => item.testTypeId === test.id),
+  );
   const orderRecipient = familyMembers.some(
     (member) => member.id === order?.careRecipientId,
   )
@@ -83,7 +92,13 @@ export default async function PatientBookLabPage({
       >
         {order ? "Back to your doctor's tests" : "Back to lab tests"}
       </BackLink>
-      {order && <OrderPrefillNotice order={order} notOffered={notOffered} />}
+      {order && (
+        <OrderPrefillNotice
+          order={order}
+          tests={toBook}
+          notOffered={notOffered}
+        />
+      )}
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <BookingLabCard
           lab={options.lab}
@@ -105,6 +120,7 @@ export default async function PatientBookLabPage({
               label: `${familyMemberName(member)} (${relationLabels[member.relation].toLowerCase()})`,
             }))}
             initialRecipientId={orderRecipient}
+            labOrderId={order?.id}
             onlinePayments={onlinePaymentsEnabled()}
           />
         ) : (

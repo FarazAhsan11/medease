@@ -6,9 +6,12 @@ import type { BookedFor } from "@/features/family/lib/relations";
 import {
   LAB_ORDER_COLUMNS,
   RECENT_ORDER_DAYS,
+  remainingTests,
   toLabOrder,
   type LabOrder,
   type LabOrderRow,
+  type OrderBooking,
+  type OrderResult,
 } from "@/features/lab-orders/lib/lab-orders";
 import { createClient } from "@/lib/supabase/server";
 
@@ -100,7 +103,85 @@ export const getLabOrder = cache(
   },
 );
 
-// The patient's active orders from the last RECENT_ORDER_DAYS, newest first.
+// The patient's bookings made from these orders, except cancelled ones, oldest
+// first. A patient has at most a handful of orders on a page, so one request.
+export async function getOrderBookings(
+  orderIds: string[],
+): Promise<OrderBooking[]> {
+  if (orderIds.length === 0) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("lab_bookings")
+    .select("id, lab_order_id, lab_name, status, ordered_test_ids")
+    .in("lab_order_id", orderIds)
+    .neq("status", "cancelled")
+    .order("created_at")
+    .returns<
+      {
+        id: string;
+        lab_order_id: string;
+        lab_name: string;
+        status: OrderBooking["status"];
+        ordered_test_ids: string[];
+      }[]
+    >();
+
+  if (error) throw new Error(`lab_bookings: ${error.message}`);
+  return data.map((row) => ({
+    id: row.id,
+    orderId: row.lab_order_id,
+    labName: row.lab_name,
+    status: row.status,
+    testIds: row.ordered_test_ids,
+  }));
+}
+
+type OrderResultRow = {
+  booking_id: string;
+  lab_name: string;
+  status: OrderResult["status"];
+  collection: OrderResult["collection"];
+  visit_date: string;
+  slot_starts_at: string | null;
+  timezone: string;
+  ordered_test_ids: string[];
+  report_id: string | null;
+  report_published_at: string | null;
+  comment: string | null;
+  reviewed_at: string | null;
+};
+
+// The doctor's view of the bookings and results for a visit's order. The
+// doctor can't read bookings, so a database function returns only what they
+// need.
+export async function getOrderResults(
+  appointmentId: string,
+): Promise<OrderResult[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_lab_order_bookings", {
+    p_appointment_id: appointmentId,
+  });
+  if (error) throw new Error(`get_lab_order_bookings: ${error.message}`);
+
+  return ((data ?? []) as OrderResultRow[]).map((row) => ({
+    bookingId: row.booking_id,
+    labName: row.lab_name,
+    status: row.status,
+    collection: row.collection,
+    visitDate: row.visit_date,
+    slotStartsAt: row.slot_starts_at,
+    timezone: row.timezone,
+    testIds: row.ordered_test_ids,
+    reportId: row.report_id,
+    reportPublishedAt: row.report_published_at,
+    comment: row.comment,
+    reviewedAt: row.reviewed_at,
+  }));
+}
+
+// The patient's active orders from the last RECENT_ORDER_DAYS that still have
+// tests to book, newest first.
 export async function getRecentLabOrders(
   patientId: string,
 ): Promise<LabOrderWithVisit[]> {
@@ -108,16 +189,30 @@ export async function getRecentLabOrders(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("lab_orders")
-    .select(VISIT_COLUMNS)
+    .select(`${VISIT_COLUMNS}, lab_bookings(ordered_test_ids, status)`)
     .eq("patient_id", patientId)
     .eq("status", "active")
     .gte("created_at", since.toISOString())
     .order("created_at", { ascending: false })
     .limit(10)
-    .returns<LabOrderVisitRow[]>();
+    .returns<
+      (LabOrderVisitRow & {
+        lab_bookings: {
+          ordered_test_ids: string[];
+          status: OrderBooking["status"];
+        }[];
+      })[]
+    >();
 
   if (error) throw new Error(`lab_orders: ${error.message}`);
-  return data.map(toLabOrderWithVisit);
+  return data
+    .filter((row) => {
+      const live = row.lab_bookings
+        .filter((booking) => booking.status !== "cancelled")
+        .map((booking) => ({ testIds: booking.ordered_test_ids }));
+      return remainingTests(toLabOrder(row), live).length > 0;
+    })
+    .map(toLabOrderWithVisit);
 }
 
 // A lab that does some or all of an order's tests.

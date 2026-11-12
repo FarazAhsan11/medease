@@ -1,5 +1,6 @@
 import { HouseIcon, PhoneIcon, StoreIcon } from "lucide-react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { LabBookingActions } from "@/features/lab-booking/components/lab-booking-actions";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
@@ -77,6 +78,11 @@ export function LabBookingEntry({ booking }: LabBookingEntryProps) {
                 : "Lab visit"}
             </span>
           </p>
+          {booking.labOrderId && (
+            <StatusBadge tone="info" className="mt-2">
+              Doctor&apos;s order
+            </StatusBadge>
+          )}
           {booking.rescheduleCount > 0 && canPatientChange(booking) && (
             <p className="mt-1 text-xs font-medium text-foreground">
               The patient moved this to a new {home ? "window" : "day"}.

@@ -7,7 +7,12 @@ import { doctorRoutes } from "@/config/routes";
 import { getAppointment } from "@/features/appointments/data/appointments";
 import { getLabTestTypes } from "@/features/lab-catalog/data/lab-catalog";
 import { DoctorLabOrderPanel } from "@/features/lab-orders/components/doctor-lab-order-panel";
-import { getLabOrderForAppointment } from "@/features/lab-orders/data/lab-orders";
+import { DoctorLabResults } from "@/features/lab-orders/components/doctor-lab-results";
+import {
+  getLabOrderForAppointment,
+  getOrderResults,
+} from "@/features/lab-orders/data/lab-orders";
+import { bookedTestIds } from "@/features/lab-orders/lib/lab-orders";
 import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -22,9 +27,10 @@ export default async function DoctorLabOrderPage({
 
   const appointment = await getAppointment(appointmentId);
   if (!appointment || appointment.doctorId !== user.id) notFound();
-  const [order, testTypes] = await Promise.all([
+  const [order, testTypes, results] = await Promise.all([
     getLabOrderForAppointment(appointment.id),
     getLabTestTypes(),
+    getOrderResults(appointment.id),
   ]);
 
   return (
@@ -35,14 +41,16 @@ export default async function DoctorLabOrderPage({
         </BackLink>
         <DashboardPageHeader
           title="Lab tests"
-          description="Tests for this visit. The patient sees them as soon as you save and can book them at any lab on MedEase."
+          description="Tests for this visit. The patient sees them as soon as you save and can book them at any lab on MedEase. The reports come back to you here."
         />
       </div>
       <DoctorLabOrderPanel
         appointment={appointment}
         order={order}
         tests={testTypes.map(({ id, name }) => ({ id, name }))}
+        bookedTestIds={bookedTestIds(results)}
       />
+      {order && <DoctorLabResults order={order} results={results} />}
     </>
   );
 }

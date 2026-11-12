@@ -8,7 +8,7 @@ export const privacyPolicy: LegalDocument = {
   slug: "privacy",
   title: "Privacy Policy",
   summary: `What personal data ${name} holds, why we hold it, who can see it and how long we keep it.`,
-  version: "1.0",
+  version: "1.1",
   updated: "12 November 2026",
   sections: [
     {
@@ -28,7 +28,7 @@ export const privacyPolicy: LegalDocument = {
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
           "Lab bookings: the lab, the tests or packages, the day of a lab visit or the window for home collection, the collection address and contact, the name, relation, date of birth and gender of the person being tested, the price paid in cash, and each step of the booking (sample collected, processing, report ready, a new sample needed or a cancellation), with when it happened and any reason or note the lab gives, or that you give when you cancel, and each new day or window you move it to. When the lab publishes the report, the PDF it uploads.",
-          "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date), the lab tests your doctor orders (with how urgent they are and any note), and the private notes your doctor keeps.",
+          "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date), the lab tests your doctor orders (with how urgent they are and any note), whether your doctor has reviewed a report from those tests and any comment they leave on it, and the private notes your doctor keeps.",
           "Messages: what you and a doctor write to each other, and when each message was sent and read.",
           "Documents you upload: the file (PDF, JPG or PNG), the name, type and date you give it, and its size. Only you can see them; doctors cannot.",
           "Medicine reminders: if you turn them on, your chosen times and time zone, and when each reminder went out.",
@@ -59,7 +59,8 @@ export const privacyPolicy: LegalDocument = {
         [
           "You, through your account.",
           "A doctor, only for patients who have an appointment with them. Their private notes are not shown to patients.",
-          "A lab, only for bookings made with it: the tests, the day or window, the name, age and gender of the person being tested, and the name and phone number of the account holder who booked. For home collection, also the address and the contact name and phone number there. The lab records each step of the booking, and you see what it records. If you cancel or move a booking, the lab sees the new time, or your reason and note. The lab uploads the report, and you open it in your records.",
+          "A lab, only for bookings made with it: the tests, the day or window, the name, age and gender of the person being tested, the name and phone number of the account holder who booked, and whether a doctor ordered the tests (not which doctor). For home collection, also the address and the contact name and phone number there. The lab records each step of the booking, and you see what it records. If you cancel or move a booking, the lab sees the new time, or your reason and note. The lab uploads the report, and you open it in your records.",
+          "The doctor who ordered your lab tests, when you book them from that order: which lab you chose, which of the ordered tests it does, the day, how far the booking has got and the report. The doctor doesn't see your address, phone number or what you paid. The report covers the whole booking, so book other tests separately if you'd rather the doctor didn't see them. The doctor can leave a comment on the report, which you see with it.",
           "Messages, only by you and the doctor you are writing to. You can message a doctor for 7 days after a visit, and the doctor can give you longer.",
           "Our administrators, who review doctor and lab verification documents. Clinical records are not part of that work, and sensitive actions are logged.",
           "The service providers listed below, only to run the service.",

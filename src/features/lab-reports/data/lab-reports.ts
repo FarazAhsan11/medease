@@ -6,8 +6,8 @@ import {
 } from "@/features/lab-reports/lib/lab-report-summary";
 import { createClient } from "@/lib/supabase/server";
 
-// Row level security limits rows to the signed-in patient or lab, with their
-// second factor; the filters keep each query on its index.
+// Row level security limits rows to the signed-in patient, lab or ordering
+// doctor, with their second factor; the filters keep each query on its index.
 
 const SUMMARY_COLUMNS = `id, created_at,
   lab_bookings (lab_name, timezone, care_recipient_name, care_recipient_relation,

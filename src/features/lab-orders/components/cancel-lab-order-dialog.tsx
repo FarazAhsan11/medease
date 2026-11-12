@@ -24,9 +24,13 @@ export function CancelLabOrderDialog({
   appointmentId: string;
 }) {
   const [open, setOpen] = useState(false);
-  const { pending, onSubmit } = useFormAction(cancelLabOrder, initialFormState, {
-    onSuccess: () => setOpen(false),
-  });
+  const { pending, onSubmit } = useFormAction(
+    cancelLabOrder,
+    initialFormState,
+    {
+      onSuccess: () => setOpen(false),
+    },
+  );
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>

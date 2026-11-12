@@ -5,17 +5,20 @@ import type { LabOrderTest } from "@/features/lab-orders/lib/lab-orders";
 
 type OrderPrefillNoticeProps = {
   order: LabOrderWithVisit;
-  // Ordered tests this lab doesn't do.
+  // Ordered tests not booked yet.
+  tests: LabOrderTest[];
+  // Of those, the ones this lab doesn't do.
   notOffered: LabOrderTest[];
 };
 
 // On the booking page opened from a doctor's order: what was chosen for the
-// patient, and what to book elsewhere.
+// patient, what to book elsewhere, and that the report goes to the doctor.
 export function OrderPrefillNotice({
   order,
+  tests,
   notOffered,
 }: OrderPrefillNoticeProps) {
-  const offeredNone = notOffered.length === order.tests.length;
+  const offeredNone = notOffered.length === tests.length;
   const forWhom =
     order.visit.careRecipientRelation !== "self"
       ? `, for ${order.visit.careRecipientName}`
@@ -28,7 +31,7 @@ export function OrderPrefillNotice({
         <p>
           {offeredNone
             ? `This lab doesn't do any of the tests ${order.visit.doctorName} ordered${forWhom}. Go back to compare labs that do.`
-            : `The tests ${order.visit.doctorName} ordered that this lab does are chosen for you${forWhom}.`}
+            : `The tests ${order.visit.doctorName} ordered that this lab does are chosen for you${forWhom}. The report for this booking goes to ${order.visit.doctorName} too, including any other tests you add.`}
         </p>
         {notOffered.length > 0 && !offeredNone && (
           <p>

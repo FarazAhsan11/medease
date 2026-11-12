@@ -17,14 +17,18 @@ type DoctorLabOrderPanelProps = {
   appointment: Appointment;
   order: LabOrder | null;
   tests: LabOrderTest[];
+  // Ordered tests a booking holds (LAB-08).
+  bookedTestIds: string[];
 };
 
 // The order form while the visit is in its window; otherwise what was ordered
-// and why it can't change. A cancel is possible at any time.
+// and why it can't change. A cancel is possible at any time until the patient
+// books the tests.
 export function DoctorLabOrderPanel({
   appointment,
   order,
   tests,
+  bookedTestIds,
 }: DoctorLabOrderPanelProps) {
   const block = getLabOrderBlock(appointment);
   const active = order?.status === "active";
@@ -50,6 +54,7 @@ export function DoctorLabOrderPanel({
             appointmentId={appointment.id}
             tests={tests}
             order={order}
+            bookedTestIds={bookedTestIds}
           />
         ) : (
           <>
@@ -61,7 +66,15 @@ export function DoctorLabOrderPanel({
         )}
         {active && (
           <div className="border-t pt-5">
-            <CancelLabOrderDialog appointmentId={appointment.id} />
+            {bookedTestIds.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                The patient has booked these tests, so the order can&apos;t be
+                cancelled. They can cancel the booking if the tests are no
+                longer needed.
+              </p>
+            ) : (
+              <CancelLabOrderDialog appointmentId={appointment.id} />
+            )}
           </div>
         )}
       </div>

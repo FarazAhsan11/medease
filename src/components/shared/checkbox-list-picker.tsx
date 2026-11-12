@@ -16,6 +16,8 @@ export type CheckboxListItem = {
   detail?: ReactNode;
   // Right-aligned, e.g. a price.
   aside?: ReactNode;
+  // Can't be changed here, e.g. a test the patient has already booked.
+  disabled?: boolean;
 };
 
 type CheckboxListPickerProps = {
@@ -91,6 +93,7 @@ export function CheckboxListPicker({
             <Checkbox
               className="mt-0.5"
               checked={selected.includes(item.key)}
+              disabled={item.disabled}
               onCheckedChange={(checked) => onToggle(item.key, checked)}
             />
             <span className="min-w-0 flex-1">

@@ -261,13 +261,24 @@ export type LabBooking = {
   items: LabBookingItem[];
   // The current report, once the lab has published one (LAB-05).
   reportId: string | null;
+  // The doctor's order this books (LAB-08); its report goes to that doctor.
+  labOrderId: string | null;
+  // The ordering doctor's comment on the report. Only on the patient's list.
+  doctorComment: DoctorComment | null;
   // When each step happened, newest move per status. Only on the patient's
   // list, which shows the tracker.
   steps: Partial<Record<LabBookingStatus, string>>;
 };
 
+export type DoctorComment = {
+  doctorName: string;
+  comment: string;
+  commentedAt: string;
+};
+
 export type LabBookingRow = {
   id: string;
+  lab_order_id: string | null;
   lab_id: string;
   status: LabBookingStatus;
   collection: "lab" | "home";
@@ -308,6 +319,11 @@ export type LabBookingRow = {
     created_at: string;
   }[];
   lab_reports: { id: string; replaced_at: string | null }[];
+  lab_result_reviews?: {
+    doctor_name: string;
+    comment: string | null;
+    commented_at: string | null;
+  } | null;
   lab_booking_items: {
     id: string;
     name: string;
@@ -323,11 +339,13 @@ export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, 
   street_address, area, city, landmark, contact_name, contact_phone, subtotal,
   collection_fee, total, payment_method, payment_status, payment_due_at, status_reason,
   status_note, status_changed_at, cancelled_by, reschedule_count, created_at,
-  lab_booking_items (id, name, price, test_names, package_id),
+  lab_order_id, lab_booking_items (id, name, price, test_names, package_id),
   lab_reports (id, replaced_at)`;
 
+// The patient's list: also the tracker's steps and the doctor's comment.
 export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
-  lab_booking_events (status, kind, created_at)`;
+  lab_booking_events (status, kind, created_at),
+  lab_result_reviews (doctor_name, comment, commented_at)`;
 
 // The newest time each status was reached. A move to a new time isn't a step.
 function stepTimes(events: LabBookingRow["lab_booking_events"]) {
@@ -339,6 +357,17 @@ function stepTimes(events: LabBookingRow["lab_booking_events"]) {
       steps[event.status] = event.created_at;
   }
   return steps;
+}
+
+function toDoctorComment(
+  review: LabBookingRow["lab_result_reviews"],
+): DoctorComment | null {
+  if (!review?.comment || !review.commented_at) return null;
+  return {
+    doctorName: review.doctor_name,
+    comment: review.comment,
+    commentedAt: review.commented_at,
+  };
 }
 
 export function toLabBooking(row: LabBookingRow): LabBooking {
@@ -386,6 +415,8 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     steps: stepTimes(row.lab_booking_events),
     reportId:
       row.lab_reports.find((report) => report.replaced_at === null)?.id ?? null,
+    labOrderId: row.lab_order_id,
+    doctorComment: toDoctorComment(row.lab_result_reviews),
     items: [...row.lab_booking_items]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => ({

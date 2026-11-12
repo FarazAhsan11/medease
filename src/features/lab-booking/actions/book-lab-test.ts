@@ -58,6 +58,7 @@ export const bookLabTest = withFormErrors(
       p_address_id: home ? booking.addressId : null,
       p_care_recipient_id: booking.careRecipientId,
       p_payment_method: booking.paymentMethod,
+      p_lab_order_id: booking.labOrderId,
     });
     if (error) {
       return databaseErrorState(error, labBookingErrorMessages, "Lab booking");

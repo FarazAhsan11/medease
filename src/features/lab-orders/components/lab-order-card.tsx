@@ -16,7 +16,10 @@ type LabOrderCardProps = {
 };
 
 // A doctor's order for the patient: who ordered it, when, for whom, and what.
-export function LabOrderCard({ order, showBookLink = true }: LabOrderCardProps) {
+export function LabOrderCard({
+  order,
+  showBookLink = true,
+}: LabOrderCardProps) {
   const { visit } = order;
 
   return (

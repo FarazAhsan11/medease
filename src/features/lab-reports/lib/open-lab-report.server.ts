@@ -9,9 +9,9 @@ import { REPORT_LINK_SECONDS } from "@/features/lab-reports/lib/lab-reports.serv
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // The report row is read with the caller's own session, so row level security
-// (the patient or the lab, with a second factor) is the permission check; only
-// then does the secret key sign a link that lasts a minute. The browser opens
-// the PDF in its own viewer.
+// (the patient, the lab or the ordering doctor, with a second factor) is the
+// permission check; only then does the secret key sign a link that lasts a
+// minute. The browser opens the PDF in its own viewer.
 export async function openLabReport(id: string): Promise<never> {
   const reportId = z.uuid().safeParse(id);
   const path = reportId.success

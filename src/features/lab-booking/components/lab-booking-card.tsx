@@ -1,7 +1,9 @@
 import { CalendarIcon, HouseIcon, PhoneIcon, StoreIcon } from "lucide-react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { patientRoutes } from "@/config/routes";
 import { BookedForBadge } from "@/features/family/components/booked-for-badge";
+import { DoctorCommentNote } from "@/features/lab-booking/components/doctor-comment-note";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
 import { OrderTracker } from "@/features/lab-booking/components/order-tracker";
@@ -38,6 +40,9 @@ export function LabBookingCard({
           careRecipientName={booking.careRecipientName}
           careRecipientRelation={booking.careRecipientRelation}
         />
+        {booking.labOrderId && (
+          <StatusBadge tone="muted">Ordered by your doctor</StatusBadge>
+        )}
       </div>
 
       <ul className="mt-3 grid gap-1 text-sm">
@@ -111,7 +116,9 @@ export function LabBookingCard({
                     href={patientRoutes.labReport(booking.reportId)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Also in your health records.
+                    {booking.labOrderId
+                      ? "Also in your health records, and sent to your doctor."
+                      : "Also in your health records."}
                   </p>
                 </div>
               ) : (
@@ -120,6 +127,14 @@ export function LabBookingCard({
                   send it.
                 </p>
               ))}
+            {booking.doctorComment && (
+              <div className="mt-4">
+                <DoctorCommentNote
+                  comment={booking.doctorComment}
+                  timezone={booking.timezone}
+                />
+              </div>
+            )}
           </div>
         )}
     </article>

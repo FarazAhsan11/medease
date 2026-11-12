@@ -15,7 +15,10 @@ export const labOrderSchema = z.object({
     .array(testId)
     .min(1, "Choose at least one test.")
     .max(MAX_ORDER_TESTS, `Order at most ${MAX_ORDER_TESTS} tests.`)
-    .refine((ids) => new Set(ids).size === ids.length, "A test is chosen twice."),
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      "A test is chosen twice.",
+    ),
   priority: z.enum(LAB_ORDER_PRIORITIES, "Choose routine or urgent."),
   note: z
     .string()

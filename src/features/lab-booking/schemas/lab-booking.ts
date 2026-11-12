@@ -46,6 +46,8 @@ export const bookLabTestSchema = z
     addressId: optionalId("Choose an address."),
     // Empty means the account holder; otherwise one of their family members.
     careRecipientId: optionalId("Choose who the test is for."),
+    // The doctor's order the page was opened from, if any (LAB-08).
+    labOrderId: optionalId("That order can't be found."),
     // Cash when online payment is off and the choice isn't shown.
     paymentMethod: z
       .enum(paymentMethods, "Choose how to pay.")

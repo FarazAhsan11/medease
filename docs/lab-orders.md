@@ -1,10 +1,10 @@
-# Lab orders (RX-04)
+# Lab orders (RX-04) and their results (LAB-08)
 
 During or after a visit, the doctor orders lab tests for the person seen. The patient sees the order on the visit and on Lab tests, compares labs that do those tests, and books one with the tests already chosen. LAB-08 builds on this: the booking points back to the order, the report goes to the ordering doctor, and the doctor comments on it (PRC-11 results inbox).
 
 ## Choices
 
-**One order per appointment, edited in place.** `lab_orders` has one row per appointment, like `visit_summaries`. The doctor can change the tests, priority and note in the same window as a prescription (from the visit's start until 14 days after) and can cancel it at any time, as with a prescription. Saving a cancelled order issues it again. Prescriptions keep versions because a printed copy goes to a pharmacy; a lab order is booked through MedEase, so the current order is what counts and the audit log keeps who changed what. When LAB-08 links bookings to an order, an order that has been booked will refuse changes to the tests.
+**One order per appointment, edited in place.** `lab_orders` has one row per appointment, like `visit_summaries`. The doctor can change the tests, priority and note in the same window as a prescription (from the visit's start until 14 days after) and can cancel it at any time, as with a prescription. Saving a cancelled order issues it again. Prescriptions keep versions because a printed copy goes to a pharmacy; a lab order is booked through MedEase, so the current order is what counts and the audit log keeps who changed what. Once a booking holds some of the tests (LAB-08), the order can add tests or change the priority and note, but can't drop a booked test or be cancelled.
 
 **Tests come from the shared list.** Items point at `lab_test_types`, the list every lab prices its tests from (LAB-01), so an order can be compared and booked at any lab without matching names. This is how electronic ordering works elsewhere: the order is made from a test compendium, and custom tests aren't accepted for electronic orders (Elation, eOrdering). A test that isn't on the list goes in the note, and the doctor asks support to add it. The name is copied onto the item, so a later rename doesn't change an order already made. LOINC codes can be filled in on the list later without touching orders.
 
@@ -29,9 +29,24 @@ During or after a visit, the doctor orders lab tests for the person seen. The pa
 - Doctor: the appointment sheet has a **Lab tests** part under the prescription, with what was ordered and a link to `/doctor/appointments/[id]/lab-tests`, where the doctor picks tests (searchable list), priority and a note, and saves or cancels. The patient chart shows each visit's order.
 - Patient: each visit with an order shows its tests, priority and note with **Book these tests**. `/patient/lab-tests` lists orders from the last 60 days under **Ordered by your doctor**. `/patient/lab-tests/orders/[id]` shows the order and compares labs; **Book** opens `/patient/lab-tests/labs/[labId]?order=[id]`.
 
+## Results (LAB-08)
+
+**The booking points at the order.** `lab_bookings` gains `lab_order_id` and `ordered_test_ids` (the ordered tests it covers, alone or inside a package), as a FHIR `DiagnosticReport.basedOn` points at its `ServiceRequest`. A foreign key on (`lab_order_id`, `patient_id`) keeps the order the patient's own. The lab reads its bookings, so the row never names the doctor: the lab sees only that a doctor ordered the tests, and the doctor is found through the order, which the lab can't read. The booking page fixes the person to the one seen at the visit. `book_lab_test` takes `p_lab_order_id` and links the booking only when the order is the patient's, still active, for the same person, and the booking covers at least one ordered test no other live booking covers. Otherwise it books as usual: the patient may add other tests, or book for someone else, from the same page. Covered tests leave the comparison and the booking page's prefill; an order with nothing left stops showing under "Ordered by your doctor". Cancelling a booking (or a lapsed payment hold) frees its tests.
+
+**The report goes to the ordering doctor, and only that doctor.** Guidance on results management (AHRQ, AMA) is that results route to the ordering clinician, who acknowledges each one. A trigger on `lab_reports` copies the order's doctor onto every report row, first or corrected, and sends that doctor an in-app notice linking to the visit's lab tests page. Row level security lets the doctor read that report row, so `openLabReport` serves them the same one-minute signed link. The whole report goes: a booking can hold tests the doctor didn't order, and the booking page and privacy policy say so.
+
+**The doctor reads only what they need.** The doctor can't read `lab_bookings` (it holds the address, phone and payment). `get_lab_order_bookings(appointment)` returns, for the order of one of the doctor's visits, each booking that wasn't cancelled (one waiting for payment too, since it holds its tests): lab, status, day, covered tests, current report and the review. It takes the visit, so the page loads it alongside the order.
+
+**Reviewed, with a comment the patient sees.** `lab_result_reviews` holds one row per booking: when the doctor reviewed it and an optional comment (up to 1000 characters), like FHIR's `DiagnosticReport.conclusion` from the `resultsInterpreter`. `review_lab_result(booking, comment)` needs the ordering doctor, a second factor and a published report. A new or changed comment sends the patient an in-app notice; removing one doesn't; saving the same again is quiet. The audit log records `lab_result.reviewed` and `lab_result.commented`, ids only. No email: the comment is clinical. PRC-11 builds the doctor's results inbox on the same rows (`lab_reports_ordering_doctor_idx`, `lab_result_reviews_doctor_idx`).
+
+**Screens.** Doctor: under the order on `/doctor/appointments/[id]/lab-tests`, **Bookings and results** lists each booking with its report (`/doctor/lab-results/[reportId]`) and the review form; booked tests are locked in the order form and the cancel button gives way to a note. Patient: the order page shows what's booked and compares labs for the rest; the booking card says "Ordered by your doctor", that the report goes to the doctor, and shows the doctor's comment. Lab: a "Doctor's order" flag on the booking.
+
+**Limits**: `rateLimits.labResultUser` (120 reviews an hour per doctor). **Indexes**: `lab_bookings_lab_order_idx` (partial), `lab_reports_ordering_doctor_idx`, `lab_result_reviews_doctor_idx` and `_patient_idx`.
+
 ## Later
 
-- LAB-08: bookings point at the order, the report goes to the ordering doctor, who comments; an order that has been booked shows as booked and stops showing under "Ordered by your doctor".
+- PRC-11: the doctor's results inbox across visits, unreviewed first.
+- A corrected report (LAB-18) should clear the review, so the doctor looks again.
 - The order on the printed prescription, for patients who go to a lab outside MedEase.
 - Package prices in the comparison.
 
@@ -41,3 +56,6 @@ During or after a visit, the doctor orders lab tests for the person seen. The pa
 - US Core ServiceRequest profile (LOINC common lab orders value set for codes): https://hl7.org/fhir/us/core/2025Jan/StructureDefinition-us-core-servicerequest.html
 - Elation Health, electronic lab orders (orders from the lab's compendium, no custom tests electronically): https://help.elationhealth.com/articles/Electronic-Lab-Order-Form
 - Mayo Clinic Laboratories, what the patient considers when choosing a laboratory: https://news.mayocliniclabs.com/?p=104691
+- HL7 FHIR R4, DiagnosticReport (basedOn, resultsInterpreter, conclusion): https://hl7.org/fhir/R4/DiagnosticReport.html
+- AHRQ, test result communication (closing the loop with the ordering clinician): https://www.ahrq.gov/diagnostic-safety/resources/issue-briefs/dxsafety-test-result-communication2.html
+- AMA, reviewing test results (route results to the ordering provider): https://www.ama-assn.org/system/files/regulatory-myths-reviewing-test-results.pdf

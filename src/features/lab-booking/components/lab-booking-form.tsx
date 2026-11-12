@@ -41,6 +41,9 @@ type LabBookingFormProps = {
   recipients: { value: string; label: string }[];
   // Who to start with, e.g. the person a doctor's order is for.
   initialRecipientId?: string | null;
+  // The doctor's order this page was opened from (LAB-08). The database links
+  // the booking to it only if it books ordered tests for the order's person.
+  labOrderId?: string | null;
   // Whether patients can pay online (PAY-07); otherwise cash only.
   onlinePayments: boolean;
 };
@@ -56,6 +59,7 @@ export function LabBookingForm({
   addresses,
   recipients,
   initialRecipientId,
+  labOrderId,
   onlinePayments,
 }: LabBookingFormProps) {
   const router = useRouter();
@@ -133,6 +137,7 @@ export function LabBookingForm({
     >
       <input type="hidden" name="requestId" value={requestId} />
       <input type="hidden" name="labId" value={labId} />
+      <input type="hidden" name="labOrderId" value={labOrderId ?? ""} />
       <input type="hidden" name="collection" value={home ? "home" : "lab"} />
       <input
         type="hidden"
@@ -220,17 +225,26 @@ export function LabBookingForm({
         </div>
       )}
 
-      {recipients.length > 0 && (
-        <SelectField
-          id="lab-booking-careRecipientId"
+      {/* A doctor's order is for the person seen at the visit. */}
+      {labOrderId ? (
+        <input
+          type="hidden"
           name="careRecipientId"
-          label="Who is this test for?"
-          emptyLabel="Myself"
-          options={recipients}
-          defaultValue={initialRecipientId}
-          hint="The lab sees this person's name, age and sex for the report."
-          error={fieldError("careRecipientId")}
+          value={initialRecipientId ?? ""}
         />
+      ) : (
+        recipients.length > 0 && (
+          <SelectField
+            id="lab-booking-careRecipientId"
+            name="careRecipientId"
+            label="Who is this test for?"
+            emptyLabel="Myself"
+            options={recipients}
+            defaultValue={initialRecipientId}
+            hint="The lab sees this person's name, age and sex for the report."
+            error={fieldError("careRecipientId")}
+          />
+        )
       )}
 
       {onlinePayments && (
