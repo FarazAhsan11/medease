@@ -9869,6 +9869,442 @@ async function testLabStaff({ patient }) {
 
 // QA-02 asks for every `raise exception` path. Read the functions as they stand
 // after all migrations, and fail on any refusal no test above produced.
+async function testLabCollectors({ patient }) {
+  section("Assigning a collector (LAB-06)");
+
+  const server = { role: "service_role" };
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  async function staffOf(labUser, role) {
+    const user = await createUser("lab", { confirmed: false });
+    succeeded(
+      `the admin adds a ${role}`,
+      await rpc(labUser, "add_lab_staff", { p_user_id: user.id, p_role: role }),
+    );
+    succeeded(
+      "they accept",
+      await rpc(server, "accept_lab_invite", { p_user_id: user.id }),
+    );
+    return user;
+  }
+  const collector = await staffOf(lab, "collector");
+  const secondCollector = await staffOf(lab, "collector");
+  const frontDesk = await staffOf(lab, "front_desk");
+  const pathologist = await staffOf(lab, "pathologist");
+  const otherCollector = await staffOf(otherLab, "collector");
+  const deskPasswordOnly = { ...frontDesk, aal: "aal1" };
+
+  const selfId = (
+    await db.query(
+      `select id from public.care_recipients
+       where account_id = $1 and relation = 'self'`,
+      [patient.id],
+    )
+  ).rows[0].id;
+  // A confirmed booking for today, written as the database owner.
+  const visit = async (labUser, collection = "home", status = "booked") =>
+    (
+      await db.query(
+        `insert into public.lab_bookings (
+           request_id, patient_id, care_recipient_id, lab_id, status, collection,
+           visit_date, slot_starts_at, slot_ends_at, lab_name, lab_address,
+           lab_phone, patient_name, care_recipient_name, care_recipient_relation,
+           street_address, area, city, contact_phone, subtotal, total, confirmed_at
+         ) values (
+           gen_random_uuid(), $1, $2, $3, $4, $5,
+           (now() at time zone 'Asia/Karachi')::date,
+           case when $5 = 'home' then now() + interval '1 hour' end,
+           case when $5 = 'home' then now() + interval '2 hours' end,
+           'Sql Lab', 'Lahore', '+92 300 0000000', 'Sql Patient', 'Sql Patient',
+           'self',
+           case when $5 = 'home' then 'House 1' end,
+           case when $5 = 'home' then 'Model Town' end,
+           case when $5 = 'home' then 'Lahore' end,
+           case when $5 = 'home' then '+92 300 1234567' end,
+           1000, 1000, now()
+         ) returning id`,
+        [patient.id, selfId, labUser.id, status, collection],
+      )
+    ).rows[0].id;
+  const homeId = await visit(lab);
+  const labVisitId = await visit(lab, "lab");
+  const collectedId = await visit(lab, "home", "sample_collected");
+  const otherLabHomeId = await visit(otherLab);
+
+  const assign = (caller, bookingId, collectorId) =>
+    rpc(caller, "assign_lab_collector", {
+      p_booking_id: bookingId,
+      p_collector_id: collectorId,
+    });
+  const inCaller = (result) => ({ ...result, fn: "lab_caller" });
+  const assignment = async (bookingId) =>
+    (
+      await db.query(
+        `select * from public.lab_booking_assignments where booking_id = $1`,
+        [bookingId],
+      )
+    ).rows[0];
+  const notices = async (userId, kind) =>
+    Number(
+      (
+        await db.query(
+          `select count(*) from public.notifications where user_id = $1 and kind = $2`,
+          [userId, kind],
+        )
+      ).rows[0].count,
+    );
+  const sees = async (caller, bookingId) =>
+    (
+      await as(caller, `select id from public.lab_bookings where id = $1`, [
+        bookingId,
+      ])
+    ).data?.length === 1;
+
+  check(
+    "a new home visit is told to the people who arrange visits, a lab visit to collectors too",
+    (await notices(collector.id, "lab_booking_new")) === 1 &&
+      (await notices(frontDesk.id, "lab_booking_new")) === 2 &&
+      (await notices(pathologist.id, "lab_booking_new")) === 0,
+  );
+  const mismatched = await db
+    .query(
+      `insert into public.lab_booking_assignments (booking_id, lab_id, patient_id, collector_id)
+       values ($1, $2, $3, $4)`,
+      [otherLabHomeId, lab.id, patient.id, collector.id],
+    )
+    .then(
+      () => false,
+      (error) => error.code === "23503",
+    );
+  check("an assignment can't name a booking from another lab", mismatched);
+  const crossLab = await db
+    .query(
+      `insert into public.lab_booking_assignments (booking_id, lab_id, patient_id, collector_id)
+       values ($1, $2, $3, $4)`,
+      [otherLabHomeId, otherLab.id, patient.id, collector.id],
+    )
+    .then(
+      () => false,
+      (error) => error.code === "23503",
+    );
+  check("or a collector from another lab", crossLab);
+
+  const people = (await rpc(frontDesk, "get_lab_collectors")).data ?? [];
+  check(
+    "the front desk lists who can take samples, collectors first",
+    people.length === 4 &&
+      people[0].role === "collector" &&
+      people[1].role === "collector" &&
+      people.some((row) => row.user_id === lab.id) &&
+      people.some((row) => row.user_id === frontDesk.id) &&
+      !people.some((row) => row.user_id === pathologist.id),
+  );
+  refused(
+    "a collector can't list them",
+    inCaller(await rpc(collector, "get_lab_collectors")),
+    "not_permitted",
+  );
+
+  refused(
+    "a patient can't assign",
+    inCaller(await assign(patient, homeId, collector.id)),
+    "not_lab",
+  );
+  denied("a guest can't assign", await assign(null, homeId, collector.id));
+  refused(
+    "a collector can't assign",
+    inCaller(await assign(collector, homeId, collector.id)),
+    "not_permitted",
+  );
+  refused(
+    "a pathologist can't assign",
+    inCaller(await assign(pathologist, homeId, collector.id)),
+    "not_permitted",
+  );
+  refused(
+    "the front desk needs two-factor",
+    await assign(deskPasswordOnly, homeId, collector.id),
+    "second_factor_required",
+  );
+  refused(
+    "an unknown booking isn't found",
+    await assign(frontDesk, randomUUID(), collector.id),
+    "booking_not_found",
+  );
+  refused(
+    "another lab's booking isn't found",
+    await assign(frontDesk, otherLabHomeId, collector.id),
+    "booking_not_found",
+  );
+  refused(
+    "a lab visit has no collector to assign",
+    await assign(frontDesk, labVisitId, collector.id),
+    "not_home_collection",
+  );
+  refused(
+    "a visit already made can't be assigned",
+    await assign(frontDesk, collectedId, collector.id),
+    "not_assignable",
+  );
+  refused(
+    "a pathologist can't be sent on a visit",
+    await assign(frontDesk, homeId, pathologist.id),
+    "invalid_collector",
+  );
+  refused(
+    "another lab's collector can't be sent",
+    await assign(frontDesk, homeId, otherCollector.id),
+    "invalid_collector",
+  );
+  denied(
+    "nobody writes assignments directly",
+    await as(
+      lab,
+      `insert into public.lab_booking_assignments (booking_id, lab_id, collector_id)
+       values ($1, $2, $3)`,
+      [homeId, lab.id, collector.id],
+    ),
+  );
+
+  succeeded(
+    "the front desk assigns a collector",
+    await assign(frontDesk, homeId, collector.id),
+  );
+  const given = await assignment(homeId);
+  check(
+    "the assignment records who gave it",
+    given?.collector_id === collector.id && given.assigned_by === frontDesk.id,
+  );
+  check(
+    "the collector is told",
+    (await notices(collector.id, "lab_booking_assigned")) === 1,
+  );
+  succeeded(
+    "assigning the same person again changes nothing",
+    await assign(frontDesk, homeId, collector.id),
+  );
+  check(
+    "and tells nobody twice",
+    (await notices(collector.id, "lab_booking_assigned")) === 1,
+  );
+  succeeded(
+    "the admin can assign themselves",
+    await assign(lab, homeId, lab.id),
+  );
+  check(
+    "the collector is told the visit left their list",
+    (await notices(collector.id, "lab_booking_unassigned")) === 1 &&
+      (await notices(lab.id, "lab_booking_assigned")) === 0,
+  );
+  succeeded(
+    "the front desk gives it back to the collector",
+    await assign(frontDesk, homeId, collector.id),
+  );
+  const today = (
+    await db.query(`select (now() at time zone 'Asia/Karachi')::date::text as day`)
+  ).rows[0].day;
+  const loadOf = async (userId, days) =>
+    (await rpc(frontDesk, "get_lab_collectors", { p_days: days })).data?.find(
+      (row) => row.user_id === userId,
+    )?.visits;
+  check(
+    "the list counts each person's visits still to make on the days asked",
+    (await loadOf(collector.id, [today]))?.[today] === 1 &&
+      Object.keys((await loadOf(secondCollector.id, [today])) ?? { x: 1 })
+        .length === 0 &&
+      Object.keys((await loadOf(collector.id, [])) ?? { x: 1 }).length === 0,
+  );
+  refused(
+    "a list asks for a page's days, not hundreds",
+    await rpc(frontDesk, "get_lab_collectors", {
+      p_days: Array.from({ length: 201 }, (_, index) =>
+        new Date(Date.UTC(2026, 0, 1) + index * DAY).toISOString().slice(0, 10),
+      ),
+    }),
+    "too_many_days",
+  );
+
+  section("What collectors see (LAB-06)");
+  check(
+    "a collector sees their own home visit and lab visits",
+    (await sees(collector, homeId)) && (await sees(collector, labVisitId)),
+  );
+  check(
+    "another collector doesn't see that home visit",
+    !(await sees(secondCollector, homeId)) &&
+      (await sees(secondCollector, labVisitId)),
+  );
+  check(
+    "nobody's home visit is hidden from collectors until assigned",
+    !(await sees(collector, collectedId)),
+  );
+  check(
+    "the front desk and pathologists see every booking",
+    (await sees(frontDesk, collectedId)) && (await sees(pathologist, homeId)),
+  );
+  const eventsSeen = async (caller) =>
+    (
+      await as(
+        caller,
+        `select id from public.lab_booking_events where booking_id = $1`,
+        [homeId],
+      )
+    ).data?.length ?? 0;
+  check(
+    "a booking's history follows the booking",
+    (await eventsSeen(collector)) > 0 && (await eventsSeen(secondCollector)) === 0,
+  );
+  const assignmentsSeen = async (caller) =>
+    (await as(caller, `select booking_id from public.lab_booking_assignments`))
+      .data?.length ?? 0;
+  check(
+    "collectors read their own assignments, the front desk all, patients none",
+    (await assignmentsSeen(collector)) === 1 &&
+      (await assignmentsSeen(secondCollector)) === 0 &&
+      (await assignmentsSeen(frontDesk)) === 1 &&
+      (await assignmentsSeen(patient)) === 0,
+  );
+  const move = (caller, bookingId, toStatus, fields = {}) =>
+    rpc(caller, "move_lab_booking", {
+      p_booking_id: bookingId,
+      p_from_status: "booked",
+      p_to_status: toStatus,
+      ...fields,
+    });
+  refused(
+    "another collector can't collect it",
+    await move(secondCollector, homeId, "sample_collected"),
+    "booking_not_found",
+  );
+  succeeded(
+    "a collector collects a lab visit",
+    await move(secondCollector, labVisitId, "sample_collected"),
+  );
+
+  section("Keeping assignments true (LAB-06)");
+  await db.query(
+    `update public.lab_bookings
+     set slot_starts_at = slot_starts_at + interval '1 day',
+         slot_ends_at = slot_ends_at + interval '1 day',
+         visit_date = visit_date + 1
+     where id = $1`,
+    [homeId],
+  );
+  check(
+    "a new window sends the visit back to be assigned",
+    (await assignment(homeId)) === undefined &&
+      (await notices(collector.id, "lab_booking_unassigned")) === 2,
+  );
+
+  const cancelledId = await visit(lab);
+  succeeded("assigned again", await assign(frontDesk, cancelledId, collector.id));
+  succeeded(
+    "the front desk cancels it",
+    await move(frontDesk, cancelledId, "cancelled", {
+      p_reason: "other",
+      p_note: "Patient unreachable",
+    }),
+  );
+  check(
+    "the collector hears it was cancelled, and it stays on record",
+    (await notices(collector.id, "lab_booking_cancelled")) === 1 &&
+      (await assignment(cancelledId))?.collector_id === collector.id,
+  );
+  refused(
+    "a cancelled visit can't be assigned",
+    await assign(frontDesk, cancelledId, secondCollector.id),
+    "not_assignable",
+  );
+
+  const deskVisitId = await visit(lab);
+  succeeded(
+    "the front desk sends themselves",
+    await assign(frontDesk, deskVisitId, frontDesk.id),
+  );
+  succeeded(
+    "the admin cancels that visit",
+    await move(lab, deskVisitId, "cancelled", {
+      p_reason: "other",
+      p_note: "Lab closed",
+    }),
+  );
+  check(
+    "the front desk sent on it hears it was cancelled",
+    (await notices(frontDesk.id, "lab_booking_cancelled")) === 1,
+  );
+
+  const redoId = await visit(lab);
+  succeeded("a visit for the collector", await assign(frontDesk, redoId, collector.id));
+  succeeded(
+    "they collect it",
+    await move(collector, redoId, "sample_collected"),
+  );
+  const deskRedoNotices = await notices(frontDesk.id, "lab_booking_recollection_needed");
+  succeeded(
+    "the pathologist asks for a new sample",
+    await move(pathologist, redoId, "recollection_needed", {
+      p_from_status: "sample_collected",
+      p_reason: "sample_haemolysed",
+    }),
+  );
+  check(
+    "the collector and the people who arrange visits are told",
+    (await notices(collector.id, "lab_booking_recollection_needed")) === 1 &&
+      (await notices(frontDesk.id, "lab_booking_recollection_needed")) ===
+        deskRedoNotices + 1,
+  );
+  check(
+    "it stays with the collector, to collect again",
+    (await assignment(redoId))?.collector_id === collector.id &&
+      (await sees(collector, redoId)),
+  );
+
+  const doneId = await visit(lab);
+  const openId = await visit(lab);
+  succeeded("a visit for the second collector", await assign(frontDesk, doneId, secondCollector.id));
+  succeeded("and another", await assign(frontDesk, openId, secondCollector.id));
+  succeeded(
+    "they collect the first",
+    await move(secondCollector, doneId, "sample_collected"),
+  );
+  succeeded(
+    "the admin removes them",
+    await rpc(lab, "remove_lab_staff", { p_user_id: secondCollector.id }),
+  );
+  check(
+    "their open visit goes back; the one they made keeps their name",
+    (await assignment(openId)) === undefined &&
+      (await assignment(doneId))?.collector_id === secondCollector.id,
+  );
+  refused(
+    "someone removed can't be assigned",
+    await assign(frontDesk, openId, secondCollector.id),
+    "invalid_collector",
+  );
+
+  succeeded("a visit for the collector", await assign(frontDesk, openId, collector.id));
+  succeeded(
+    "the collector becomes a pathologist",
+    await rpc(lab, "set_lab_staff_role", {
+      p_user_id: collector.id,
+      p_role: "pathologist",
+    }),
+  );
+  check(
+    "a role that can't take samples gives the visit back",
+    (await assignment(openId)) === undefined,
+  );
+  succeeded(
+    "the front desk can send themselves",
+    await assign(frontDesk, openId, frontDesk.id),
+  );
+  succeeded(
+    "and take the assignment back",
+    await assign(frontDesk, openId, null),
+  );
+  check("it's unassigned", (await assignment(openId)) === undefined);
+}
+
 async function testConsents() {
   section("Consent records (AUTH-03, CMPL-02, PRV-02)");
 
@@ -10147,6 +10583,7 @@ try {
   await testLabOrderResults(await freshPatients());
   await testLabResultsInbox(await freshPatients());
   await testLabStaff(await freshPatients());
+  await testLabCollectors(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import {
   LAB_BOOKING_COLUMNS,
+  LAB_SIDE_BOOKING_COLUMNS,
   LAB_BOOKING_WITH_STEPS_COLUMNS,
   LAB_TIMEZONE,
   stageStatuses,
@@ -55,6 +56,10 @@ export async function getPatientLabBooking(userId: string, bookingId: string) {
 
 type DayRange = { from?: string; before?: string };
 
+// The bookings page also reads who goes to each home visit; other lists don't
+// need it.
+type Columns = typeof LAB_SIDE_BOOKING_COLUMNS | typeof LAB_BOOKING_COLUMNS;
+
 // One page of a lab's bookings in some statuses, by visit day, forwards or
 // backwards along the stage's index. One extra row says whether there are
 // more, without counting them all.
@@ -64,11 +69,12 @@ async function readLabBookings(
   ascending: boolean,
   { from, before }: DayRange,
   shown: number,
+  columns: Columns = LAB_SIDE_BOOKING_COLUMNS,
 ) {
   const supabase = await createClient();
   let query = supabase
     .from("lab_bookings")
-    .select(LAB_BOOKING_COLUMNS)
+    .select(columns)
     .eq("lab_id", labId)
     .in("status", statuses);
   if (from) query = query.gte("visit_date", from);
@@ -127,7 +133,14 @@ export async function getLabBookings(labId: string, stage: LabBookingStage) {
 
 // Bookings waiting for their report, the longest-waiting visit first.
 export function getLabBookingsAwaitingReport(labId: string) {
-  return readLabBookings(labId, ["processing"], true, {}, LAB_BOOKINGS_SHOWN);
+  return readLabBookings(
+    labId,
+    ["processing"],
+    true,
+    {},
+    LAB_BOOKINGS_SHOWN,
+    LAB_BOOKING_COLUMNS,
+  );
 }
 
 // How many bookings wait at each open stage, for the tabs.

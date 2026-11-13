@@ -4,6 +4,7 @@
 // Design: docs/lab-booking.md.
 
 import type { CareRecipientRelation } from "@/features/family/lib/relations";
+import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
 // Match book_lab_test.
@@ -265,9 +266,19 @@ export type LabBooking = {
   labOrderId: string | null;
   // The ordering doctor's comment on the report. Only on the patient's list.
   doctorComment: DoctorComment | null;
+  // Who goes to a home visit (LAB-06). Only on the lab's list.
+  collectorId: string | null;
   // When each step happened, newest move per status. Only on the patient's
   // list, which shows the tracker.
   steps: Partial<Record<LabBookingStatus, string>>;
+};
+
+// Someone a home visit can go to, with their visits still to make per day.
+export type LabCollector = {
+  id: string;
+  name: string;
+  role: LabMemberRole;
+  visits: Record<string, number>;
 };
 
 export type DoctorComment = {
@@ -324,6 +335,9 @@ export type LabBookingRow = {
     comment: string | null;
     commented_at: string | null;
   } | null;
+  // At most one: the key is the booking, but the foreign key to it is
+  // composite, so PostgREST embeds it as a list.
+  assignment?: { collector_id: string }[];
   lab_booking_items: {
     id: string;
     name: string;
@@ -346,6 +360,11 @@ export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, 
 export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
   lab_booking_events (status, kind, created_at),
   lab_result_reviews (doctor_name, comment, commented_at)`;
+
+// The lab's list: also who goes to each home visit. Row level security shows
+// a collector only their own.
+export const LAB_SIDE_BOOKING_COLUMNS = `${LAB_BOOKING_COLUMNS},
+  assignment:lab_booking_assignments (collector_id)`;
 
 // The newest time each status was reached. A move to a new time isn't a step.
 function stepTimes(events: LabBookingRow["lab_booking_events"]) {
@@ -417,6 +436,7 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
       row.lab_reports.find((report) => report.replaced_at === null)?.id ?? null,
     labOrderId: row.lab_order_id,
     doctorComment: toDoctorComment(row.lab_result_reviews),
+    collectorId: row.assignment?.[0]?.collector_id ?? null,
     items: [...row.lab_booking_items]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => ({
@@ -506,6 +526,19 @@ export const labBookingMoveErrorMessages: Record<string, string> = {
   note_required: "Add a note saying what happened.",
   invalid_note: `Keep the note under ${MAX_STATUS_NOTE} characters.`,
   report_required: "Upload the report to mark it ready.",
+};
+
+// Sending a collector on a home visit (LAB-06).
+export const assignCollectorErrorMessages: Record<string, string> = {
+  not_lab: "Only lab accounts can assign collectors.",
+  not_permitted: "Your role in this lab can't assign collectors.",
+  second_factor_required: "Confirm your two-factor sign-in first.",
+  booking_not_found: "This booking isn't in your list.",
+  not_home_collection: "Only home collections have a collector.",
+  not_assignable:
+    "This visit was already made or closed, so its collector can't change.",
+  invalid_collector:
+    "That person can't take samples for this lab any more. Pick someone else.",
 };
 
 // The patient cancelling or moving a booking (LAB-20).

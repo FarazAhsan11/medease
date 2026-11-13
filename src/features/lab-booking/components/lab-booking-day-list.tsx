@@ -1,5 +1,8 @@
 import { LabBookingEntry } from "@/features/lab-booking/components/lab-booking-entry";
-import type { LabBooking } from "@/features/lab-booking/lib/lab-bookings";
+import type {
+  LabBooking,
+  LabCollector,
+} from "@/features/lab-booking/lib/lab-bookings";
 import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { formatDate } from "@/lib/datetime";
 
@@ -7,6 +10,9 @@ type LabBookingDayListProps = {
   bookings: LabBooking[];
   // The viewer's role in the lab, which decides the moves offered.
   role: LabMemberRole;
+  viewerId: string;
+  // The people a home visit can go to, for those who assign them.
+  collectors?: LabCollector[];
   // Shown under the list when there were more than it holds.
   more?: string;
   // Days before this one are marked as left over, for open bookings.
@@ -27,27 +33,39 @@ function byDay(bookings: LabBooking[]) {
 export function LabBookingDayList({
   bookings,
   role,
+  viewerId,
+  collectors,
   more,
   markBefore,
 }: LabBookingDayListProps) {
   return (
     <div className="space-y-6">
-      {byDay(bookings).map(([day, entries]) => (
-        <section key={day} className="space-y-3">
-          <h3 className="text-sm font-semibold">
-            {formatDate(`${day}T12:00:00Z`, "UTC")}{" "}
-            <span className="font-normal text-muted-foreground">
-              ({entries.length})
-            </span>
-            {markBefore && day < markBefore && (
-              <span className="ml-2 font-normal text-warning">Earlier day</span>
-            )}
-          </h3>
-          {entries.map((booking) => (
-            <LabBookingEntry key={booking.id} booking={booking} role={role} />
-          ))}
-        </section>
-      ))}
+      {byDay(bookings).map(([day, entries]) => {
+        return (
+          <section key={day} className="space-y-3">
+            <h3 className="text-sm font-semibold">
+              {formatDate(`${day}T12:00:00Z`, "UTC")}{" "}
+              <span className="font-normal text-muted-foreground">
+                ({entries.length})
+              </span>
+              {markBefore && day < markBefore && (
+                <span className="ml-2 font-normal text-warning">
+                  Earlier day
+                </span>
+              )}
+            </h3>
+            {entries.map((booking) => (
+              <LabBookingEntry
+                key={booking.id}
+                booking={booking}
+                role={role}
+                viewerId={viewerId}
+                collectors={collectors}
+              />
+            ))}
+          </section>
+        );
+      })}
       {more && (
         <p className="text-center text-xs text-muted-foreground">{more}</p>
       )}

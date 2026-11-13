@@ -12,12 +12,16 @@ import {
   getOpenLabBookingCounts,
   LAB_BOOKINGS_SHOWN,
 } from "@/features/lab-booking/data/lab-bookings";
+import { getLabCollectors } from "@/features/lab-booking/data/lab-collectors";
 import {
   LAB_TIMEZONE,
   labBookingStages,
   type LabBookingStage,
 } from "@/features/lab-booking/lib/lab-bookings";
-import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
+import {
+  memberCan,
+  requireLabMember,
+} from "@/features/lab-staff/lib/lab-member.server";
 import { toDateKey } from "@/lib/datetime";
 import { searchParam } from "@/lib/directory-search";
 
@@ -38,10 +42,28 @@ export default async function LabBookingsPage({
   const stage: LabBookingStage =
     labBookingStages.find((value) => value === requested) ?? "to-collect";
   const member = await requireLabMember("bookings.view");
+  const assigns = memberCan(member, "bookings.assign");
+  const sees = memberCan(member, "bookings.view_all");
   const [{ bookings, more, earlier }, counts] = await Promise.all([
     getLabBookings(member.labId, stage),
     getOpenLabBookingCounts(member.labId),
   ]);
+  // Names for the list, and for the picker each person's visits on the days
+  // shown. Only those who assign collectors need them.
+  const collectors = assigns
+    ? await getLabCollectors(
+        stage === "to-collect"
+          ? [
+              ...new Set(
+                [...bookings, ...(earlier?.bookings ?? [])].map(
+                  (booking) => booking.visitDate,
+                ),
+              ),
+            ]
+          : [],
+      )
+    : undefined;
+  const viewer = { role: member.role, viewerId: member.user.id, collectors };
   const today = toDateKey(new Date(), LAB_TIMEZONE);
   const leftOver = earlier?.bookings ?? [];
 
@@ -61,9 +83,11 @@ export default async function LabBookingsPage({
           icon={ClipboardListIcon}
           title={emptyTitles[stage]}
           description={
-            stage === "to-collect"
-              ? "Patients book your listed tests from the lab tests pages. New bookings also show in your notifications."
-              : "Bookings move here as you update them."
+            stage === "to-collect" && !sees
+              ? "Lab visits, and the home visits your lab gives you, show here."
+              : stage === "to-collect"
+                ? "Patients book your listed tests from the lab tests pages. New bookings also show in your notifications."
+                : "Bookings move here as you update them."
           }
         />
       ) : (
@@ -71,7 +95,7 @@ export default async function LabBookingsPage({
           {bookings.length > 0 ? (
             <LabBookingDayList
               bookings={bookings}
-              role={member.role}
+              {...viewer}
               more={
                 more
                   ? `Showing the first ${LAB_BOOKINGS_SHOWN} bookings.`
@@ -96,7 +120,7 @@ export default async function LabBookingsPage({
               </div>
               <LabBookingDayList
                 bookings={leftOver}
-                role={member.role}
+                {...viewer}
                 markBefore={today}
                 more={
                   earlier?.more

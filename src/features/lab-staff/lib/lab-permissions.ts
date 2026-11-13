@@ -4,7 +4,11 @@ import { z } from "zod";
 // private.lab_role_can and enforces it; this copy only decides which pages,
 // links and buttons to show. Keep the two in step.
 
-export const labStaffRoles = ["front_desk", "collector", "pathologist"] as const;
+export const labStaffRoles = [
+  "front_desk",
+  "collector",
+  "pathologist",
+] as const;
 export const labMemberRoleSchema = z.enum(["admin", ...labStaffRoles]);
 export const labStaffRoleSchema = z.enum(labStaffRoles);
 
@@ -13,7 +17,9 @@ export type LabStaffRole = z.infer<typeof labStaffRoleSchema>;
 
 export type LabPermission =
   | "bookings.view"
+  | "bookings.view_all"
   | "bookings.collect"
+  | "bookings.assign"
   | "bookings.process"
   | "bookings.cancel"
   | "reports.view"
@@ -26,13 +32,16 @@ export type LabPermission =
 const staffPermissions: Record<LabStaffRole, readonly LabPermission[]> = {
   front_desk: [
     "bookings.view",
+    "bookings.view_all",
     "bookings.collect",
+    "bookings.assign",
     "bookings.cancel",
     "reports.view",
   ],
   collector: ["bookings.view", "bookings.collect"],
   pathologist: [
     "bookings.view",
+    "bookings.view_all",
     "bookings.process",
     "reports.view",
     "reports.publish",
@@ -51,8 +60,10 @@ export const labRoleLabels: Record<LabMemberRole, string> = {
 };
 
 export const labRoleDescriptions: Record<LabStaffRole, string> = {
-  front_desk: "Sees bookings and reports, marks samples collected, cancels.",
-  collector: "Sees bookings and marks samples collected.",
+  front_desk:
+    "Sees bookings and reports, sends collectors on home visits, marks samples collected, cancels.",
+  collector:
+    "Sees lab visits and the home visits given to them, and marks samples collected.",
   pathologist: "Moves samples into processing and uploads reports.",
 };
 

@@ -2,6 +2,7 @@ import { HouseIcon, PhoneIcon, StoreIcon } from "lucide-react";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { LabBookingActions } from "@/features/lab-booking/components/lab-booking-actions";
+import { LabBookingCollector } from "@/features/lab-booking/components/lab-booking-collector";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
 import { bookedByLabel } from "@/features/family/lib/relations";
@@ -10,6 +11,7 @@ import {
   canPatientChange,
   paymentLabels,
   type LabBooking,
+  type LabCollector,
 } from "@/features/lab-booking/lib/lab-bookings";
 import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { formatTime } from "@/lib/datetime";
@@ -18,11 +20,18 @@ import { formatFee, telHref } from "@/lib/format";
 type LabBookingEntryProps = {
   booking: LabBooking;
   role: LabMemberRole;
+  viewerId: string;
+  collectors?: LabCollector[];
 };
 
 // One booking in the lab's list: who, what, where, what to collect, and the
 // next step.
-export function LabBookingEntry({ booking, role }: LabBookingEntryProps) {
+export function LabBookingEntry({
+  booking,
+  role,
+  viewerId,
+  collectors,
+}: LabBookingEntryProps) {
   const home = booking.collection === "home" && booking.address;
   const age = booking.careRecipientDateOfBirth
     ? ageOn(booking.careRecipientDateOfBirth, booking.visitDate)
@@ -103,6 +112,12 @@ export function LabBookingEntry({ booking, role }: LabBookingEntryProps) {
           </p>
         </div>
       </div>
+      <LabBookingCollector
+        booking={booking}
+        role={role}
+        viewerId={viewerId}
+        collectors={collectors}
+      />
       <LabBookingStatusReason booking={booking} audience="lab" />
       <LabBookingActions booking={booking} role={role} />
     </article>

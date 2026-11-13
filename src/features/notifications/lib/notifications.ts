@@ -29,6 +29,8 @@ const titles = {
   lab_order_cancelled: "A lab test order was cancelled",
   lab_result_ready: "A lab report you ordered is ready",
   lab_result_comment: "Your doctor commented on a lab report",
+  lab_booking_assigned: "You have a new home collection",
+  lab_booking_unassigned: "A home collection left your list",
 } as const;
 
 export type NotificationKind = keyof typeof titles;

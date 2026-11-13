@@ -198,3 +198,13 @@ export const rescheduleLabBookingSchema = z
 export const payLabBookingSchema = z.object({
   bookingId: z.uuid(),
 });
+
+// Sending a collector on a home visit, or taking it back with none (LAB-06).
+export const assignCollectorSchema = z.object({
+  bookingId: z.uuid(),
+  collectorId: z
+    .string()
+    .optional()
+    .transform((value) => value || null)
+    .pipe(z.uuid("Choose someone from the list.").nullable()),
+});

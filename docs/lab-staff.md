@@ -8,7 +8,9 @@ What each role can do. The database holds the matrix (`private.lab_role_can`); `
 
 | Permission | Lab admin | Front desk | Sample collector | Pathologist |
 | --- | --- | --- | --- | --- |
-| See bookings (`bookings.view`) | yes | yes | yes | yes |
+| See bookings (`bookings.view`) | yes | yes | lab visits and own home visits | yes |
+| See every booking (`bookings.view_all`) | yes | yes | | yes |
+| Send a collector on a home visit (`bookings.assign`) | yes | yes | | |
 | Mark a sample collected (`bookings.collect`) | yes | yes | yes | |
 | Move to processing, ask for a new sample (`bookings.process`) | yes | | | yes |
 | Cancel a booking (`bookings.cancel`) | yes | yes | | |
@@ -53,12 +55,11 @@ Someone who uses "Forgot password" before accepting gets signed in but stays `in
 
 ## Notifications
 
-Booking notices (new, cancelled, rescheduled) go to every active member whose role can collect samples (admin, front desk, collectors; `private.lab_role_can(role, 'bookings.collect')`) through `private.notify_lab`, one row each, written by the same triggers as before. Labs have only a few people, so this stays a single insert. Verification notices still go to the admin only.
+Booking notices (new, cancelled, rescheduled) go through `private.notify_lab`, one row each, to the active members with a right, never to the person who made the change. For a lab visit that's everyone who can collect samples (admin, front desk, collectors); for a home visit only those who arrange visits (`bookings.assign`), and the collector given it hears through `private.notify_lab_collector`. See home-collection.md, "Assigning a collector". Labs have only a few people, so this stays a single insert. Verification notices still go to the admin only.
 
 ## Not in this step
 
 - Sign-off (LAB-17), sample tracking with who did each step (LAB-16), and the collector's day view (LAB-21) build on these roles.
-- Choosing which collector gets a home collection (LAB-06).
 - More than one admin, and moving the lab to a new admin.
 - Staff accept the same documents as the lab admin, including the partner terms. Whether staff should accept only the terms and privacy policy is for counsel (CMPL-03).
 
