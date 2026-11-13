@@ -1,14 +1,12 @@
 import { StatusBadge } from "@/components/shared/status-badge";
-import { doctorRoutes } from "@/config/routes";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
-import { LabResultReviewForm } from "@/features/lab-orders/components/lab-result-review-form";
+import { LabResultReport } from "@/features/lab-orders/components/lab-result-report";
 import {
   testNames,
   type LabOrder,
   type OrderResult,
 } from "@/features/lab-orders/lib/lab-orders";
-import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
-import { formatDate, formatDateTime } from "@/lib/datetime";
+import { formatDate } from "@/lib/datetime";
 
 type LabResultEntryProps = {
   order: Pick<LabOrder, "tests">;
@@ -37,24 +35,14 @@ export function LabResultEntry({ order, result }: LabResultEntryProps) {
         </p>
       </div>
       {reportId && (
-        <div className="grid gap-4 border-t pt-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <LabReportLink href={doctorRoutes.labReport(reportId)} />
-            {result.reportPublishedAt && (
-              <p className="text-xs text-muted-foreground">
-                Published{" "}
-                {formatDateTime(result.reportPublishedAt, result.timezone)}
-              </p>
-            )}
-          </div>
-          <LabResultReviewForm
-            // Start again from the saved review after a save.
-            key={`${result.reviewedAt}:${result.comment}`}
-            bookingId={result.bookingId}
-            comment={result.comment}
-            reviewed={result.reviewedAt !== null}
-          />
-        </div>
+        <LabResultReport
+          reportId={reportId}
+          bookingId={result.bookingId}
+          publishedAt={result.reportPublishedAt}
+          timezone={result.timezone}
+          comment={result.comment}
+          reviewedAt={result.reviewedAt}
+        />
       )}
     </li>
   );

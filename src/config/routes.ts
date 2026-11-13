@@ -107,6 +107,8 @@ export const doctorRoutes = {
     `/doctor/appointments/${appointmentId}/prescription`,
   labOrder: (appointmentId: string) =>
     `/doctor/appointments/${appointmentId}/lab-tests`,
+  // Reports from tests this doctor ordered, across visits (PRC-11).
+  labResults: "/doctor/lab-results",
   labReport: (reportId: string) => `/doctor/lab-results/${reportId}`,
 } as const;
 

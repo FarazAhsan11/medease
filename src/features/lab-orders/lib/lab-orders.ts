@@ -1,4 +1,6 @@
 import type { Appointment } from "@/features/appointments/lib/appointments";
+import type { BookedFor } from "@/features/family/lib/relations";
+import { daysBetweenDateKeys, toDateKey } from "@/lib/datetime";
 import type { LabBookingStatus } from "@/features/lab-booking/lib/lab-bookings";
 import {
   getPrescribeBlock,
@@ -105,6 +107,53 @@ export type OrderResult = {
   comment: string | null;
   reviewedAt: string | null;
 };
+
+// A report in the doctor's results inbox (PRC-11, get_lab_results_inbox).
+export type InboxResult = BookedFor & {
+  reportId: string;
+  bookingId: string;
+  appointmentId: string;
+  labName: string;
+  collection: "lab" | "home";
+  visitDate: string;
+  timezone: string;
+  priority: LabOrderPriority;
+  testNames: string[];
+  publishedAt: string;
+  version: number;
+  reviewedAt: string | null;
+  comment: string | null;
+};
+
+export const RESULTS_PER_PAGE = 25;
+
+// Where the next page starts: the last row's time and id, in the URL as
+// `<iso time>_<report id>`. Ids and times only, never patient data.
+export type InboxCursor = { at: string; id: string };
+
+export const inboxCursor = (result: InboxResult, reviewed: boolean) =>
+  `${reviewed ? result.reviewedAt : result.publishedAt}_${result.reportId}`;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function parseInboxCursor(value: string | undefined) {
+  const [at, id] = value?.split("_") ?? [];
+  if (!at || !id || !UUID.test(id) || Number.isNaN(Date.parse(at))) {
+    return null;
+  }
+  return { at, id } satisfies InboxCursor;
+}
+
+// How long a report has waited for review, in the doctor's calendar days.
+// Null on the day it came in, when the published time says enough.
+export function waitingLabel(publishedAt: string, timezone: string, now: Date) {
+  const days = daysBetweenDateKeys(
+    toDateKey(publishedAt, timezone),
+    toDateKey(now, timezone),
+  );
+  if (days <= 0) return null;
+  return days === 1 ? "waiting 1 day" : `waiting ${days} days`;
+}
 
 // The order's test names, for a booking's test ids.
 export const testNames = (order: Pick<LabOrder, "tests">, ids: string[]) =>

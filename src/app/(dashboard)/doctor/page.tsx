@@ -2,6 +2,7 @@ import {
   CalendarClockIcon,
   CalendarDaysIcon,
   ClipboardCheckIcon,
+  FlaskConicalIcon,
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -33,19 +34,23 @@ import {
 } from "@/features/messaging/components/recent-messages-card";
 import { listConversations } from "@/features/messaging/data/messaging";
 import { getMedicalProfiles } from "@/features/medical-profile/data/medical-profiles";
-import { getLabOrders } from "@/features/lab-orders/data/lab-orders";
+import {
+  countResultsToReview,
+  getLabOrders,
+} from "@/features/lab-orders/data/lab-orders";
 import { getVisitSummaries } from "@/features/visit-summaries/data/visit-summaries";
 import { requireRole } from "@/lib/auth/session";
 import { formatTime } from "@/lib/datetime";
 
 export default async function DoctorOverviewPage() {
   const user = await requireRole("doctor");
-  const [appointments, prescriptions, verification, conversations] =
+  const [appointments, prescriptions, verification, conversations, toReview] =
     await Promise.all([
       listDoctorAppointments(user.id),
       getDoctorPrescriptionSummaries(user.id),
       getDoctorVerification(user.id),
       listConversations("doctor", RECENT_MESSAGES_SHOWN),
+      countResultsToReview(),
     ]);
   const { upcoming, needsOutcome } = groupDoctorAppointments(appointments);
 
@@ -88,6 +93,13 @@ export default async function DoctorOverviewPage() {
       hint:
         needsOutcome.length > 0 ? "Mark completed or no-show" : "All caught up",
       icon: ClipboardCheckIcon,
+    },
+    {
+      label: "Results to review",
+      value: String(toReview),
+      hint: toReview > 0 ? "Lab reports from your orders" : "All caught up",
+      icon: FlaskConicalIcon,
+      href: doctorRoutes.labResults,
     },
   ];
 

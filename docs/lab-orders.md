@@ -43,10 +43,51 @@ During or after a visit, the doctor orders lab tests for the person seen. The pa
 
 **Limits**: `rateLimits.labResultUser` (120 reviews an hour per doctor). **Indexes**: `lab_bookings_lab_order_idx` (partial), `lab_reports_ordering_doctor_idx`, `lab_result_reviews_doctor_idx` and `_patient_idx`.
 
+## Results inbox (PRC-11)
+
+Researched on 2026-11-12, built on 2026-11-13 (`20261113120000_lab_results_inbox.sql`). As built, it differs from the plan below only where noted.
+
+**Scope.** `/doctor/lab-results` lists every report from tests the doctor ordered, across all visits, with reports still to review first. The doctor marks each one reviewed and can comment, using the existing `LabResultReviewForm` and `review_lab_result`. Reports a patient shares need REC-03, which waits on the SEC-06 scanner, so PRC-11 goes to `Partial` with a note. Critical alerts (LAB-11) and check-in alerts (SIG-12/13) join the inbox later.
+
+**Best practice found.** The AMA says "if you order it, you own it": results go only to the ordering care team, and abnormal results stand out. Tracking guidance says a doctor confirms receipt of each result, urgent results that aren't acknowledged in time get escalated, and preliminary, final and corrected reports are told apart, with any change sent to the ordering clinician. A corrected report must therefore appear as unreviewed again. For paging, use keyset (cursor) pagination on `(timestamp, id)`, with `id` as the tiebreaker, an index whose order matches the `ORDER BY` exactly, and a check with EXPLAIN that it does an index seek. Don't use OFFSET.
+
+**Database (`20261113120000_lab_results_inbox.sql`).**
+- Track review per report version: add `lab_reports.reviewed_at timestamptz`. Leave `lab_result_reviews` (one per booking) as the source for the comment. A corrected report (LAB-18) is a new row with `reviewed_at` null, so it comes back as one to review with no extra logic. Backfill it: `update lab_reports r set reviewed_at = v.reviewed_at from lab_result_reviews v where v.booking_id = r.booking_id and r.replaced_at is null`.
+- As built, `reviewed_at` isn't readable directly: `authenticated` gets a column list on `lab_reports` without it, so labs and patients don't learn when the doctor reviewed. Only the doctor's functions return it. A new `lab_reports` column must be added to that grant.
+- Indexes, which replace `lab_reports_ordering_doctor_idx` (drop it):
+  - `lab_reports_to_review_idx on (ordering_doctor_id, created_at, id) where ordering_doctor_id is not null and replaced_at is null and reviewed_at is null`. The set stays small however many reports a doctor has reviewed.
+  - `lab_reports_reviewed_idx on (ordering_doctor_id, reviewed_at desc, id desc) where ordering_doctor_id is not null and replaced_at is null and reviewed_at is not null`.
+- `review_lab_result` changes: after the checks, `update lab_reports set reviewed_at = now() where booking_id = v_booking.id and replaced_at is null and reviewed_at is null`. Today the function returns early when the comment hasn't changed. That return must still mark an unreviewed corrected report, so it should return only when the comment is unchanged and the current report is already reviewed. Also refresh `lab_result_reviews.reviewed_at` when the doctor re-reviews a corrected report, and write `lab_result.reviewed` to the audit log again. No trigger on `lab_reports` blocks updates; there is only `require_second_factor`, and the function already requires the second factor.
+- `get_lab_results_inbox(p_reviewed boolean, p_cursor_at timestamptz default null, p_cursor_id uuid default null, p_limit int default 25)`, SECURITY DEFINER, stable, with the same guards as `get_lab_order_bookings` (`not_doctor`, `second_factor_required`). It's needed because doctors can't read `lab_bookings`, by design. Clamp `p_limit` to 1–50.
+  - It reads `lab_reports r` (current rows where `ordering_doctor_id = auth.uid()`), joins `lab_bookings b` (for `lab_name`, `status`, `collection`, `visit_date`, `timezone` and `ordered_test_ids`), `lab_orders o` (for `priority` and `appointment_id`) and `appointments a` (for `care_recipient_name` and `care_recipient_relation`, the treated person), then left-joins `lab_result_reviews v` (for `comment`). Test names come from `array(select test_name from lab_order_items i where i.order_id = o.id and i.test_type_id = any(b.ordered_test_ids))`.
+  - To review: `reviewed_at is null`, order `created_at asc, id asc`, so the result waiting longest comes first. Urgent items get a badge. They aren't sorted first: that would break the keyset index, and the set is small.
+  - Reviewed: order `reviewed_at desc, id desc`, with the keyset `(r.reviewed_at, r.id) < (p_cursor_at, p_cursor_id)`.
+  - As built, it first reads the page's report ids from the list's index (an index-only scan, checked with EXPLAIN in `test:sql`), then joins the rest by id in that order. It refuses a cursor with only one half (`invalid_cursor`).
+  - As built, it returns no `patient_id` (nothing uses it), and `timezone` is the visit's, so times show in the doctor's zone. It returns `report_id, booking_id, appointment_id, patient_name, care_recipient_name, care_recipient_relation, lab_name, collection, visit_date, timezone, priority, test_names text[], published_at (r.created_at), version, reviewed_at, comment`.
+- `count_lab_results_to_review() returns int`, with the same guards, served by `lab_reports_to_review_idx`. It feeds the tab count and an overview stat.
+- `npm run test:sql` tests: not a doctor, no second factor, another doctor sees nothing, ordering of both lists, keyset paging, the count, a review marking the report, a corrected report (insert version 2 and set `replaced_at` on version 1) coming back unreviewed and then reviewable with the same comment, and the backfill. Every `raise exception` needs a test.
+- Apply with `npx supabase db query --remote=qugkunfzyolslpcftiqe --yes --file <migration>`, then confirm with a read-only query.
+
+**App.**
+- `doctorRoutes.labResults = "/doctor/lab-results"` in `src/config/routes.ts`. The `[id]/route.ts` already serves the report, so the page sits beside it. Add `{ title: "Lab results", href: "/doctor/lab-results", icon: FlaskConicalIcon }` to the doctor `nav` in `src/config/dashboards.ts`, after Patients.
+- Loaders go in `src/features/lab-orders/data/lab-orders.ts`: `getResultsInbox(reviewed, cursor)` and `countResultsToReview()`. Types go in `lib/lab-orders.ts` (`InboxResult`).
+- Page `src/app/(dashboard)/doctor/lab-results/page.tsx`: call `requireRole("doctor")`; `?view=reviewed` switches lists and `?after=<iso>_<uuid>` is the cursor (ids and times only, no patient data). Add `loading.tsx` with `PageSkeleton variant="list"`.
+- Components, one per kebab-case file in `src/features/lab-orders/components/`:
+  - `results-inbox-tabs.tsx`: link tabs styled like `lab-booking/components/lab-booking-stage-links.tsx`, "To review (n)" and "Reviewed".
+  - `results-inbox-list.tsx`, with `EmptyState` from shared.
+  - `results-inbox-item.tsx`: the patient (`careRecipientName` and `bookedByLabel` from `src/features/family/`, the doctor's wording), a "Corrected report" badge for version 2 on, tests, lab, published date ("waiting N days" when unreviewed), an urgent badge (`priorityLabels`), `LabReportLink` to `doctorRoutes.labReport(reportId)`, a link to the visit `doctorRoutes.labOrder(appointmentId)`, and `LabResultReviewForm`, keyed by review time and comment like `LabResultEntry`.
+  - Paging: a "Next results" / "Older results" link that carries the next cursor. The loader asks for one row more than a page, so the link shows only when there is another page; "Back to the start" leaves a paged list.
+- Doctor overview (`src/app/(dashboard)/doctor/page.tsx`): a fifth stat, "Results to review", linking to the inbox (the user chose a fifth card on 2026-11-13). `StatGrid` goes to 3 columns at lg and 5 at xl when there are five; `Stat` takes an optional `href`.
+- `LabResultEntry`'s "Reviewed" badge should follow the current report's `reviewed_at`, so `get_lab_order_bookings` should also return `r.reviewed_at`.
+- The `lab_result_ready` notice keeps linking to the visit's lab tests page. Optionally change it to the inbox.
+- No live badge: per the CLAUDE.md realtime rules that would need a Broadcast event on `user:<id>`, so it's left for later.
+
+**Status.** PRC-11 is `Partial`: reports a patient shares wait on REC-03.
+
 ## Later
 
-- PRC-11: the doctor's results inbox across visits, unreviewed first.
-- A corrected report (LAB-18) should clear the review, so the doctor looks again.
+- A corrected report (LAB-18) should clear the review, so the doctor looks again. PRC-11's `lab_reports.reviewed_at` covers the inbox side of this. LAB-18 must keep the booking `report_ready` while it has a current report: the inbox doesn't check booking status (so its lists stay index-only), and `review_lab_result` refuses any other status.
+- A live count on the Lab results nav item, as a Broadcast event on `user:<id>`.
 - The order on the printed prescription, for patients who go to a lab outside MedEase.
 - Package prices in the comparison.
 
@@ -59,3 +100,7 @@ During or after a visit, the doctor orders lab tests for the person seen. The pa
 - HL7 FHIR R4, DiagnosticReport (basedOn, resultsInterpreter, conclusion): https://hl7.org/fhir/R4/DiagnosticReport.html
 - AHRQ, test result communication (closing the loop with the ordering clinician): https://www.ahrq.gov/diagnostic-safety/resources/issue-briefs/dxsafety-test-result-communication2.html
 - AMA, reviewing test results (route results to the ordering provider): https://www.ama-assn.org/system/files/regulatory-myths-reviewing-test-results.pdf
+- AMA, 9 steps to reduce the EHR inbox ("if you order it, you own it"): https://www.ama-assn.org/practice-management/digital/9-steps-reduce-ehr-inbox-and-stress-system-level
+- CAP Today, safer use of lab data in EHRs (corrected reports, notify the ordering clinician): https://www.captodayonline.com/guidance-aims-for-safer-use-of-lab-data-in-ehrs/2/
+- CNA, test result management (confirm receipt, escalate unacknowledged urgent results): https://www-new.cna.com/sites/default/files/assets/993bee82-d5d7-4d1f-b57c-14f8e065cb3b/AlertBulletin-Test-Result-Management.pdf
+- Readyset, keyset pagination in Postgres: https://readyset.io/blog/optimizing-sql-pagination-in-postgres

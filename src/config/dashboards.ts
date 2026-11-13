@@ -100,6 +100,11 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
       },
       { title: "Patients", href: "/doctor/patients", icon: UsersIcon },
       {
+        title: "Lab results",
+        href: "/doctor/lab-results",
+        icon: FlaskConicalIcon,
+      },
+      {
         title: "Availability",
         href: "/doctor/availability",
         icon: CalendarClockIcon,

@@ -7,7 +7,10 @@ import {
   LAB_ORDER_COLUMNS,
   RECENT_ORDER_DAYS,
   remainingTests,
+  RESULTS_PER_PAGE,
   toLabOrder,
+  type InboxCursor,
+  type InboxResult,
   type LabOrder,
   type LabOrderRow,
   type OrderBooking,
@@ -179,6 +182,74 @@ export async function getOrderResults(
     reviewedAt: row.reviewed_at,
   }));
 }
+
+type InboxRow = {
+  report_id: string;
+  booking_id: string;
+  appointment_id: string;
+  patient_name: string;
+  care_recipient_name: string;
+  care_recipient_relation: InboxResult["careRecipientRelation"];
+  lab_name: string;
+  collection: InboxResult["collection"];
+  visit_date: string;
+  timezone: string;
+  priority: InboxResult["priority"];
+  test_names: string[];
+  published_at: string;
+  version: number;
+  reviewed_at: string | null;
+  comment: string | null;
+};
+
+// One page of the doctor's results inbox (PRC-11): still to review, the one
+// waiting longest first, or reviewed, the latest first. One extra row says
+// whether there's another page.
+export async function getResultsInbox(
+  reviewed: boolean,
+  cursor: InboxCursor | null,
+): Promise<{ results: InboxResult[]; more: boolean }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_lab_results_inbox", {
+    p_reviewed: reviewed,
+    p_cursor_at: cursor?.at,
+    p_cursor_id: cursor?.id,
+    p_limit: RESULTS_PER_PAGE + 1,
+  });
+  if (error) throw new Error(`get_lab_results_inbox: ${error.message}`);
+
+  const rows = (data ?? []) as InboxRow[];
+  return {
+    more: rows.length > RESULTS_PER_PAGE,
+    results: rows.slice(0, RESULTS_PER_PAGE).map((row) => ({
+      reportId: row.report_id,
+      bookingId: row.booking_id,
+      appointmentId: row.appointment_id,
+      patientName: row.patient_name,
+      careRecipientName: row.care_recipient_name,
+      careRecipientRelation: row.care_recipient_relation,
+      labName: row.lab_name,
+      collection: row.collection,
+      visitDate: row.visit_date,
+      timezone: row.timezone,
+      priority: row.priority,
+      testNames: row.test_names,
+      publishedAt: row.published_at,
+      version: row.version,
+      reviewedAt: row.reviewed_at,
+      comment: row.comment,
+    })),
+  };
+}
+
+// Reports from the doctor's orders still to review, for the inbox tab and the
+// overview.
+export const countResultsToReview = cache(async (): Promise<number> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("count_lab_results_to_review");
+  if (error) throw new Error(`count_lab_results_to_review: ${error.message}`);
+  return data ?? 0;
+});
 
 // The patient's active orders from the last RECENT_ORDER_DAYS that still have
 // tests to book, newest first.

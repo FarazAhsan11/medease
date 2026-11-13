@@ -2059,6 +2059,389 @@ async function testLabOrderResults({ patient, secondPatient }) {
   );
 }
 
+async function testLabResultsInbox({ patient, secondPatient }) {
+  section("The doctor's results inbox (PRC-11)");
+
+  const doctor = await createDoctor();
+  const otherDoctor = await createDoctor();
+  const visit = await startedVisit(doctor, patient);
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const orderId = idOf(
+    await rpc(doctor, "save_lab_order", {
+      p_appointment_id: visit,
+      p_test_ids: ["cbc", "hba1c", "lipid-profile"],
+      p_priority: "urgent",
+    }),
+  );
+  const lab = await createLab({ status: "approved" });
+  const testIds = {};
+  for (const type of ["cbc", "hba1c", "lipid-profile"]) {
+    testIds[type] = idOf(
+      await rpc(lab, "save_lab_test", {
+        p_test_type_id: type,
+        p_price: 1000,
+        p_turnaround_hours: 24,
+        p_home_collection: true,
+        p_preparation: null,
+        p_listed: true,
+      }),
+    );
+  }
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+  }).format(new Date());
+
+  const inbox = (caller, reviewed, fields = {}) =>
+    rpc(caller, "get_lab_results_inbox", { p_reviewed: reviewed, ...fields });
+  const ids = async (caller, reviewed, fields) =>
+    ((await inbox(caller, reviewed, fields)).data ?? []).map(
+      (row) => row.report_id,
+    );
+  const count = async (caller) =>
+    (await rpc(caller, "count_lab_results_to_review")).data?.[0]
+      ?.count_lab_results_to_review;
+
+  refused(
+    "a patient can't open the inbox",
+    await inbox(patient, false),
+    "not_doctor",
+  );
+  refused(
+    "the inbox needs a second factor",
+    await inbox({ ...doctor, aal: "aal1" }, false),
+    "second_factor_required",
+  );
+  refused(
+    "a cursor needs both its time and id",
+    await inbox(doctor, true, { p_cursor_at: new Date().toISOString() }),
+    "invalid_cursor",
+  );
+  denied("a guest can't open it", await inbox(null, false));
+  refused(
+    "a patient can't count results",
+    await rpc(patient, "count_lab_results_to_review"),
+    "not_doctor",
+  );
+  refused(
+    "counting needs a second factor",
+    await rpc({ ...doctor, aal: "aal1" }, "count_lab_results_to_review"),
+    "second_factor_required",
+  );
+  check(
+    "the inbox starts empty",
+    (await count(doctor)) === 0 && (await ids(doctor, false)).length === 0,
+  );
+
+  // One booking and report per ordered test, published a day apart.
+  const publish = async (type, daysAgo) => {
+    const bookingId = idOf(
+      await rpc(patient, "book_lab_test", {
+        p_request_id: randomUUID(),
+        p_lab_id: lab.id,
+        p_lab_test_ids: [testIds[type]],
+        p_package_ids: [],
+        p_collection: "lab",
+        p_visit_date: today,
+        p_slot_starts_at: null,
+        p_address_id: null,
+        p_care_recipient_id: null,
+        p_lab_order_id: orderId,
+      }),
+    );
+    for (const [from, to] of [
+      ["booked", "sample_collected"],
+      ["sample_collected", "processing"],
+    ]) {
+      await rpc(lab, "move_lab_booking", {
+        p_booking_id: bookingId,
+        p_from_status: from,
+        p_to_status: to,
+        p_reason: null,
+        p_note: null,
+      });
+    }
+    const path = `${lab.id}/${bookingId}/${randomUUID()}.pdf`;
+    await rpc({ role: "service_role" }, "mark_upload_checked", {
+      p_bucket: "lab-reports",
+      p_path: path,
+      p_owner_id: lab.id,
+    });
+    const reportId = idOf(
+      await rpc(lab, "publish_lab_report", {
+        p_booking_id: bookingId,
+        p_path: path,
+      }),
+    );
+    await db.query(
+      `update public.lab_reports set created_at = now() - $2 * interval '1 day'
+       where id = $1`,
+      [reportId, daysAgo],
+    );
+    return { bookingId, reportId };
+  };
+  const cbc = await publish("cbc", 3);
+  const hba1c = await publish("hba1c", 2);
+  const lipid = await publish("lipid-profile", 1);
+  check(
+    "the fixtures are in place",
+    [orderId, cbc.reportId, hba1c.reportId, lipid.reportId].every(Boolean),
+  );
+
+  const waiting = (await inbox(doctor, false)).data ?? [];
+  check(
+    "reports to review come oldest first",
+    waiting.map((row) => row.report_id).join() ===
+      [cbc.reportId, hba1c.reportId, lipid.reportId].join(),
+    JSON.stringify(waiting.map((row) => row.report_id)),
+  );
+  check(
+    "each names the visit, person, lab, tests and priority",
+    waiting[0]?.appointment_id === visit &&
+      waiting[0]?.booking_id === cbc.bookingId &&
+      waiting[0]?.patient_name?.length > 0 &&
+      waiting[0]?.patient_id === undefined &&
+      waiting[0]?.care_recipient_name?.length > 0 &&
+      waiting[0]?.lab_name?.length > 0 &&
+      waiting[0]?.priority === "urgent" &&
+      waiting[0]?.test_names.length === 1 &&
+      waiting[0]?.version === 1 &&
+      waiting[0]?.reviewed_at === null,
+    JSON.stringify(waiting[0]),
+  );
+  check("and are counted", (await count(doctor)) === 3);
+  const reviewedAtColumn = async (caller) =>
+    (
+      await as(
+        caller,
+        `select reviewed_at from public.lab_reports where id = $1`,
+        [cbc.reportId],
+      )
+    ).error?.code;
+  check(
+    "only the doctor's functions read when a report was reviewed",
+    (await reviewedAtColumn(lab)) === "42501" &&
+      (await reviewedAtColumn(patient)) === "42501" &&
+      ((
+        await as(lab, `select id, version from public.lab_reports where id = $1`, [
+          cbc.reportId,
+        ])
+      ).data ?? []).length === 1,
+  );
+  check(
+    "another doctor sees none of them",
+    (await count(otherDoctor)) === 0 &&
+      (await ids(otherDoctor, false)).length === 0,
+  );
+
+  const firstPage = (await inbox(doctor, false, { p_limit: 2 })).data ?? [];
+  check(
+    "a page stops at the limit",
+    firstPage.map((row) => row.report_id).join() ===
+      [cbc.reportId, hba1c.reportId].join(),
+  );
+  check(
+    "and the next page starts after its last row",
+    (
+      await ids(doctor, false, {
+        p_cursor_at: firstPage[1]?.published_at,
+        p_cursor_id: firstPage[1]?.report_id,
+      })
+    ).join() === lipid.reportId,
+  );
+  check(
+    "a page holds at least one row",
+    (await ids(doctor, false, { p_limit: 0 })).length === 1,
+  );
+
+  const review = (bookingId, comment = null) =>
+    rpc(doctor, "review_lab_result", {
+      p_booking_id: bookingId,
+      p_comment: comment,
+    });
+  succeeded("the doctor reviews one", await review(hba1c.bookingId));
+  check(
+    "it leaves the list to review",
+    (await ids(doctor, false)).join() ===
+      [cbc.reportId, lipid.reportId].join() && (await count(doctor)) === 2,
+  );
+  check(
+    "and joins the reviewed list",
+    (await ids(doctor, true)).join() === hba1c.reportId,
+  );
+
+  await review(cbc.bookingId, "All normal.");
+  await review(lipid.bookingId);
+  // Fixed times, so the order doesn't hang on the clock.
+  for (const [report, hoursAgo] of [
+    [hba1c, 3],
+    [cbc, 2],
+    [lipid, 1],
+  ]) {
+    await db.query(
+      `update public.lab_reports set reviewed_at = now() - $2 * interval '1 hour'
+       where id = $1`,
+      [report.reportId, hoursAgo],
+    );
+  }
+  const reviewedPage = (await inbox(doctor, true, { p_limit: 2 })).data ?? [];
+  check(
+    "reviewed reports come latest first, with the comment",
+    reviewedPage.map((row) => row.report_id).join() ===
+      [lipid.reportId, cbc.reportId].join() &&
+      reviewedPage[1]?.comment === "All normal.",
+  );
+  check(
+    "and page the same way",
+    (
+      await ids(doctor, true, {
+        p_cursor_at: reviewedPage[1]?.reviewed_at,
+        p_cursor_id: reviewedPage[1]?.report_id,
+      })
+    ).join() === hba1c.reportId,
+  );
+  check("nothing is left to review", (await count(doctor)) === 0);
+
+  // A corrected report (LAB-18): a new version replaces the reviewed one.
+  await db.query(
+    `update public.lab_reports set replaced_at = now() where id = $1`,
+    [cbc.reportId],
+  );
+  const { rows: corrected } = await db.query(
+    `insert into public.lab_reports (
+       booking_id, lab_id, patient_id, care_recipient_id, version, storage_path
+     )
+     select booking_id, lab_id, patient_id, care_recipient_id, 2,
+       lab_id || '/' || booking_id || '/' || gen_random_uuid() || '.pdf'
+     from public.lab_reports where id = $1
+     returning id`,
+    [cbc.reportId],
+  );
+  const correctedId = corrected[0]?.id;
+  const bookingView = async () =>
+    (
+      (await rpc(doctor, "get_lab_order_bookings", { p_appointment_id: visit }))
+        .data ?? []
+    ).find((row) => row.booking_id === cbc.bookingId);
+  const backToReview = (await inbox(doctor, false)).data ?? [];
+  check(
+    "a corrected report comes back to review, with the earlier comment",
+    backToReview.length === 1 &&
+      backToReview[0].report_id === correctedId &&
+      backToReview[0].version === 2 &&
+      backToReview[0].comment === "All normal." &&
+      (await count(doctor)) === 1,
+    JSON.stringify(backToReview),
+  );
+  check(
+    "and the visit's view shows it as not reviewed",
+    (await bookingView())?.report_id === correctedId &&
+      (await bookingView())?.reviewed_at === null,
+  );
+
+  const reviewRow = async () =>
+    (
+      await db.query(
+        `select reviewed_at from public.lab_result_reviews where booking_id = $1`,
+        [cbc.bookingId],
+      )
+    ).rows[0];
+  const patientNotices = async () =>
+    (
+      await db.query(
+        `select 1 from public.notifications
+         where user_id = $1 and kind = 'lab_result_comment'`,
+        [patient.id],
+      )
+    ).rows.length;
+  const audits = async () =>
+    (
+      await db.query(
+        `select action from public.audit_log
+         where target_id = $1 and action like 'lab_result%' order by id`,
+        [cbc.bookingId],
+      )
+    ).rows.map((row) => row.action);
+  await db.query(
+    `update public.lab_result_reviews
+     set reviewed_at = now() - interval '1 day' where booking_id = $1`,
+    [cbc.bookingId],
+  );
+  const before = { notices: await patientNotices(), audits: await audits() };
+  succeeded(
+    "the doctor reviews it with the same comment",
+    await review(cbc.bookingId, "All normal."),
+  );
+  check(
+    "which marks it reviewed without telling the patient again",
+    (await count(doctor)) === 0 &&
+      (await bookingView())?.reviewed_at !== null &&
+      new Date((await reviewRow()).reviewed_at) >
+        new Date(Date.now() - 60 * MINUTE) &&
+      (await patientNotices()) === before.notices &&
+      (await audits()).join() ===
+        [...before.audits, "lab_result.reviewed"].join(),
+  );
+  await review(cbc.bookingId, "All normal.");
+  check(
+    "saving it again is quiet",
+    (await audits()).length === before.audits.length + 1,
+  );
+
+  // What the migration does for reports reviewed before reviewed_at existed.
+  await db.query(
+    `update public.lab_reports set reviewed_at = null where id = $1`,
+    [hba1c.reportId],
+  );
+  await db.query(
+    `update public.lab_reports r set reviewed_at = v.reviewed_at
+     from public.lab_result_reviews v
+     where v.booking_id = r.booking_id
+       and r.replaced_at is null and r.reviewed_at is null`,
+  );
+  check(
+    "reports reviewed earlier count as reviewed",
+    (await count(doctor)) === 0 &&
+      (await ids(doctor, true)).includes(hba1c.reportId),
+  );
+  check(
+    "a patient's other doctor never sees them",
+    (await ids(otherDoctor, true)).length === 0 &&
+      ((await inbox(secondPatient, true)).error?.message ?? "") ===
+        "not_doctor",
+  );
+
+  // The lists read their own index, not the whole table.
+  await db.exec(`set enable_seqscan = off`);
+  const plan = async (sql) =>
+    (await db.query(`explain ${sql}`, [doctor.id])).rows
+      .map((row) => row["QUERY PLAN"])
+      .join("\n");
+  const toReviewPlan = await plan(
+    `select id from public.lab_reports
+     where ordering_doctor_id = $1 and replaced_at is null and reviewed_at is null
+       and (created_at, id) > ('-infinity'::timestamptz, '00000000-0000-0000-0000-000000000000'::uuid)
+     order by created_at, id limit 25`,
+  );
+  const reviewedPlan = await plan(
+    `select id from public.lab_reports
+     where ordering_doctor_id = $1 and replaced_at is null and reviewed_at is not null
+       and (reviewed_at, id) < ('infinity'::timestamptz, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid)
+     order by reviewed_at desc, id desc limit 25`,
+  );
+  await db.exec(`reset enable_seqscan`);
+  const seeks = (text, index) => text.includes(index) && !text.includes("Sort");
+  check(
+    "the list to review seeks its index, already in order",
+    seeks(toReviewPlan, "lab_reports_to_review_idx"),
+    seeks(toReviewPlan, "lab_reports_to_review_idx") ? "" : toReviewPlan,
+  );
+  check(
+    "so does the reviewed list",
+    seeks(reviewedPlan, "lab_reports_reviewed_idx"),
+    seeks(reviewedPlan, "lab_reports_reviewed_idx") ? "" : reviewedPlan,
+  );
+}
+
 async function testPatientDocuments({ patient, secondPatient }) {
   section("Patient documents (REC-02)");
 
@@ -9288,6 +9671,7 @@ try {
   await testLabPayments();
   // After the catalog and booking groups, which count every lab offering a test.
   await testLabOrderResults(await freshPatients());
+  await testLabResultsInbox(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();
