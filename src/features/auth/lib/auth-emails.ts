@@ -2,8 +2,10 @@ import "server-only";
 
 import { after } from "next/server";
 
+import { labInviteRoute } from "@/config/routes";
 import {
   confirmSignUpEmail,
+  labInviteEmail,
   resetPasswordEmail,
 } from "@/features/auth/emails/auth-email-templates";
 import {
@@ -75,5 +77,23 @@ export function sendPasswordResetEmail(recipient: Recipient) {
       return url.toString();
     },
     (url) => resetPasswordEmail(recipient.name, url),
+  );
+}
+
+// A lab admin's invitation (LAB-07). A new link replaces the last one.
+export function sendLabInviteEmail(
+  recipient: Recipient,
+  labName: string,
+  roleLabel: string,
+) {
+  return sendTokenEmail(
+    recipient,
+    "lab_invite",
+    (token, siteUrl) => {
+      const url = new URL(labInviteRoute, siteUrl);
+      url.searchParams.set("token", token);
+      return url.toString();
+    },
+    (url) => labInviteEmail(recipient.name, labName, roleLabel, url),
   );
 }

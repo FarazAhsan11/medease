@@ -9,12 +9,32 @@ import {
   labProfile,
   labServices,
 } from "@/features/lab-dashboard/data/lab-dashboard";
+import {
+  memberCan,
+  requireLabMember,
+} from "@/features/lab-staff/lib/lab-member.server";
 
 export const metadata: Metadata = {
   title: "Lab profile",
 };
 
-export default function LabProfilePage() {
+// Staff see only their own account here; the lab's details are the admin's.
+export default async function LabProfilePage() {
+  const member = await requireLabMember();
+  if (!memberCan(member, "profile")) {
+    return (
+      <>
+        <DashboardPageHeader
+          title="Your account"
+          description={`You sign in to ${member.labName} with this account.`}
+        />
+        <div className="max-w-xl">
+          <ChangePasswordCard />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <PreviewNotice feature="The lab profile" />

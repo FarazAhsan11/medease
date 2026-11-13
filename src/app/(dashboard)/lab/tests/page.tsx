@@ -18,7 +18,7 @@ import {
   PACKAGE_TESTS,
 } from "@/features/lab-catalog/lib/lab-catalog";
 import { getLabVerification } from "@/features/lab-verification/data/lab-verification";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 
 export const metadata: Metadata = {
   title: "Test catalog",
@@ -27,13 +27,13 @@ export const metadata: Metadata = {
 export default async function LabTestsCatalogPage({
   searchParams,
 }: PageProps<"/lab/tests">) {
-  const user = await requireRole("lab");
+  const { labId } = await requireLabMember("catalog");
   const [{ q }, { tests, packages }, testTypes, verification] =
     await Promise.all([
       searchParams,
-      getLabCatalog(user.id),
+      getLabCatalog(labId),
       getLabTestTypes(),
-      getLabVerification(user.id),
+      getLabVerification(labId),
     ]);
 
   const query = (typeof q === "string" ? q : "").trim().slice(0, 80);

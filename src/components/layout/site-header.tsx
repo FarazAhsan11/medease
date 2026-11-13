@@ -33,7 +33,7 @@ export function SiteHeader({
         <Logo href={role ? dashboards[role].home : "/"} />
 
         <nav aria-label="Main" className="hidden lg:block">
-          <NavLinks role={role} />
+          <NavLinks role={role} labRole={user?.labRole} />
         </nav>
 
         <div className="flex items-center gap-1">
@@ -58,7 +58,12 @@ export function SiteHeader({
                   feed={notifications}
                 />
               )}
-              <UserMenu role={user.role} name={user.name} email={user.email} />
+              <UserMenu
+                role={user.role}
+                labRole={user.labRole}
+                name={user.name}
+                email={user.email}
+              />
             </>
           ) : (
             <div className="hidden lg:block">
@@ -66,7 +71,7 @@ export function SiteHeader({
             </div>
           )}
           <div className="lg:hidden">
-            <MobileNav role={role} />
+            <MobileNav role={role} labRole={user?.labRole} />
           </div>
         </div>
       </Container>

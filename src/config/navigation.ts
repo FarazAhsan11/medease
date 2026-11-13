@@ -11,6 +11,11 @@ import {
 
 import { dashboards, type DashboardRole } from "@/config/dashboards";
 import { legalRoutes } from "@/config/routes";
+import {
+  labRoleCan,
+  type LabMemberRole,
+  type LabPermission,
+} from "@/features/lab-staff/lib/lab-permissions";
 
 export type NavItem = {
   title: string;
@@ -28,12 +33,30 @@ export const mainNav: NavItem[] = [
   { title: "Contact", href: "/contact", icon: MailIcon },
 ];
 
-// Header links for the signed-in role, or the public links for guests.
-export function getHeaderNav(role: DashboardRole | null) {
+// Header links for the signed-in role, or the public links for guests. Lab
+// staff see only the pages their role opens (the pages check again).
+export function getHeaderNav(
+  role: DashboardRole | null,
+  labRole: LabMemberRole | null = null,
+) {
   if (!role) return { links: mainNav, more: [] };
 
   const { nav, moreNav } = dashboards[role];
-  return { links: nav, more: moreNav };
+  const shown = (item: { permission?: LabPermission }) =>
+    !item.permission || labRoleCan(labRole ?? "admin", item.permission);
+  return { links: nav.filter(shown), more: moreNav.filter(shown) };
+}
+
+// The user menu's account link; lab staff get their own account, not the lab's.
+export function getAccountLink(
+  role: DashboardRole,
+  labRole: LabMemberRole | null = null,
+) {
+  const { account } = dashboards[role];
+  if (role === "lab" && labRole && labRole !== "admin") {
+    return { ...account, title: "Your account" };
+  }
+  return account;
 }
 
 export const footerNav: { title: string; links: NavItem[] }[] = [

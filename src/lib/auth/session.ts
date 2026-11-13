@@ -7,6 +7,10 @@ import { z } from "zod";
 import { dashboards, type DashboardRole } from "@/config/dashboards";
 import { consentRoute, twoFactorRoute } from "@/config/routes";
 import { getPendingConsents } from "@/features/consent/data/consents";
+import {
+  getLabRoleFromAppMetadata,
+  type LabMemberRole,
+} from "@/features/lab-staff/lib/lab-permissions";
 import { getRoleFromAppMetadata } from "@/lib/auth/roles";
 import { hasPublicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +22,9 @@ export type SessionUser = {
   role: DashboardRole;
   // "aal2" once the session has passed a second factor.
   assuranceLevel: string;
+  // Labs only: the person's role in their lab, for choosing links. Access is
+  // decided by the database (see requireLabMember).
+  labRole: LabMemberRole | null;
 };
 
 const userMetadataSchema = z.object({ full_name: z.string().min(1) });
@@ -44,6 +51,8 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     name: metadata.success ? metadata.data.full_name : email,
     role,
     assuranceLevel: claims.aal ?? "aal1",
+    labRole:
+      role === "lab" ? getLabRoleFromAppMetadata(claims.app_metadata) : null,
   };
 });
 

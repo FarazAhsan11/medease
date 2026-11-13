@@ -17,9 +17,9 @@ import {
   labBookingStages,
   type LabBookingStage,
 } from "@/features/lab-booking/lib/lab-bookings";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { toDateKey } from "@/lib/datetime";
 import { searchParam } from "@/lib/directory-search";
-import { requireRole } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Bookings",
@@ -37,10 +37,10 @@ export default async function LabBookingsPage({
   const requested = searchParam((await searchParams).stage);
   const stage: LabBookingStage =
     labBookingStages.find((value) => value === requested) ?? "to-collect";
-  const user = await requireRole("lab");
+  const member = await requireLabMember("bookings.view");
   const [{ bookings, more, earlier }, counts] = await Promise.all([
-    getLabBookings(user.id, stage),
-    getOpenLabBookingCounts(user.id),
+    getLabBookings(member.labId, stage),
+    getOpenLabBookingCounts(member.labId),
   ]);
   const today = toDateKey(new Date(), LAB_TIMEZONE);
   const leftOver = earlier?.bookings ?? [];
@@ -71,6 +71,7 @@ export default async function LabBookingsPage({
           {bookings.length > 0 ? (
             <LabBookingDayList
               bookings={bookings}
+              role={member.role}
               more={
                 more
                   ? `Showing the first ${LAB_BOOKINGS_SHOWN} bookings.`
@@ -95,6 +96,7 @@ export default async function LabBookingsPage({
               </div>
               <LabBookingDayList
                 bookings={leftOver}
+                role={member.role}
                 markBefore={today}
                 more={
                   earlier?.more

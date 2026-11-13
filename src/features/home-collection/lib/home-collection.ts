@@ -82,6 +82,7 @@ export function formatDuration(minutes: number) {
 
 export const homeCollectionErrorMessages: Record<string, string> = {
   not_lab: "Only lab accounts can set up home collection.",
+  not_permitted: "Only the lab admin can change home collection.",
   lab_not_found: "We couldn't find your lab's profile. Please contact support.",
   invalid_collection_settings:
     "Some of these settings aren't valid. Please check them.",

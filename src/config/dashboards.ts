@@ -23,10 +23,15 @@ import {
 
 import type { NavItem } from "@/config/navigation";
 import { labRoutes } from "@/config/routes";
+import type { LabPermission } from "@/features/lab-staff/lib/lab-permissions";
 
 export type DashboardRole = "patient" | "doctor" | "lab" | "admin";
 
-type DashboardNavItem = NavItem & { icon: LucideIcon };
+// Lab links may need a permission: staff see only the pages their role opens.
+type DashboardNavItem = NavItem & {
+  icon: LucideIcon;
+  permission?: LabPermission;
+};
 
 export type DashboardConfig = {
   label: string;
@@ -120,18 +125,37 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     nav: [
       { title: "Overview", href: "/lab", icon: LayoutDashboardIcon },
       { title: "Bookings", href: "/lab/bookings", icon: ClipboardListIcon },
-      { title: "Test catalog", href: labRoutes.tests, icon: TestTubesIcon },
+      {
+        title: "Test catalog",
+        href: labRoutes.tests,
+        icon: TestTubesIcon,
+        permission: "catalog",
+      },
       {
         title: "Home collection",
         href: labRoutes.homeCollection,
         icon: HouseIcon,
+        permission: "home_collection",
       },
-      { title: "Reports", href: "/lab/reports", icon: FileTextIcon },
+      {
+        title: "Reports",
+        href: labRoutes.reports,
+        icon: FileTextIcon,
+        permission: "reports.view",
+      },
     ],
-    moreNav: [],
+    moreNav: [
+      {
+        title: "Staff",
+        href: labRoutes.staff,
+        icon: UsersIcon,
+        permission: "staff",
+      },
+    ],
+    // Staff see only their own account there.
     account: {
       title: "Lab profile",
-      href: "/lab/profile",
+      href: labRoutes.profile,
       icon: SettingsIcon,
     },
   },

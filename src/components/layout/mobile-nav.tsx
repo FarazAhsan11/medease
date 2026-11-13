@@ -15,12 +15,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { dashboards, type DashboardRole } from "@/config/dashboards";
+import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 
 type MobileNavProps = {
   role: DashboardRole | null;
+  labRole?: LabMemberRole | null;
 };
 
-export function MobileNav({ role }: MobileNavProps) {
+export function MobileNav({ role, labRole = null }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -38,7 +40,12 @@ export function MobileNav({ role }: MobileNavProps) {
           </SheetTitle>
         </SheetHeader>
         <nav aria-label="Mobile" className="px-2">
-          <NavLinks role={role} orientation="vertical" onNavigate={close} />
+          <NavLinks
+            role={role}
+            labRole={labRole}
+            orientation="vertical"
+            onNavigate={close}
+          />
         </nav>
         {!role && (
           <div className="mt-auto border-t p-4">

@@ -20,6 +20,28 @@ export function confirmSignUpEmail(name: string | null, url: string) {
   });
 }
 
+// Names the lab and the role, which the invitee needs to trust the link, but
+// nothing about patients; the subject names no one.
+export function labInviteEmail(
+  name: string | null,
+  labName: string,
+  roleLabel: string,
+  url: string,
+) {
+  return renderEmail({
+    subject: "You're invited to join a lab on MedEase",
+    preview: "Set a password to start.",
+    heading: "Join your lab on MedEase",
+    paragraphs: [
+      greeting(name),
+      `${labName} has added you to its team on MedEase as ${roleLabel}. Set a password to start. You'll also pair an authenticator app, because lab accounts handle patient information. The link expires in 7 days and works once.`,
+    ],
+    action: { label: "Set your password", url },
+    footnote:
+      "If you don't work for this lab, you can safely ignore this email. No account is used until you set a password.",
+  });
+}
+
 export function resetPasswordEmail(name: string | null, url: string) {
   return renderEmail({
     subject: "Reset your MedEase password",

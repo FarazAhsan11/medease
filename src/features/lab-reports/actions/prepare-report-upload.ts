@@ -8,7 +8,7 @@ import {
   requestedReportUploadSchema,
   type PreparedReportUploadState,
 } from "@/features/lab-reports/schemas/lab-report";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError } from "@/lib/form-state";
 import {
@@ -30,7 +30,7 @@ export const prepareReportUpload = withFormErrors<
     return formError("Choose a PDF of 10 MB or less.", "validation_failed");
   }
 
-  const user = await requireRole("lab");
+  const { user, labId } = await requireLabMember("reports.publish");
   if (await isRateLimited(rateLimits.labReportUploadUser, user.id)) {
     return formError(RATE_LIMITED_MESSAGE, "rate_limited");
   }
@@ -58,7 +58,7 @@ export const prepareReportUpload = withFormErrors<
 
   const upload = await createReportUpload(
     createAdminClient(),
-    user.id,
+    labId,
     bookingId,
   );
   return { status: "success", upload };

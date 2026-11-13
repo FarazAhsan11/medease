@@ -99,6 +99,9 @@ export const rateLimits = {
     limit: 120,
     windowSeconds: ONE_HOUR,
   },
+  // A lab admin inviting, re-inviting, changing or removing staff (LAB-07).
+  // Each invite creates an account and sends an email.
+  labStaffUser: { name: "lab-staff-user", limit: 30, windowSeconds: ONE_HOUR },
   // Starting a conversation, or a doctor extending or closing one.
   conversationUser: {
     name: "conversation-user",

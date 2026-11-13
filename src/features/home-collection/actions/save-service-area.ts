@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 
 import { homeCollectionErrorMessages } from "@/features/home-collection/lib/home-collection";
 import { serviceAreaSchema } from "@/features/home-collection/schemas/home-collection";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { databaseErrorState } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, validationError, type FormState } from "@/lib/form-state";
@@ -21,7 +21,7 @@ export const saveServiceArea = withFormErrors(
     const parsed = serviceAreaSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return validationError(parsed.error);
 
-    const user = await requireRole("lab");
+    const { user } = await requireLabMember("home_collection");
     if (await isRateLimited(rateLimits.catalogUser, user.id)) {
       return formError(RATE_LIMITED_MESSAGE, "rate_limited");
     }

@@ -5,17 +5,20 @@ import { getLabBookingsAwaitingReport } from "@/features/lab-booking/data/lab-bo
 import { AwaitingReportsCard } from "@/features/lab-reports/components/awaiting-reports-card";
 import { PublishedReportsCard } from "@/features/lab-reports/components/published-reports-card";
 import { listPublishedLabReports } from "@/features/lab-reports/data/lab-reports";
-import { requireRole } from "@/lib/auth/session";
+import {
+  memberCan,
+  requireLabMember,
+} from "@/features/lab-staff/lib/lab-member.server";
 
 export const metadata: Metadata = {
   title: "Reports",
 };
 
 export default async function LabReportsPage() {
-  const user = await requireRole("lab");
+  const member = await requireLabMember("reports.view");
   const [awaiting, published] = await Promise.all([
-    getLabBookingsAwaitingReport(user.id),
-    listPublishedLabReports(user.id),
+    getLabBookingsAwaitingReport(member.labId),
+    listPublishedLabReports(member.labId),
   ]);
 
   return (
@@ -28,6 +31,7 @@ export default async function LabReportsPage() {
         <AwaitingReportsCard
           bookings={awaiting.bookings}
           more={awaiting.more}
+          canUpload={memberCan(member, "reports.publish")}
         />
         <PublishedReportsCard reports={published} />
       </div>

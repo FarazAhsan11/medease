@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { NavMoreMenu } from "@/components/layout/nav-more-menu";
 import { dashboards, type DashboardRole } from "@/config/dashboards";
 import { getHeaderNav } from "@/config/navigation";
+import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { cn } from "@/lib/utils";
 
 type NavLinksProps = {
   role: DashboardRole | null;
+  labRole?: LabMemberRole | null;
   orientation?: "horizontal" | "vertical";
   onNavigate?: () => void;
 };
@@ -27,11 +29,12 @@ function getActiveHref(pathname: string, hrefs: string[], home: string) {
 
 export function NavLinks({
   role,
+  labRole = null,
   orientation = "horizontal",
   onNavigate,
 }: NavLinksProps) {
   const pathname = usePathname();
-  const { links, more } = getHeaderNav(role);
+  const { links, more } = getHeaderNav(role, labRole);
   const vertical = orientation === "vertical";
   const items = vertical ? [...links, ...more] : links;
   const activeHref = getActiveHref(

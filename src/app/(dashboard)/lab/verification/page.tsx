@@ -6,7 +6,7 @@ import { LabVerificationChecklist } from "@/features/lab-verification/components
 import { LabVerificationForm } from "@/features/lab-verification/components/lab-verification-form";
 import { LabVerificationStatusCard } from "@/features/lab-verification/components/lab-verification-status-card";
 import { getLabVerification } from "@/features/lab-verification/data/lab-verification";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { isOpenForReview } from "@/lib/verification";
 
 export const metadata: Metadata = {
@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 };
 
 export default async function LabVerificationPage() {
-  const user = await requireRole("lab");
-  const verification = await getLabVerification(user.id);
+  const { labId } = await requireLabMember("profile");
+  const verification = await getLabVerification(labId);
 
   // Every lab account gets a profile at sign-up.
   if (!verification) notFound();

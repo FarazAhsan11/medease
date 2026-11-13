@@ -16,16 +16,22 @@ import {
 } from "@/features/lab-dashboard/data/lab-dashboard";
 import { getLabVerification } from "@/features/lab-verification/data/lab-verification";
 import { labBannerText } from "@/features/lab-verification/lib/lab-verification";
-import { requireRole } from "@/lib/auth/session";
+import {
+  memberCan,
+  requireLabMember,
+} from "@/features/lab-staff/lib/lab-member.server";
 
 export default async function LabOverviewPage() {
-  const user = await requireRole("lab");
-  const verification = await getLabVerification(user.id);
+  const member = await requireLabMember();
+  // Only the admin handles verification, so only they wait for it.
+  const verification = memberCan(member, "profile")
+    ? await getLabVerification(member.labId)
+    : null;
 
   return (
     <>
       <DashboardPageHeader
-        title={user.name}
+        title={member.labName}
         description="Today's collections, test queue, and reports at a glance."
         actions={
           <Link

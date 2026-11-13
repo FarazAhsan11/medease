@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 
+import { findLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { getLabVerification } from "@/features/lab-verification/data/lab-verification";
 import { isAcceptableLicense } from "@/features/lab-verification/lib/lab-documents";
 import {
@@ -9,7 +10,6 @@ import {
   LAB_DOCUMENTS_BUCKET,
 } from "@/features/lab-verification/lib/lab-verification";
 import { labVerificationSchema } from "@/features/lab-verification/schemas/lab-verification";
-import { getSessionUser } from "@/lib/auth/session";
 import {
   databaseErrorState,
   SECOND_FACTOR_MESSAGE,
@@ -34,10 +34,16 @@ const UPLOAD_FAILED_MESSAGE =
 // removes the licence it replaced. A new file is deleted if the save fails.
 export const saveLabVerification = withFormErrors<FormState, unknown>(
   async (_previousState, input) => {
-    const user = await getSessionUser();
-    if (user?.role !== "lab") {
-      return formError("Only labs can send verification details.", "not_lab");
+    // Only the admin, whose account id is the lab's (save_lab_verification
+    // refuses staff too); this says why.
+    const member = await findLabMember("profile");
+    if (!member) {
+      return formError(
+        "Only the lab admin can send verification details.",
+        "not_lab",
+      );
     }
+    const { user } = member;
 
     const admin = createAdminClient();
     const parsed = labVerificationSchema.safeParse(input);

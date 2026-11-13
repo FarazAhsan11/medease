@@ -1,9 +1,12 @@
 import { LabBookingEntry } from "@/features/lab-booking/components/lab-booking-entry";
 import type { LabBooking } from "@/features/lab-booking/lib/lab-bookings";
+import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { formatDate } from "@/lib/datetime";
 
 type LabBookingDayListProps = {
   bookings: LabBooking[];
+  // The viewer's role in the lab, which decides the moves offered.
+  role: LabMemberRole;
   // Shown under the list when there were more than it holds.
   more?: string;
   // Days before this one are marked as left over, for open bookings.
@@ -23,6 +26,7 @@ function byDay(bookings: LabBooking[]) {
 
 export function LabBookingDayList({
   bookings,
+  role,
   more,
   markBefore,
 }: LabBookingDayListProps) {
@@ -40,7 +44,7 @@ export function LabBookingDayList({
             )}
           </h3>
           {entries.map((booking) => (
-            <LabBookingEntry key={booking.id} booking={booking} />
+            <LabBookingEntry key={booking.id} booking={booking} role={role} />
           ))}
         </section>
       ))}

@@ -121,7 +121,14 @@ export const labRoutes = {
   reports: "/lab/reports",
   // Opens the report on a short-lived signed link.
   report: (reportId: string) => `/lab/reports/${reportId}`,
+  profile: "/lab/profile",
+  staff: "/lab/staff",
+  // Where someone lands once the lab has removed them.
+  accessEnded: "/lab/access-ended",
 } as const;
+
+// Opened from a staff invitation email.
+export const labInviteRoute = "/lab-invite";
 
 export const adminRoutes = {
   home: "/admin",

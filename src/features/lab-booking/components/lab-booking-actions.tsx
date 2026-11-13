@@ -8,18 +8,26 @@ import {
 } from "@/features/lab-booking/lib/lab-bookings";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
 import { UploadReportDialog } from "@/features/lab-reports/components/upload-report-dialog";
+import {
+  labRoleCan,
+  permissionForMove,
+  type LabMemberRole,
+} from "@/features/lab-staff/lib/lab-permissions";
 import { toDateKey } from "@/lib/datetime";
 
 type LabBookingActionsProps = {
   booking: LabBooking;
+  // The viewer's role in the lab: only the moves it allows are offered.
+  role: LabMemberRole;
 };
 
 // What the lab can do next with a booking, or its report once it's done. The
 // database checks each move.
-export function LabBookingActions({ booking }: LabBookingActionsProps) {
-  const next = nextStatuses[booking.status];
+export function LabBookingActions({ booking, role }: LabBookingActionsProps) {
+  const can = (status: string) => labRoleCan(role, permissionForMove(status));
+  const next = nextStatuses[booking.status].filter(can);
   if (next.length === 0) {
-    return booking.reportId ? (
+    return booking.reportId && labRoleCan(role, "reports.view") ? (
       <div className="border-t pt-4">
         <LabReportLink href={labRoutes.report(booking.reportId)} />
       </div>

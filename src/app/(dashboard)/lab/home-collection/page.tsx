@@ -5,17 +5,17 @@ import { CollectionScheduleForm } from "@/features/home-collection/components/co
 import { ServiceAreasCard } from "@/features/home-collection/components/service-areas-card";
 import { getHomeCollectionSetup } from "@/features/home-collection/data/home-collection";
 import { getLabVerification } from "@/features/lab-verification/data/lab-verification";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 
 export const metadata: Metadata = {
   title: "Home collection",
 };
 
 export default async function LabHomeCollectionPage() {
-  const user = await requireRole("lab");
+  const { labId } = await requireLabMember("home_collection");
   const [{ settings, hours, areas }, verification] = await Promise.all([
-    getHomeCollectionSetup(user.id),
-    getLabVerification(user.id),
+    getHomeCollectionSetup(labId),
+    getLabVerification(labId),
   ]);
 
   return (

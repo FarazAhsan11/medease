@@ -15,16 +15,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { dashboards, type DashboardRole } from "@/config/dashboards";
+import { getAccountLink } from "@/config/navigation";
 import { signOut } from "@/features/auth/actions/sign-out";
+import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 
 type UserMenuProps = {
   role: DashboardRole;
+  labRole?: LabMemberRole | null;
   name: string;
   email: string;
 };
 
-export function UserMenu({ role, name, email }: UserMenuProps) {
-  const { label, account } = dashboards[role];
+export function UserMenu({
+  role,
+  labRole = null,
+  name,
+  email,
+}: UserMenuProps) {
+  const { label } = dashboards[role];
+  const account = getAccountLink(role, labRole);
   const [signingOut, startSignOut] = useTransition();
 
   return (

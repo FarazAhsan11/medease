@@ -44,6 +44,7 @@ const SUPABASE_STUBS = /* sql */ `
     email_confirmed_at timestamptz,
     raw_app_meta_data jsonb not null default '{}',
     raw_user_meta_data jsonb not null default '{}',
+    last_sign_in_at timestamptz,
     created_at timestamptz not null default now()
   );
 

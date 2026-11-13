@@ -8,8 +8,8 @@ export const partnerTerms: LegalDocument = {
   slug: "partner-terms",
   title: "Doctor and Lab Partner Terms",
   summary: `The agreement between ${name} and the doctors and labs who join it.`,
-  version: "1.1",
-  updated: "8 November 2026",
+  version: "1.2",
+  updated: "13 November 2026",
   sections: [
     {
       title: "These terms",
@@ -68,7 +68,8 @@ export const partnerTerms: LegalDocument = {
     {
       title: "Account security",
       body: [
-        "Two-factor sign-in is required for doctors and labs. Your account is for you alone. Do not share it with staff or colleagues, and tell us straight away if you think it has been used by someone else.",
+        "Two-factor sign-in is required for doctors and labs, and for every lab staff member. Your account is for you alone. Do not share it with staff or colleagues, and tell us straight away if you think it has been used by someone else.",
+        "A lab's admin can invite its own staff, each with their own account and a role that limits what they can see and do. The lab is responsible for the people it invites: give each person only the role their work needs, and remove them as soon as they leave.",
       ],
     },
     {

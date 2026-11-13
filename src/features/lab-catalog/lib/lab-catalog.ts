@@ -70,6 +70,7 @@ export function packageSavings(price: number, separatePrice: number) {
 
 export const labCatalogErrorMessages: Record<string, string> = {
   not_lab: "Only lab accounts can change a test catalog.",
+  not_permitted: "Only the lab admin can change the test catalog.",
   lab_not_found: "We couldn't find your lab's profile. Please contact support.",
   unknown_test: "That test isn't on our list. Choose another one.",
   test_not_found: "One of these tests isn't in your catalog. Reload the page.",

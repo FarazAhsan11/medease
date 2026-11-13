@@ -9,7 +9,7 @@ import {
 } from "@/features/lab-booking/lib/lab-bookings";
 import { moveLabBookingSchema } from "@/features/lab-booking/schemas/lab-booking";
 import { sendDueRefunds } from "@/features/payments/lib/process-payments.server";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { databaseErrorState } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, validationError, type FormState } from "@/lib/form-state";
@@ -27,7 +27,7 @@ export const moveLabBooking = withFormErrors(
     const parsed = moveLabBookingSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return validationError(parsed.error);
 
-    const user = await requireRole("lab");
+    const { user } = await requireLabMember("bookings.view");
     if (await isRateLimited(rateLimits.labBookingMoveUser, user.id)) {
       return formError(RATE_LIMITED_MESSAGE, "rate_limited");
     }

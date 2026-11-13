@@ -12,7 +12,7 @@ import {
   isReportPath,
 } from "@/features/lab-reports/lib/lab-reports.server";
 import { uploadedReportSchema } from "@/features/lab-reports/schemas/lab-report";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { databaseErrorState } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, type FormState } from "@/lib/form-state";
@@ -30,7 +30,7 @@ import { createClient } from "@/lib/supabase/server";
 // isn't published is deleted.
 export const publishLabReport = withFormErrors<FormState, unknown>(
   async (_previousState, input) => {
-    const user = await requireRole("lab");
+    const { user, labId } = await requireLabMember("reports.publish");
     const parsed = uploadedReportSchema.safeParse(input);
     if (!parsed.success) {
       return formError(REPORT_UPLOAD_FAILED_MESSAGE, "validation_failed");
@@ -38,7 +38,7 @@ export const publishLabReport = withFormErrors<FormState, unknown>(
 
     const { bookingId, path } = parsed.data;
     // Only a path in this booking's folder in the lab's own space is touched.
-    if (!isReportPath(user.id, bookingId, path)) {
+    if (!isReportPath(labId, bookingId, path)) {
       return formError(REPORT_UPLOAD_FAILED_MESSAGE, "invalid_path");
     }
     const admin = createAdminClient();
@@ -58,7 +58,7 @@ export const publishLabReport = withFormErrors<FormState, unknown>(
     const { error: checkError } = await admin.rpc("mark_upload_checked", {
       p_bucket: LAB_REPORTS_BUCKET,
       p_path: path,
-      p_owner_id: user.id,
+      p_owner_id: labId,
     });
     if (checkError) {
       await discardUpload();

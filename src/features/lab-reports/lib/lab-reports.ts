@@ -26,6 +26,7 @@ export const REPORT_UPLOAD_FAILED_MESSAGE =
 
 export const labReportErrorMessages: Record<string, string> = {
   not_lab: "Only lab accounts can publish reports.",
+  not_permitted: "Your role in this lab can't publish reports.",
   booking_not_found: "This booking isn't in your list.",
   status_changed:
     "This booking was already updated, perhaps from another tab. The list now shows where it is.",

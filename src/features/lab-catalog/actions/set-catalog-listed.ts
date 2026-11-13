@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 
 import { labCatalogErrorMessages } from "@/features/lab-catalog/lib/lab-catalog";
 import { catalogListedSchema } from "@/features/lab-catalog/schemas/lab-catalog";
-import { requireRole } from "@/lib/auth/session";
+import { requireLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { databaseErrorState } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError, type FormState } from "@/lib/form-state";
@@ -25,7 +25,7 @@ export const setCatalogListed = withFormErrors<FormState, ListedInput>(
       return formError(labCatalogErrorMessages.test_not_found);
     }
 
-    const user = await requireRole("lab");
+    const { user } = await requireLabMember("catalog");
     if (await isRateLimited(rateLimits.catalogUser, user.id)) {
       return formError(RATE_LIMITED_MESSAGE, "rate_limited");
     }

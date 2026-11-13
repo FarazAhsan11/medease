@@ -7,7 +7,7 @@ import {
   requestedLicenseUploadSchema,
   type PreparedLicenseUploadState,
 } from "@/features/lab-verification/schemas/lab-verification";
-import { getSessionUser } from "@/lib/auth/session";
+import { findLabMember } from "@/features/lab-staff/lib/lab-member.server";
 import { SECOND_FACTOR_MESSAGE } from "@/lib/database-errors";
 import { withFormErrors } from "@/lib/form-action.server";
 import { formError } from "@/lib/form-state";
@@ -30,10 +30,13 @@ export const prepareLicenseUpload = withFormErrors<
     return formError("Check your file and try again.", "validation_failed");
   }
 
-  const user = await getSessionUser();
-  if (user?.role !== "lab") {
-    return formError("Only labs can upload a licence.", "not_lab");
+  // Only the admin, whose account id is the lab's (save_lab_verification
+  // refuses staff too); this says why.
+  const member = await findLabMember("profile");
+  if (!member) {
+    return formError("Only the lab admin can upload a licence.", "not_lab");
   }
+  const { user } = member;
   if (user.assuranceLevel !== "aal2") {
     return formError(SECOND_FACTOR_MESSAGE, "second_factor_required");
   }

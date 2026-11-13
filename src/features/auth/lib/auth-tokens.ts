@@ -4,7 +4,10 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type TokenPurpose = "email_confirmation" | "password_reset";
+export type TokenPurpose =
+  | "email_confirmation"
+  | "password_reset"
+  | "lab_invite";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -12,6 +15,8 @@ const DAY_MS = 24 * HOUR_MS;
 const lifetimes: Record<TokenPurpose, number> = {
   email_confirmation: DAY_MS,
   password_reset: HOUR_MS,
+  // Staff may not check their email the day they're invited.
+  lab_invite: 7 * DAY_MS,
 };
 
 // Per user and purpose: one email a minute, five an hour.
@@ -55,7 +60,9 @@ export async function issueAuthToken(
     if (recent.length >= MAX_PER_HOUR) return { status: "rate_limited" };
   }
 
-  // A new link replaces any earlier one, and day-old rows are pruned.
+  // A new link replaces any earlier one. Old rows are pruned: expired ones,
+  // and used ones after a day (the cooldown counts those). A live link for
+  // another purpose, such as a week-long lab invitation, stays.
   const { error: retireError } = await admin
     .from("auth_tokens")
     .update({ used_at: new Date(now).toISOString() })
@@ -64,11 +71,13 @@ export async function issueAuthToken(
     .is("used_at", null);
   if (retireError) fail("retire", retireError.message);
 
+  const nowIso = new Date(now).toISOString();
+  const dayAgo = new Date(now - DAY_MS).toISOString();
   await admin
     .from("auth_tokens")
     .delete()
     .eq("user_id", userId)
-    .lt("created_at", new Date(now - DAY_MS).toISOString());
+    .or(`expires_at.lt.${nowIso},and(used_at.not.is.null,created_at.lt.${dayAgo})`);
 
   const token = randomBytes(32).toString("base64url");
   const { data, error } = await admin

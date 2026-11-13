@@ -9,12 +9,15 @@ import { UploadReportDialog } from "@/features/lab-reports/components/upload-rep
 type AwaitingReportsCardProps = {
   bookings: LabBooking[];
   more: boolean;
+  // Front desk staff see the list but don't upload.
+  canUpload: boolean;
 };
 
 // Bookings the lab is processing, each waiting for its report.
 export function AwaitingReportsCard({
   bookings,
   more,
+  canUpload,
 }: AwaitingReportsCardProps) {
   return (
     <PanelCard
@@ -42,10 +45,12 @@ export function AwaitingReportsCard({
                     {items} · {formatBookingWhen(booking)}
                   </p>
                 </div>
-                <UploadReportDialog
-                  bookingId={booking.id}
-                  summary={`${booking.careRecipientName} · ${items}`}
-                />
+                {canUpload && (
+                  <UploadReportDialog
+                    bookingId={booking.id}
+                    summary={`${booking.careRecipientName} · ${items}`}
+                  />
+                )}
               </li>
             );
           })}

@@ -3122,9 +3122,9 @@ async function testLabVerification({ patient }) {
   denied("a guest can't use it", await save(null, details()));
   const noProfile = await createUser("lab");
   refused(
-    "a lab account with no profile is refused",
+    "a lab account with no membership is refused",
     await save(noProfile, details()),
-    "lab_not_found",
+    "not_lab",
   );
   check(
     "an unknown authority is refused by the table",
@@ -3469,9 +3469,9 @@ async function testLabCatalog({ patient }) {
     "second_factor_required",
   );
   refused(
-    "a lab login with no lab profile can't",
+    "a lab login with no membership can't",
     await saveTest(noProfile),
-    "lab_not_found",
+    "not_lab",
   );
   check(
     "a price of zero is refused",
@@ -3601,9 +3601,9 @@ async function testLabCatalog({ patient }) {
     "second_factor_required",
   );
   refused(
-    "a lab login with no lab profile can't",
+    "a lab login with no membership can't",
     await savePackage(noProfile),
-    "lab_not_found",
+    "not_lab",
   );
 
   const edited = await savePackage(lab, {
@@ -4304,9 +4304,9 @@ async function testHomeCollection({ patient }) {
     "second_factor_required",
   );
   refused(
-    "a lab login with no profile can't",
+    "a lab login with no membership can't",
     inLock(await saveSchedule(noProfile)),
-    "lab_not_found",
+    "not_lab",
   );
   refused(
     "a slot length off the list is refused",
@@ -9393,6 +9393,480 @@ async function testSchemaRules() {
   );
 }
 
+async function testLabStaff({ patient }) {
+  section("Lab staff accounts (LAB-07)");
+
+  const server = { role: "service_role" };
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  const passwordOnly = { ...lab, aal: "aal1" };
+  const inCaller = (result) => ({ ...result, fn: "lab_caller" });
+  // A brand new account, as the invite action creates it.
+  const newAccount = () => createUser("lab", { confirmed: false });
+  const add = (caller, userId, role) =>
+    rpc(caller, "add_lab_staff", { p_user_id: userId, p_role: role });
+  const setRole = (caller, userId, role) =>
+    rpc(caller, "set_lab_staff_role", { p_user_id: userId, p_role: role });
+  const remove = (caller, userId) =>
+    rpc(caller, "remove_lab_staff", { p_user_id: userId });
+  const accept = (caller, userId) =>
+    rpc(caller, "accept_lab_invite", { p_user_id: userId });
+  const memberRow = async (userId) =>
+    (
+      await db.query(`select * from public.lab_members where user_id = $1`, [
+        userId,
+      ])
+    ).rows[0];
+  const labOf = async (caller) =>
+    (await as(caller, `select private.current_lab_id() as id`)).data?.[0]?.id;
+  const can = async (caller, permission) =>
+    (await as(caller, `select private.lab_can($1) as ok`, [permission]))
+      .data?.[0]?.ok;
+  const saveTest = (caller) =>
+    rpc(caller, "save_lab_test", {
+      p_test_type_id: "cbc",
+      p_price: 1000,
+      p_turnaround_hours: 24,
+      p_home_collection: false,
+    });
+  const moveTo = (caller, status) =>
+    rpc(caller, "move_lab_booking", {
+      p_booking_id: randomUUID(),
+      p_from_status: "booked",
+      p_to_status: status,
+    });
+  async function activeStaff(role) {
+    const user = await newAccount();
+    succeeded(`the admin invites a ${role}`, await add(lab, user.id, role));
+    succeeded("the invitation is accepted", await accept(server, user.id));
+    return user;
+  }
+
+  const owner = await memberRow(lab.id);
+  check(
+    "the account that registered the lab is its admin",
+    owner?.role === "admin" && owner.status === "active",
+  );
+  check("the admin's lab is their own", (await labOf(lab)) === lab.id);
+
+  section("Inviting (LAB-07)");
+  const invited = await newAccount();
+  refused("a patient can't invite", await add(patient, invited.id, "collector"), "not_lab");
+  denied("a guest can't invite", await add(null, invited.id, "collector"));
+  refused(
+    "an admin without two-factor can't",
+    await add(passwordOnly, invited.id, "collector"),
+    "second_factor_required",
+  );
+  refused(
+    "nobody is invited as a second admin",
+    await add(lab, invited.id, "admin"),
+    "invalid_role",
+  );
+  refused(
+    "an account in use can't be claimed",
+    await add(lab, otherLab.id, "collector"),
+    "invalid_user",
+  );
+  refused(
+    "a patient's account can't be claimed",
+    await add(lab, patient.id, "collector"),
+    "invalid_user",
+  );
+  const stale = await newAccount();
+  await db.query(
+    `update auth.users set created_at = now() - interval '11 minutes' where id = $1`,
+    [stale.id],
+  );
+  refused(
+    "an account made earlier can't be claimed",
+    await add(lab, stale.id, "collector"),
+    "invalid_user",
+  );
+  succeeded("the admin invites someone", await add(lab, invited.id, "collector"));
+  const invitedRow = await memberRow(invited.id);
+  check(
+    "they wait as invited, filed under the lab",
+    invitedRow?.status === "invited" &&
+      invitedRow.lab_id === lab.id &&
+      invitedRow.invited_by === lab.id,
+  );
+  refused(
+    "the same account can't be added twice",
+    await add(otherLab, invited.id, "collector"),
+    "invalid_user",
+  );
+  refused(
+    "an invited person can't act for the lab yet",
+    inCaller(await moveTo(invited, "sample_collected")),
+    "not_lab",
+  );
+  check("an invited person has no lab yet", (await labOf(invited)) === null);
+  denied(
+    "nobody writes members directly",
+    await as(
+      lab,
+      `insert into public.lab_members (user_id, lab_id, role, status) values ($1, $2, 'collector', 'active')`,
+      [(await newAccount()).id, lab.id],
+    ),
+  );
+
+  denied("a lab can't accept an invitation itself", await accept(invited, invited.id));
+  succeeded("the invitation link activates them", await accept(server, invited.id));
+  refused(
+    "an invitation is accepted once",
+    await accept(server, invited.id),
+    "invite_not_found",
+  );
+  check(
+    "once accepted they belong to the lab",
+    (await labOf(invited)) === lab.id &&
+      (await memberRow(invited.id)).activated_at !== null,
+  );
+
+  const crowded = await createLab({ status: "approved" });
+  await db.query(
+    `with people as (
+       insert into auth.users (email, raw_app_meta_data)
+       select gen_random_uuid() || '@example.invalid', '{"role":"lab"}'
+       from generate_series(1, 50)
+       returning id
+     )
+     insert into public.lab_members (user_id, lab_id, role, status, activated_at)
+     select id, $1, 'collector', 'active', now() from people`,
+    [crowded.id],
+  );
+  refused(
+    "a lab holds 50 people besides the admin",
+    await add(crowded, (await newAccount()).id, "collector"),
+    "staff_limit",
+  );
+
+  section("What each role can do (LAB-07)");
+  const collector = invited;
+  const frontDesk = await activeStaff("front_desk");
+  const pathologist = await activeStaff("pathologist");
+
+  refused(
+    "a collector can't change the catalog",
+    inCaller(await saveTest(collector)),
+    "not_permitted",
+  );
+  refused(
+    "a collector can't cancel a booking",
+    await moveTo(collector, "cancelled"),
+    "not_permitted",
+  );
+  refused(
+    "a collector gets as far as finding the booking to collect",
+    await moveTo(collector, "sample_collected"),
+    "booking_not_found",
+  );
+  refused(
+    "a front desk can cancel (no such booking here)",
+    await moveTo(frontDesk, "cancelled"),
+    "booking_not_found",
+  );
+  refused(
+    "a front desk can't move a sample into processing",
+    await moveTo(frontDesk, "processing"),
+    "not_permitted",
+  );
+  refused(
+    "a pathologist can move one into processing (no such booking here)",
+    await moveTo(pathologist, "processing"),
+    "booking_not_found",
+  );
+  refused(
+    "a pathologist can't cancel",
+    await moveTo(pathologist, "cancelled"),
+    "not_permitted",
+  );
+  refused(
+    "a collector can't publish a report",
+    await rpc(collector, "publish_lab_report", {
+      p_booking_id: randomUUID(),
+      p_path: "x.pdf",
+    }),
+    "not_permitted",
+  );
+  refused(
+    "a pathologist can publish (no such booking here)",
+    await rpc(pathologist, "publish_lab_report", {
+      p_booking_id: randomUUID(),
+      p_path: "x.pdf",
+    }),
+    "booking_not_found",
+  );
+  check(
+    "front desk and pathologists open reports, collectors don't",
+    (await can(frontDesk, "reports.view")) === true &&
+      (await can(pathologist, "reports.view")) === true &&
+      (await can(collector, "reports.view")) === false,
+  );
+  check(
+    "only the admin manages staff",
+    (await can(lab, "staff")) === true &&
+      (await can(frontDesk, "staff")) === false,
+  );
+  check(
+    "an unknown role or permission allows nothing",
+    (
+      await db.query(
+        `select private.lab_role_can('nobody', 'bookings.view')
+           or private.lab_role_can('admin', null) as ok`,
+      )
+    ).rows[0].ok === false,
+  );
+  refused(
+    "staff can't list the lab's people",
+    inCaller(await rpc(frontDesk, "get_lab_staff")),
+    "not_permitted",
+  );
+
+  const readsProfile = async (caller) =>
+    (
+      await as(caller, `select id from public.lab_profiles where id = $1`, [
+        lab.id,
+      ])
+    ).data?.length === 1;
+  const membership = async (caller) =>
+    (await rpc(caller, "get_lab_membership")).data?.[0];
+  check(
+    "staff don't read the lab's profile row (licence, review note)",
+    !(await readsProfile(frontDesk)) && (await readsProfile(lab)),
+  );
+  const deskMembership = await membership(frontDesk);
+  check(
+    "staff get their lab's name and their role from their membership",
+    deskMembership?.lab_id === lab.id &&
+      deskMembership.role === "front_desk" &&
+      deskMembership.status === "active" &&
+      typeof deskMembership.lab_name === "string",
+  );
+  check(
+    "someone with no lab has no membership",
+    (await membership(patient)) === undefined,
+  );
+
+  await db.query(
+    `select private.notify_lab($1, 'lab_booking_new', '/lab/bookings')`,
+    [lab.id],
+  );
+  const noticesFor = async (userId) =>
+    Number(
+      (
+        await db.query(
+          `select count(*) from public.notifications where user_id = $1 and kind = 'lab_booking_new'`,
+          [userId],
+        )
+      ).rows[0].count,
+    );
+  check(
+    "booking notices reach the admin, front desk and collectors only",
+    (await noticesFor(lab.id)) === 1 &&
+      (await noticesFor(frontDesk.id)) === 1 &&
+      (await noticesFor(collector.id)) === 1 &&
+      (await noticesFor(pathologist.id)) === 0,
+  );
+
+  const staffList = (await rpc(lab, "get_lab_staff")).data ?? [];
+  check(
+    "the admin lists the lab's people, admin first",
+    staffList.length === 4 &&
+      staffList[0].user_id === lab.id &&
+      staffList.every((row) => row.status === "active"),
+  );
+
+  section("Changing roles and removing (LAB-07)");
+  refused(
+    "staff can't change roles",
+    inCaller(await setRole(frontDesk, collector.id, "pathologist")),
+    "not_permitted",
+  );
+  refused(
+    "an admin without two-factor can't",
+    await setRole(passwordOnly, collector.id, "pathologist"),
+    "second_factor_required",
+  );
+  refused(
+    "nobody is made admin",
+    await setRole(lab, collector.id, "admin"),
+    "invalid_role",
+  );
+  refused(
+    "the admin's own role is fixed",
+    await setRole(lab, lab.id, "collector"),
+    "member_not_found",
+  );
+  refused(
+    "another lab's people are out of reach",
+    await setRole(otherLab, collector.id, "pathologist"),
+    "member_not_found",
+  );
+  succeeded(
+    "the admin makes the collector a pathologist",
+    await setRole(lab, collector.id, "pathologist"),
+  );
+  check(
+    "the new role applies straight away",
+    (await can(collector, "reports.view")) === true,
+  );
+
+  refused(
+    "an admin without two-factor can't remove anyone",
+    await remove(passwordOnly, frontDesk.id),
+    "second_factor_required",
+  );
+  refused(
+    "the admin can't be removed",
+    await remove(lab, lab.id),
+    "member_not_found",
+  );
+  refused(
+    "another lab can't remove them",
+    await remove(otherLab, frontDesk.id),
+    "member_not_found",
+  );
+  await db.query(
+    `insert into public.auth_tokens (user_id, purpose, token_hash, expires_at)
+     values ($1, 'lab_invite', $2, now() + interval '7 days')`,
+    [frontDesk.id, randomUUID()],
+  );
+  const removed = await remove(lab, frontDesk.id);
+  check(
+    "removing returns how far they had got",
+    removed.data?.[0]?.remove_lab_staff === "active",
+    removed.error?.message ?? "",
+  );
+  const removedRow = await memberRow(frontDesk.id);
+  check(
+    "the row stays, marked removed with who and when",
+    removedRow.status === "removed" &&
+      removedRow.removed_by === lab.id &&
+      removedRow.removed_at !== null,
+  );
+  check(
+    "their unused links stop working",
+    Number(
+      (
+        await db.query(
+          `select count(*) from public.auth_tokens where user_id = $1 and used_at is null`,
+          [frontDesk.id],
+        )
+      ).rows[0].count,
+    ) === 0,
+  );
+  check("access ends at once", (await labOf(frontDesk)) === null);
+  check(
+    "their membership shows removed",
+    (await membership(frontDesk))?.status === "removed",
+  );
+  refused(
+    "they can't act for the lab",
+    await moveTo(frontDesk, "cancelled"),
+    "not_lab",
+  );
+  refused(
+    "nobody is removed twice",
+    await remove(lab, frontDesk.id),
+    "member_not_found",
+  );
+
+  const pending = await newAccount();
+  succeeded("another invitation", await add(lab, pending.id, "collector"));
+  const withdrawn = await remove(lab, pending.id);
+  check(
+    "withdrawing an invitation says it was unused",
+    withdrawn.data?.[0]?.remove_lab_staff === "invited",
+  );
+  refused(
+    "a withdrawn invitation can't be accepted",
+    await accept(server, pending.id),
+    "invite_not_found",
+  );
+
+  section("Inviting someone back (LAB-07)");
+  const restore = (caller, email, role) =>
+    rpc(caller, "restore_lab_staff", { p_email: email, p_role: role });
+  const restoredId = (result) => result.data?.[0]?.restore_lab_staff ?? null;
+  // They had signed in before they were removed.
+  await db.query(
+    `update auth.users set last_sign_in_at = now(), email = lower(email) where id = $1`,
+    [frontDesk.id],
+  );
+  const deskEmail = (
+    await db.query(`select email from auth.users where id = $1`, [frontDesk.id])
+  ).rows[0].email;
+  refused(
+    "staff can't invite anyone back",
+    inCaller(await restore(collector, deskEmail, "front_desk")),
+    "not_permitted",
+  );
+  refused(
+    "an admin without two-factor can't",
+    await restore(passwordOnly, deskEmail, "front_desk"),
+    "second_factor_required",
+  );
+  refused(
+    "nobody comes back as admin",
+    await restore(lab, deskEmail, "admin"),
+    "invalid_role",
+  );
+  const elsewhere = await restore(otherLab, deskEmail, "front_desk");
+  check(
+    "another lab can't take over someone this lab removed",
+    !elsewhere.error && restoredId(elsewhere) === null,
+  );
+  const stranger = await restore(lab, `nobody-${randomUUID()}@example.invalid`, "collector");
+  check(
+    "an email that isn't a removed member gives nothing",
+    !stranger.error && restoredId(stranger) === null,
+  );
+  const activeEmail = (
+    await db.query(`select email from auth.users where id = $1`, [collector.id])
+  ).rows[0].email;
+  check(
+    "a current member isn't reopened",
+    restoredId(await restore(lab, activeEmail, "front_desk")) === null,
+  );
+  const back = await restore(lab, `  ${deskEmail.toUpperCase()} `, "collector");
+  check(
+    "the admin invites a removed person back by email, in any case",
+    restoredId(back) === frontDesk.id,
+    back.error?.message ?? "",
+  );
+  const backRow = await memberRow(frontDesk.id);
+  check(
+    "their row is an invitation again, with the new role",
+    backRow.status === "invited" &&
+      backRow.role === "collector" &&
+      backRow.removed_at === null &&
+      backRow.activated_at === null,
+  );
+  check("they have no access until they accept", (await labOf(frontDesk)) === null);
+  const withdrawnAgain = await remove(lab, frontDesk.id);
+  check(
+    "withdrawing it keeps the used account (banned, not deleted)",
+    withdrawnAgain.data?.[0]?.remove_lab_staff === "active",
+  );
+  succeeded("and they can be invited back again", await restore(lab, deskEmail, "collector"));
+  succeeded("and accept", await accept(server, frontDesk.id));
+  check("access returns", (await labOf(frontDesk)) === lab.id);
+
+  const crowdedLeaver = await createUser("lab");
+  await db.query(
+    `insert into public.lab_members (user_id, lab_id, role, status, activated_at, removed_at)
+     values ($1, $2, 'collector', 'removed', now(), now())`,
+    [crowdedLeaver.id, crowded.id],
+  );
+  refused(
+    "a full lab can't invite anyone back",
+    await restore(crowded, crowdedLeaver.email, "collector"),
+    "staff_limit",
+  );
+}
+
 // QA-02 asks for every `raise exception` path. Read the functions as they stand
 // after all migrations, and fail on any refusal no test above produced.
 async function testConsents() {
@@ -9672,6 +10146,7 @@ try {
   // After the catalog and booking groups, which count every lab offering a test.
   await testLabOrderResults(await freshPatients());
   await testLabResultsInbox(await freshPatients());
+  await testLabStaff(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

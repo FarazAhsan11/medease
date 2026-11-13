@@ -11,16 +11,18 @@ import {
   paymentLabels,
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
+import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { formatTime } from "@/lib/datetime";
 import { formatFee, telHref } from "@/lib/format";
 
 type LabBookingEntryProps = {
   booking: LabBooking;
+  role: LabMemberRole;
 };
 
 // One booking in the lab's list: who, what, where, what to collect, and the
 // next step.
-export function LabBookingEntry({ booking }: LabBookingEntryProps) {
+export function LabBookingEntry({ booking, role }: LabBookingEntryProps) {
   const home = booking.collection === "home" && booking.address;
   const age = booking.careRecipientDateOfBirth
     ? ageOn(booking.careRecipientDateOfBirth, booking.visitDate)
@@ -102,7 +104,7 @@ export function LabBookingEntry({ booking }: LabBookingEntryProps) {
         </div>
       </div>
       <LabBookingStatusReason booking={booking} audience="lab" />
-      <LabBookingActions booking={booking} />
+      <LabBookingActions booking={booking} role={role} />
     </article>
   );
 }

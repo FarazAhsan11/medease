@@ -5,15 +5,22 @@ import { resetPassword } from "@/features/auth/actions/reset-password";
 import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
 import { PasswordInput } from "@/features/auth/components/password-input";
 import { useFormAction } from "@/hooks/use-form-action";
-import { initialFormState } from "@/lib/form-state";
+import { initialFormState, type FormState } from "@/lib/form-state";
 
 type ResetPasswordFormProps = {
   token: string;
+  // Also sets the first password from a lab staff invitation.
+  action?: (state: FormState, formData: FormData) => Promise<FormState>;
+  submitLabel?: string;
 };
 
-export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
+export function ResetPasswordForm({
+  token,
+  action = resetPassword,
+  submitLabel = "Update password",
+}: ResetPasswordFormProps) {
   const { pending, onSubmit, fieldError } = useFormAction(
-    resetPassword,
+    action,
     initialFormState,
   );
 
@@ -51,7 +58,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         />
       </FormField>
       <AuthSubmitButton pending={pending} pendingLabel="Saving…">
-        Update password
+        {submitLabel}
       </AuthSubmitButton>
     </form>
   );

@@ -495,6 +495,7 @@ export const labBookingErrorMessages: Record<string, string> = {
 
 export const labBookingMoveErrorMessages: Record<string, string> = {
   not_lab: "Only lab accounts can update bookings.",
+  not_permitted: "Your role in this lab can't make this change.",
   booking_not_found: "This booking isn't in your list.",
   status_changed:
     "This booking was already updated, perhaps from another tab. The list now shows where it is.",
