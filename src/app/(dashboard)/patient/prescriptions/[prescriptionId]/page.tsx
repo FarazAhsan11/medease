@@ -5,7 +5,7 @@ import { BackLink } from "@/components/shared/back-link";
 import { DashboardPageHeader } from "@/components/shared/dashboard-page-header";
 import { patientRoutes } from "@/config/routes";
 import { PrescriptionDocument } from "@/features/prescriptions/components/prescription-document";
-import { PrintButton } from "@/features/prescriptions/components/print-button";
+import { PrintButton } from "@/components/shared/print-button";
 import {
   getPrescription,
   getReplacementId,

@@ -10511,6 +10511,423 @@ async function testConsents() {
   succeeded("and booking works again", await book(patient));
 }
 
+async function testLabSamples({ patient, secondPatient }) {
+  section("Sample IDs, labels and step history (LAB-16)");
+
+  const server = { role: "service_role" };
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  async function staffOf(labUser, role, name) {
+    const user = await createUser("lab", { confirmed: false });
+    await rpc(labUser, "add_lab_staff", { p_user_id: user.id, p_role: role });
+    await rpc(server, "accept_lab_invite", { p_user_id: user.id });
+    await db.query(
+      `update auth.users set raw_user_meta_data = jsonb_build_object('full_name', $2::text)
+       where id = $1`,
+      [user.id, name],
+    );
+    return user;
+  }
+  const frontDesk = await staffOf(lab, "front_desk", "Desk Person");
+  const collector = await staffOf(lab, "collector", "Collector One");
+  const secondCollector = await staffOf(lab, "collector", "Collector Two");
+  const pathologist = await staffOf(lab, "pathologist", "Path Person");
+  const deskPasswordOnly = { ...frontDesk, aal: "aal1" };
+
+  // The lab's catalog: a blood test, a urine test and a package of both.
+  const testId = async (typeId) =>
+    (
+      await db.query(
+        `insert into public.lab_tests (lab_id, test_type_id, price, turnaround_hours)
+         values ($1, $2, 500, 24) returning id`,
+        [lab.id, typeId],
+      )
+    ).rows[0].id;
+  const cbc = await testId("cbc");
+  const urine = await testId("urine-re");
+  const packageId = (
+    await db.query(
+      `insert into public.lab_packages (lab_id, name, price) values ($1, 'Sql Package', 900)
+       returning id`,
+      [lab.id],
+    )
+  ).rows[0].id;
+  await db.query(
+    `insert into public.lab_package_items (package_id, lab_id, lab_test_id)
+     values ($1, $2, $3), ($1, $2, $4)`,
+    [packageId, lab.id, cbc, urine],
+  );
+
+  const selfOf = async (person) =>
+    (
+      await db.query(
+        `select id from public.care_recipients where account_id = $1 and relation = 'self'`,
+        [person.id],
+      )
+    ).rows[0].id;
+  // A confirmed booking for today, written as the database owner.
+  const visit = async (
+    labUser,
+    { person = patient, collection = "lab", status = "booked", items = ["cbc"] } = {},
+  ) => {
+    const id = (
+      await db.query(
+        `insert into public.lab_bookings (
+           request_id, patient_id, care_recipient_id, lab_id, status, collection,
+           visit_date, slot_starts_at, slot_ends_at, lab_name, lab_address,
+           lab_phone, patient_name, care_recipient_name, care_recipient_relation,
+           street_address, area, city, contact_phone, subtotal, total, confirmed_at
+         ) values (
+           gen_random_uuid(), $1, $2, $3, $4, $5,
+           (now() at time zone 'Asia/Karachi')::date,
+           case when $5 = 'home' then now() + interval '1 hour' end,
+           case when $5 = 'home' then now() + interval '2 hours' end,
+           'Sql Lab', 'Lahore', '+92 300 0000000', 'Sql Patient', 'Sql Patient',
+           'self',
+           case when $5 = 'home' then 'House 1' end,
+           case when $5 = 'home' then 'Model Town' end,
+           case when $5 = 'home' then 'Lahore' end,
+           case when $5 = 'home' then '+92 300 1234567' end,
+           1000, 1000, now()
+         ) returning id`,
+        [person.id, await selfOf(person), labUser.id, status, collection],
+      )
+    ).rows[0].id;
+    for (const item of items) {
+      const single = item !== "package";
+      await db.query(
+        `insert into public.lab_booking_items (
+           booking_id, lab_id, patient_id, lab_test_id, package_id, test_type_id,
+           name, price, test_names
+         ) values ($1, $2, $3, $4, $5, $6, $7, 500, array[$7])`,
+        [
+          id,
+          labUser.id,
+          person.id,
+          single ? (item === "cbc" ? cbc : urine) : null,
+          single ? null : packageId,
+          single ? (item === "cbc" ? "cbc" : "urine-re") : null,
+          item,
+        ],
+      );
+    }
+    return id;
+  };
+
+  const print = (caller, bookingId) =>
+    rpc(caller, "prepare_lab_sample_labels", { p_booking_id: bookingId });
+  const history = (caller, bookingId) =>
+    rpc(caller, "get_lab_booking_history", { p_booking_id: bookingId });
+  const move = (caller, id, from, to, reason = null) =>
+    rpc(caller, "move_lab_booking", {
+      p_booking_id: id,
+      p_from_status: from,
+      p_to_status: to,
+      p_reason: reason,
+      p_note: null,
+    });
+  const inCaller = (result) => ({ ...result, fn: "lab_caller" });
+  const inLookup = (result) => ({ ...result, fn: "lab_booking_for" });
+  const samplesOf = async (bookingId) =>
+    (
+      await db.query(
+        `select * from public.lab_samples where booking_id = $1 order by created_at, code`,
+        [bookingId],
+      )
+    ).rows;
+  const codes = (result) => (result.data ?? []).map((row) => row.code);
+  const accessionPattern = /^\d{6}-\d{4}-[BUS]$/;
+
+  const both = await visit(lab, { items: ["cbc", "urine"] });
+  const first = await print(frontDesk, both);
+  succeeded("the front desk prints labels before collection", first);
+  check(
+    "one code per sample type, under one accession",
+    first.data?.length === 2 &&
+      first.data.every((row) => accessionPattern.test(row.code)) &&
+      first.data[0].code.slice(0, 11) === first.data[1].code.slice(0, 11) &&
+      first.data.map((row) => row.sample_type).join() === "blood,urine",
+    codes(first).join(", "),
+  );
+  check(
+    "a reprint gives the same codes",
+    codes(await print(frontDesk, both)).join() === codes(first).join(),
+  );
+  check(
+    "the printer is recorded and nothing is collected yet",
+    (await samplesOf(both)).every(
+      (row) => row.created_by === frontDesk.id && row.collected_at === null,
+    ),
+  );
+
+  const packaged = await visit(lab, { items: ["package"] });
+  const editedLater = await visit(lab, { items: ["package"] });
+  // The lab drops the urine test from the package after these were booked.
+  await db.query(
+    `delete from public.lab_package_items where package_id = $1 and lab_test_id = $2`,
+    [packageId, urine],
+  );
+  const fromPackage = await print(lab, packaged);
+  check(
+    "a package's tests decide its containers",
+    fromPackage.data?.map((row) => row.sample_type).join() === "blood,urine",
+  );
+  check(
+    "as booked, even after the lab edits the package",
+    (await print(lab, editedLater)).data?.map((row) => row.sample_type).join() ===
+      "blood,urine",
+  );
+  await db.query(
+    `insert into public.lab_package_items (package_id, lab_id, lab_test_id) values ($1, $2, $3)`,
+    [packageId, lab.id, urine],
+  );
+  const [firstNumber, secondNumber] = [first, fromPackage].map((result) =>
+    Number(result.data[0].code.slice(7, 11)),
+  );
+  // The package print came after first, with nothing between.
+  check(
+    "accessions count up through the lab's day",
+    secondNumber === firstNumber + 1,
+    `${firstNumber} then ${secondNumber}`,
+  );
+  const elsewhere = await visit(otherLab, { person: secondPatient });
+  const otherCodes = await db.query(
+    `select private.issue_lab_samples(b) from public.lab_bookings b where id = $1`,
+    [elsewhere],
+  );
+  check(
+    "another lab keeps its own count",
+    !!otherCodes &&
+      (await samplesOf(elsewhere))[0]?.accession.endsWith("-0001"),
+  );
+
+  // Marking collected without a print makes the codes there and then.
+  const unprinted = await visit(lab);
+  succeeded(
+    "the collector marks a lab visit collected",
+    await move(collector, unprinted, "booked", "sample_collected"),
+  );
+  const made = await samplesOf(unprinted);
+  check(
+    "collecting makes the code and records who and when",
+    made.length === 1 &&
+      made[0].sample_type === "blood" &&
+      made[0].created_by === collector.id &&
+      made[0].collected_by === collector.id &&
+      made[0].collected_at !== null,
+  );
+
+  succeeded(
+    "collecting keeps printed codes",
+    await move(collector, both, "booked", "sample_collected"),
+  );
+  check(
+    "and fills in the collection",
+    (await samplesOf(both)).every(
+      (row) => row.collected_by === collector.id && row.created_by === frontDesk.id,
+    ),
+  );
+  check(
+    "a collected sample still reprints",
+    codes(await print(collector, both)).join() === codes(first).join(),
+  );
+  succeeded(
+    "the pathologist asks for a new sample",
+    await move(pathologist, both, "sample_collected", "recollection_needed", "sample_haemolysed"),
+  );
+  const retired = await samplesOf(both);
+  check(
+    "the old containers are rejected with who and why",
+    retired.length === 2 &&
+      retired.every(
+        (row) =>
+          row.rejected_by === pathologist.id && row.rejection_reason === "sample_haemolysed",
+      ),
+  );
+  const again = await print(frontDesk, both);
+  check(
+    "the next print starts a new accession",
+    again.data?.length === 2 &&
+      !codes(again).some((code) => codes(first).includes(code)),
+  );
+  check(
+    "the rejected codes stay on record",
+    (await samplesOf(both)).length === 4,
+  );
+
+  // Who may print, and what.
+  refused(
+    "a patient can't print labels",
+    inCaller(await print(patient, both)),
+    "not_lab",
+  );
+  denied("a guest can't print labels", await print(null, both));
+  refused(
+    "a pathologist doesn't take samples, so doesn't print",
+    inCaller(await print(pathologist, both)),
+    "not_permitted",
+  );
+  refused(
+    "printing needs two-factor",
+    await print(deskPasswordOnly, both),
+    "second_factor_required",
+  );
+  refused(
+    "an unknown booking isn't found",
+    inLookup(await print(frontDesk, randomUUID())),
+    "booking_not_found",
+  );
+  refused(
+    "another lab's booking isn't found",
+    inLookup(await print(frontDesk, elsewhere)),
+    "booking_not_found",
+  );
+  const home = await visit(lab, { collection: "home" });
+  succeeded(
+    "the front desk sends the collector",
+    await rpc(frontDesk, "assign_lab_collector", {
+      p_booking_id: home,
+      p_collector_id: collector.id,
+    }),
+  );
+  refused(
+    "another collector can't print someone else's home visit",
+    inLookup(await print(secondCollector, home)),
+    "booking_not_found",
+  );
+  succeeded("the assigned collector can", await print(collector, home));
+  const cancelled = await visit(lab);
+  await move(frontDesk, cancelled, "booked", "cancelled", "patient_request");
+  refused(
+    "a cancelled booking has no labels",
+    await print(frontDesk, cancelled),
+    "not_printable",
+  );
+  check(
+    "and gets no codes",
+    (await samplesOf(cancelled)).length === 0,
+  );
+  const printedThenCancelled = await visit(lab);
+  await print(frontDesk, printedThenCancelled);
+  await move(frontDesk, printedThenCancelled, "booked", "cancelled", "patient_request");
+  check(
+    "cancelling retires codes printed ahead",
+    (await samplesOf(printedThenCancelled)).every(
+      (row) =>
+        row.rejected_at !== null &&
+        row.rejected_by === frontDesk.id &&
+        row.rejection_reason === "patient_request",
+    ),
+  );
+  // Collected before codes existed: the first print makes them.
+  const older = await visit(lab, { status: "processing" });
+  check(
+    "a booking already in the lab gets codes on its first print",
+    codes(await print(frontDesk, older)).length === 1,
+  );
+
+  // Reading samples.
+  const readAs = async (caller, bookingId) =>
+    (
+      await as(caller, `select code from public.lab_samples where booking_id = $1`, [
+        bookingId,
+      ])
+    ).data ?? [];
+  check(
+    "the lab's people read a booking's samples",
+    (await readAs(pathologist, both)).length === 4 &&
+      (await readAs(collector, home)).length === 1,
+  );
+  check(
+    "but not another collector's home visit, another lab's or the patient",
+    (await readAs(secondCollector, home)).length === 0 &&
+      (await readAs(otherLab, both)).length === 0 &&
+      (await readAs(patient, both)).length === 0,
+  );
+  check(
+    "reading needs two-factor",
+    (await readAs(deskPasswordOnly, both)).length === 0,
+  );
+  denied(
+    "nobody writes samples directly",
+    await as(
+      lab,
+      `update public.lab_samples set rejected_at = now() where booking_id = $1`,
+      [both],
+    ),
+  );
+  denied(
+    "or the counters",
+    await as(lab, `select * from public.lab_accession_counters`),
+  );
+
+  // History with names.
+  const steps = await history(frontDesk, both);
+  succeeded("the front desk reads a booking's history", steps);
+  const rows = steps.data ?? [];
+  const step = (status) => rows.find((row) => row.status === status);
+  check(
+    "each step names who took it",
+    step("booked")?.actor === "system" &&
+      step("sample_collected")?.actor === "staff" &&
+      step("sample_collected")?.actor_name === "Collector One" &&
+      step("sample_collected")?.actor_role === "collector" &&
+      step("recollection_needed")?.actor_name === "Path Person" &&
+      step("recollection_needed")?.reason === "sample_haemolysed",
+    JSON.stringify(rows.map((row) => [row.status, row.actor, row.actor_name])),
+  );
+  check(
+    "in order",
+    rows.map((row) => row.status).join() ===
+      "booked,sample_collected,recollection_needed",
+  );
+  const patientMoved = await visit(lab);
+  succeeded(
+    "the patient cancels a booking",
+    await rpc(patient, "cancel_lab_booking", {
+      p_booking_id: patientMoved,
+      p_reason: "no_longer_needed",
+    }),
+  );
+  check(
+    "a patient's own step says so",
+    (await history(lab, patientMoved)).data?.find(
+      (row) => row.status === "cancelled",
+    )?.actor === "patient",
+  );
+  succeeded(
+    "the collector removed from the lab",
+    await rpc(lab, "remove_lab_staff", { p_user_id: collector.id }),
+  );
+  check(
+    "keeps their name on what they did",
+    (await history(lab, both)).data?.find(
+      (row) => row.status === "sample_collected",
+    )?.actor_name === "Collector One",
+  );
+  refused(
+    "a patient can't read the lab's history",
+    inCaller(await history(patient, both)),
+    "not_lab",
+  );
+  denied("a guest can't either", await history(null, both));
+  refused(
+    "the history needs two-factor",
+    await history(deskPasswordOnly, both),
+    "second_factor_required",
+  );
+  refused(
+    "another collector's home visit isn't found",
+    inLookup(await history(secondCollector, home)),
+    "booking_not_found",
+  );
+  refused(
+    "nor another lab's booking",
+    inLookup(await history(otherLab, both)),
+    "booking_not_found",
+  );
+}
+
 async function testEveryRefusalIsTested() {
   section("Every refusal has a test (QA-02)");
 
@@ -10584,6 +11001,7 @@ try {
   await testLabResultsInbox(await freshPatients());
   await testLabStaff(await freshPatients());
   await testLabCollectors(await freshPatients());
+  await testLabSamples(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

@@ -36,6 +36,8 @@
   --color-warning-soft: var(--warning-soft);
   --color-ink: var(--ink);
   --color-ink-foreground: var(--ink-foreground);
+  --color-label: var(--label);
+  --color-label-foreground: var(--label-foreground);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -106,6 +108,9 @@
   --warning-soft: #fef3c7;
   --ink: #0f172a;
   --ink-foreground: #cbd5e1;
+  /* Printed sample labels: black on white, as on the tube. */
+  --label: #ffffff;
+  --label-foreground: #000000;
 
   --chart-1: #49adca;
   --chart-2: #1782a3;

@@ -10,7 +10,7 @@ import { PrescriptionDocument } from "@/features/prescriptions/components/prescr
 import { PrescriptionEditor } from "@/features/prescriptions/components/prescription-editor";
 import { PrescriptionForm } from "@/features/prescriptions/components/prescription-form";
 import { PrescriptionSummaryCard } from "@/features/prescriptions/components/prescription-summary-card";
-import { PrintButton } from "@/features/prescriptions/components/print-button";
+import { PrintButton } from "@/components/shared/print-button";
 import {
   getPrescribeBlock,
   prescribeBlockMessages,

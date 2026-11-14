@@ -4,6 +4,11 @@
 // Design: docs/lab-booking.md.
 
 import type { CareRecipientRelation } from "@/features/family/lib/relations";
+import {
+  openSamples,
+  type LabSample,
+  type LabSampleRecord,
+} from "@/features/lab-samples/lib/samples";
 import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
@@ -268,6 +273,8 @@ export type LabBooking = {
   doctorComment: DoctorComment | null;
   // Who goes to a home visit (LAB-06). Only on the lab's list.
   collectorId: string | null;
+  // The open containers' codes (LAB-16); only the lab's list reads them.
+  samples: LabSample[];
   // When each step happened, newest move per status. Only on the patient's
   // list, which shows the tracker.
   steps: Partial<Record<LabBookingStatus, string>>;
@@ -338,6 +345,7 @@ export type LabBookingRow = {
   // At most one: the key is the booking, but the foreign key to it is
   // composite, so PostgREST embeds it as a list.
   assignment?: { collector_id: string }[];
+  samples?: LabSampleRecord[];
   lab_booking_items: {
     id: string;
     name: string;
@@ -361,10 +369,16 @@ export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
   lab_booking_events (status, kind, created_at),
   lab_result_reviews (doctor_name, comment, commented_at)`;
 
-// The lab's list: also who goes to each home visit. Row level security shows
-// a collector only their own.
+// The lab's list: also who goes to each home visit and the sample codes. Row
+// level security shows a collector only their own home visits.
 export const LAB_SIDE_BOOKING_COLUMNS = `${LAB_BOOKING_COLUMNS},
-  assignment:lab_booking_assignments (collector_id)`;
+  assignment:lab_booking_assignments (collector_id),
+  samples:lab_samples (code, sample_type, rejected_at)`;
+
+// One booking's page: every container it has had, rejected ones included.
+export const LAB_BOOKING_DETAIL_COLUMNS = `${LAB_BOOKING_COLUMNS},
+  assignment:lab_booking_assignments (collector_id),
+  samples:lab_samples (code, sample_type, created_at, collected_at, rejected_at, rejection_reason)`;
 
 // The newest time each status was reached. A move to a new time isn't a step.
 function stepTimes(events: LabBookingRow["lab_booking_events"]) {
@@ -437,6 +451,7 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     labOrderId: row.lab_order_id,
     doctorComment: toDoctorComment(row.lab_result_reviews),
     collectorId: row.assignment?.[0]?.collector_id ?? null,
+    samples: openSamples(row.samples ?? []),
     items: [...row.lab_booking_items]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => ({

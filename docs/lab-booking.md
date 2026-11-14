@@ -63,6 +63,8 @@ This follows the order lifecycle in HL7's Clinical Order Workflows guide: the fi
 
 **Limits.** 600 moves an hour per lab account (`rateLimits.labBookingMoveUser`); notes up to 500 characters.
 
+**Sample codes and who moved it (LAB-16).** Collecting a sample gives it a code and barcode label, a new sample request retires it, and the lab reads each booking's history with staff names: see [lab-samples.md](./lab-samples.md).
+
 ## Reports (LAB-05)
 
 **The report is the last step.** For a booking it's processing, the lab presses **Upload report**, picks the PDF and publishes it; `publish_lab_report` files the report and moves the booking to report ready in one transaction, which tells the patient. A trigger on `lab_bookings` refuses report ready without a current report (`report_required`), so `move_lab_booking` can no longer mark a booking ready by itself and a patient told "your report is ready" can always open it. Bookings marked ready before this change keep the old wording ("collect it from the lab").

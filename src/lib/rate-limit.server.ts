@@ -82,6 +82,13 @@ export const rateLimits = {
     limit: 600,
     windowSeconds: ONE_HOUR,
   },
+  // A lab printing sample labels (LAB-16): one print per booking, reprints
+  // when a label is spoiled.
+  labSampleLabelUser: {
+    name: "lab-sample-label-user",
+    limit: 600,
+    windowSeconds: ONE_HOUR,
+  },
   // A lab asking for report upload links. Separate from uploadUser, which is
   // sized for a person's own files: a lab publishes a report per booking, a
   // few hundred on a busy day.

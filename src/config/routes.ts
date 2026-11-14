@@ -118,6 +118,9 @@ export const labRoutes = {
   tests: "/lab/tests",
   homeCollection: "/lab/home-collection",
   bookings: "/lab/bookings",
+  // One booking: its samples and who did each step (LAB-16).
+  booking: (bookingId: string) => `/lab/bookings/${bookingId}`,
+  bookingLabels: (bookingId: string) => `/lab/bookings/${bookingId}/labels`,
   reports: "/lab/reports",
   // Opens the report on a short-lived signed link.
   report: (reportId: string) => `/lab/reports/${reportId}`,

@@ -11,7 +11,7 @@ What each role can do. The database holds the matrix (`private.lab_role_can`); `
 | See bookings (`bookings.view`) | yes | yes | lab visits and own home visits | yes |
 | See every booking (`bookings.view_all`) | yes | yes | | yes |
 | Send a collector on a home visit (`bookings.assign`) | yes | yes | | |
-| Mark a sample collected (`bookings.collect`) | yes | yes | yes | |
+| Mark a sample collected, print sample labels (`bookings.collect`) | yes | yes | yes | |
 | Move to processing, ask for a new sample (`bookings.process`) | yes | | | yes |
 | Cancel a booking (`bookings.cancel`) | yes | yes | | |
 | Open reports (`reports.view`) | yes | yes | | yes |
@@ -59,7 +59,7 @@ Booking notices (new, cancelled, rescheduled) go through `private.notify_lab`, o
 
 ## Not in this step
 
-- Sign-off (LAB-17), sample tracking with who did each step (LAB-16), and the collector's day view (LAB-21) build on these roles.
+- Sign-off (LAB-17) and the collector's day view (LAB-21) build on these roles. Sample tracking with who did each step (LAB-16) is built: [lab-samples.md](./lab-samples.md).
 - More than one admin, and moving the lab to a new admin.
 - Staff accept the same documents as the lab admin, including the partner terms. Whether staff should accept only the terms and privacy policy is for counsel (CMPL-03).
 

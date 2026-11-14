@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import {
   LAB_BOOKING_COLUMNS,
+  LAB_BOOKING_DETAIL_COLUMNS,
   LAB_SIDE_BOOKING_COLUMNS,
   LAB_BOOKING_WITH_STEPS_COLUMNS,
   LAB_TIMEZONE,
@@ -13,6 +14,7 @@ import {
   type LabBookingStage,
   type LabBookingStatus,
 } from "@/features/lab-booking/lib/lab-bookings";
+import type { LabSampleDetail } from "@/features/lab-samples/lib/samples";
 import { toDateKey } from "@/lib/datetime";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,6 +56,28 @@ export async function getPatientLabBooking(userId: string, bookingId: string) {
   return data ? toLabBooking(data) : null;
 }
 
+// One of the lab's bookings with every container it has had, oldest first,
+// or null when the lab can't see it (row level security also hides other
+// collectors' home visits).
+export async function getLabBooking(labId: string, bookingId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("lab_bookings")
+    .select(LAB_BOOKING_DETAIL_COLUMNS)
+    .eq("id", bookingId)
+    .eq("lab_id", labId)
+    .order("created_at", { referencedTable: "samples" })
+    .order("code", { referencedTable: "samples" })
+    .maybeSingle<LabBookingRow>();
+
+  if (error) throw new Error(`lab_bookings: ${error.message}`);
+  if (!data) return null;
+  return {
+    booking: toLabBooking(data),
+    samples: (data.samples ?? []) as LabSampleDetail[],
+  };
+}
+
 type DayRange = { from?: string; before?: string };
 
 // The bookings page also reads who goes to each home visit; other lists don't
@@ -77,6 +101,9 @@ async function readLabBookings(
     .select(columns)
     .eq("lab_id", labId)
     .in("status", statuses);
+  // Only the open containers; rejected ones stay in the database.
+  if (columns === LAB_SIDE_BOOKING_COLUMNS)
+    query = query.is("samples.rejected_at", null);
   if (from) query = query.gte("visit_date", from);
   if (before) query = query.lt("visit_date", before);
   const { data, error } = await query

@@ -6,6 +6,7 @@ import { LabBookingCollector } from "@/features/lab-booking/components/lab-booki
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
 import { bookedByLabel } from "@/features/family/lib/relations";
+import { BookingSampleBar } from "@/features/lab-samples/components/booking-sample-bar";
 import {
   ageOn,
   canPatientChange,
@@ -22,6 +23,8 @@ type LabBookingEntryProps = {
   role: LabMemberRole;
   viewerId: string;
   collectors?: LabCollector[];
+  // The link to the booking's own page; off on that page.
+  detailsLink?: boolean;
 };
 
 // One booking in the lab's list: who, what, where, what to collect, and the
@@ -31,6 +34,7 @@ export function LabBookingEntry({
   role,
   viewerId,
   collectors,
+  detailsLink = true,
 }: LabBookingEntryProps) {
   const home = booking.collection === "home" && booking.address;
   const age = booking.careRecipientDateOfBirth
@@ -117,6 +121,11 @@ export function LabBookingEntry({
         role={role}
         viewerId={viewerId}
         collectors={collectors}
+      />
+      <BookingSampleBar
+        booking={booking}
+        role={role}
+        detailsLink={detailsLink}
       />
       <LabBookingStatusReason booking={booking} audience="lab" />
       <LabBookingActions booking={booking} role={role} />
