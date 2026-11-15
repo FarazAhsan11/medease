@@ -32,8 +32,8 @@ export function StaffListCard({ members }: StaffListCardProps) {
       </ul>
       {staffCount === 0 && (
         <p className="border-t px-5 py-4 text-sm text-muted-foreground">
-          Invite your front desk, collectors and pathologists so each person
-          signs in with their own account.
+          Invite your front desk, collectors, technicians and pathologists so
+          each person signs in with their own account.
         </p>
       )}
     </PanelCard>

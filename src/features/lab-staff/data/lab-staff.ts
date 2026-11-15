@@ -3,7 +3,10 @@ import "server-only";
 import { z } from "zod";
 
 import { labMemberRoleSchema } from "@/features/lab-staff/lib/lab-permissions";
-import type { LabStaffMember } from "@/features/lab-staff/lib/lab-staff";
+import type {
+  LabSigner,
+  LabStaffMember,
+} from "@/features/lab-staff/lib/lab-staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,6 +19,8 @@ const rowSchema = z.object({
   invited_at: z.string(),
   activated_at: z.string().nullable(),
   invite_expires_at: z.string().nullable(),
+  signer_name: z.string().nullable(),
+  signer_title: z.string().nullable(),
 });
 
 // The lab's people, admin first. get_lab_staff checks the caller is the
@@ -37,6 +42,10 @@ export async function getLabStaff(): Promise<LabStaffMember[]> {
       invitedAt: row.invited_at,
       activatedAt: row.activated_at,
       inviteExpiresAt: row.invite_expires_at,
+      signer:
+        row.signer_name && row.signer_title
+          ? { name: row.signer_name, title: row.signer_title }
+          : null,
     }));
 }
 
@@ -64,4 +73,20 @@ export async function getLabInviteDetails(userId: string) {
 
   const invite = inviteSchema.parse(data);
   return { role: invite.role, labName: invite.lab.lab_name };
+}
+
+// The signed-in person's own sign-off details (LAB-17), from their own
+// membership row, which row level security lets them read.
+export async function getOwnSigner(userId: string): Promise<LabSigner | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("lab_members")
+    .select("signer_name, signer_title")
+    .eq("user_id", userId)
+    .maybeSingle<{ signer_name: string | null; signer_title: string | null }>();
+  if (error) throw new Error(`lab_members: ${error.message}`);
+
+  return data?.signer_name && data.signer_title
+    ? { name: data.signer_name, title: data.signer_title }
+    : null;
 }

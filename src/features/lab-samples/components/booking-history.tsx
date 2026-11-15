@@ -24,6 +24,11 @@ export function BookingHistory({ steps, timezone }: BookingHistoryProps) {
             aria-hidden
           />
           <p className="font-medium">{stepTitle(step, timezone)}</p>
+          {step.kind === "report_returned" && step.note && (
+            <p className="break-words whitespace-pre-line text-muted-foreground">
+              {step.note}
+            </p>
+          )}
           {step.reason && (
             <p className="text-muted-foreground">
               {reasonLabels[step.reason as StatusReason] ?? step.reason}
@@ -40,6 +45,10 @@ export function BookingHistory({ steps, timezone }: BookingHistoryProps) {
 }
 
 function stepTitle(step: BookingHistoryStep, timezone: string) {
+  if (step.kind === "report_uploaded") return "Report uploaded";
+  if (step.kind === "report_returned") return "Report sent back";
+  if (step.kind === "report_signed_off")
+    return "Report signed off and released";
   if (step.kind === "rescheduled") {
     const when = step.slot_starts_at
       ? formatDateTime(step.slot_starts_at, timezone)

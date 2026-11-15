@@ -11,7 +11,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 // Runs in the browser: gets a signed link, uploads straight to Storage, then
-// asks the server to check what arrived and publish it.
+// asks the server to check what arrived, file it for sign-off, and sign it off
+// too if the uploader chose to.
 export async function uploadLabReport(
   _previousState: FormState,
   formData: FormData,
@@ -19,7 +20,7 @@ export async function uploadLabReport(
   const parsed = uploadReportSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return validationError(parsed.error);
 
-  const { bookingId, file } = parsed.data;
+  const { bookingId, file, signNow } = parsed.data;
   const prepared = await prepareReportUpload(initialFormState, {
     bookingId,
     type: file.type,
@@ -38,5 +39,9 @@ export async function uploadLabReport(
     );
   }
 
-  return publishLabReport(initialFormState, { bookingId, path });
+  return publishLabReport(initialFormState, {
+    bookingId,
+    path,
+    signNow: signNow === "1",
+  });
 }

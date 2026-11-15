@@ -31,6 +31,8 @@ const titles = {
   lab_result_comment: "Your doctor commented on a lab report",
   lab_booking_assigned: "You have a new home collection",
   lab_booking_unassigned: "A home collection left your list",
+  lab_report_to_sign: "A lab report is waiting for sign-off",
+  lab_report_returned: "A lab report you uploaded was sent back",
 } as const;
 
 export type NotificationKind = keyof typeof titles;

@@ -8,8 +8,8 @@ export const partnerTerms: LegalDocument = {
   slug: "partner-terms",
   title: "Doctor and Lab Partner Terms",
   summary: `The agreement between ${name} and the doctors and labs who join it.`,
-  version: "1.2",
-  updated: "13 November 2026",
+  version: "1.3",
+  updated: "15 November 2026",
   sections: [
     {
       title: "These terms",
@@ -56,6 +56,7 @@ export const partnerTerms: LegalDocument = {
           "Patients pay you in cash, at the lab or to your collector, the total shown on the booking.",
           "Use a patient's details only to carry out their booking.",
           "You alone are responsible for sample handling, testing and the accuracy of your reports.",
+          "A report reaches the patient only after someone you have given sign-off rights reviews and signs it off in the app. The name and qualification you enter for them are printed on every report they sign, so they must be true and kept up to date.",
         ],
       ],
     },

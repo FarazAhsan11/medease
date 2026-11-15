@@ -1915,6 +1915,15 @@ async function testLabOrderResults({ patient, secondPatient }) {
       p_path: path,
     }),
   );
+  const { rows: pendingRows } = await db.query(
+    `select ordering_doctor_id from public.lab_reports where id = $1`,
+    [reportId],
+  );
+  check(
+    "a report waiting for sign-off doesn't reach the doctor yet",
+    pendingRows[0]?.ordering_doctor_id === null,
+  );
+  succeeded("the lab signs it off", await signOffReport(lab, reportId));
   const { rows: reportRows } = await db.query(
     `select ordering_doctor_id from public.lab_reports where id = $1`,
     [reportId],
@@ -2172,8 +2181,12 @@ async function testLabResultsInbox({ patient, secondPatient }) {
         p_path: path,
       }),
     );
+    await signOffReport(lab, reportId);
+    // Uploaded in the opposite order, so the inbox is seen to go by release.
     await db.query(
-      `update public.lab_reports set created_at = now() - $2 * interval '1 day'
+      `update public.lab_reports
+       set created_at = now() - (10 - $2) * interval '1 day',
+           released_at = now() - $2 * interval '1 day'
        where id = $1`,
       [reportId, daysAgo],
     );
@@ -2188,6 +2201,13 @@ async function testLabResultsInbox({ patient, secondPatient }) {
   );
 
   const waiting = (await inbox(doctor, false)).data ?? [];
+  check(
+    "reports to review are dated by release",
+    waiting[0]?.published_at !== undefined &&
+      new Date(waiting[0].published_at) > new Date(Date.now() - 4 * 86400000) &&
+      new Date(waiting[0].published_at) < new Date(Date.now() - 2 * 86400000),
+    waiting[0]?.published_at,
+  );
   check(
     "reports to review come oldest first",
     waiting.map((row) => row.report_id).join() ===
@@ -2221,11 +2241,15 @@ async function testLabResultsInbox({ patient, secondPatient }) {
     "only the doctor's functions read when a report was reviewed",
     (await reviewedAtColumn(lab)) === "42501" &&
       (await reviewedAtColumn(patient)) === "42501" &&
-      ((
-        await as(lab, `select id, version from public.lab_reports where id = $1`, [
-          cbc.reportId,
-        ])
-      ).data ?? []).length === 1,
+      (
+        (
+          await as(
+            lab,
+            `select id, version from public.lab_reports where id = $1`,
+            [cbc.reportId],
+          )
+        ).data ?? []
+      ).length === 1,
   );
   check(
     "another doctor sees none of them",
@@ -2308,10 +2332,11 @@ async function testLabResultsInbox({ patient, secondPatient }) {
   );
   const { rows: corrected } = await db.query(
     `insert into public.lab_reports (
-       booking_id, lab_id, patient_id, care_recipient_id, version, storage_path
+       booking_id, lab_id, patient_id, care_recipient_id, version, storage_path,
+       released_at
      )
      select booking_id, lab_id, patient_id, care_recipient_id, 2,
-       lab_id || '/' || booking_id || '/' || gen_random_uuid() || '.pdf'
+       lab_id || '/' || booking_id || '/' || gen_random_uuid() || '.pdf', now()
      from public.lab_reports where id = $1
      returning id`,
     [cbc.reportId],
@@ -2419,8 +2444,8 @@ async function testLabResultsInbox({ patient, secondPatient }) {
   const toReviewPlan = await plan(
     `select id from public.lab_reports
      where ordering_doctor_id = $1 and replaced_at is null and reviewed_at is null
-       and (created_at, id) > ('-infinity'::timestamptz, '00000000-0000-0000-0000-000000000000'::uuid)
-     order by created_at, id limit 25`,
+       and (released_at, id) > ('-infinity'::timestamptz, '00000000-0000-0000-0000-000000000000'::uuid)
+     order by released_at, id limit 25`,
   );
   const reviewedPlan = await plan(
     `select id from public.lab_reports
@@ -2984,6 +3009,41 @@ async function createLab({
     [user.id, status, authority, license ? `${user.id}/license-1.pdf` : null],
   );
   return user;
+}
+
+// A copy of the report at a new path in its booking's folder, recorded as
+// checked, the way the sign-off action stores the stamped PDF (LAB-17).
+async function checkedSignedCopy(reportId) {
+  const { rows } = await db.query(
+    `select lab_id, booking_id from public.lab_reports where id = $1`,
+    [reportId],
+  );
+  const path = `${rows[0].lab_id}/${rows[0].booking_id}/${randomUUID()}.pdf`;
+  await rpc({ role: "service_role" }, "mark_upload_checked", {
+    p_bucket: "lab-reports",
+    p_path: path,
+    p_owner_id: rows[0].lab_id,
+  });
+  return path;
+}
+
+// Signs a report off as the caller, giving them sign-off details if they have
+// none, so tests of what follows a released report can get one.
+async function signOffReport(caller, reportId) {
+  const { rows } = await db.query(
+    `update public.lab_members
+     set signer_name = coalesce(signer_name, 'Dr Sql Signer'),
+         signer_title = coalesce(signer_title, 'MBBS, FCPS (Pathology)')
+     where user_id = $1
+     returning signer_name, signer_title`,
+    [caller.id],
+  );
+  return rpc(caller, "sign_off_lab_report", {
+    p_report_id: reportId,
+    p_signed_path: await checkedSignedCopy(reportId),
+    p_signer_name: rows[0]?.signer_name ?? null,
+    p_signer_title: rows[0]?.signer_title ?? null,
+  });
 }
 
 const labRow = async (id) =>
@@ -5323,19 +5383,29 @@ async function testLabBooking({ patient, secondPatient }) {
       report.replaced_at === null,
   );
   refused(
-    "a second click doesn't publish twice",
+    "a second click doesn't upload twice",
     await publish(lab, todayId, await checkedReport(lab, todayId)),
-    "status_changed",
+    "report_awaiting_sign_off",
   );
   check(
-    "publishing is audited, ids only",
+    "uploading is audited, ids only",
     (
       await db.query(
         `select details from public.audit_log
-         where action = 'lab_report.published' and target_id = $1`,
+         where action = 'lab_report.uploaded' and target_id = $1`,
         [todayId],
       )
     ).rows[0]?.details?.report_id === report?.id,
+  );
+  check(
+    "the report waits for sign-off with the booking still in processing (LAB-17)",
+    (await bookingRow(todayId)).status === "processing",
+  );
+  succeeded("the lab signs it off", await signOffReport(lab, report.id));
+  refused(
+    "once signed off, another upload finds it ready",
+    await publish(lab, todayId, await checkedReport(lab, todayId)),
+    "status_changed",
   );
   const reportsSeenBy = async (caller) =>
     (
@@ -9451,7 +9521,11 @@ async function testLabStaff({ patient }) {
 
   section("Inviting (LAB-07)");
   const invited = await newAccount();
-  refused("a patient can't invite", await add(patient, invited.id, "collector"), "not_lab");
+  refused(
+    "a patient can't invite",
+    await add(patient, invited.id, "collector"),
+    "not_lab",
+  );
   denied("a guest can't invite", await add(null, invited.id, "collector"));
   refused(
     "an admin without two-factor can't",
@@ -9483,7 +9557,10 @@ async function testLabStaff({ patient }) {
     await add(lab, stale.id, "collector"),
     "invalid_user",
   );
-  succeeded("the admin invites someone", await add(lab, invited.id, "collector"));
+  succeeded(
+    "the admin invites someone",
+    await add(lab, invited.id, "collector"),
+  );
   const invitedRow = await memberRow(invited.id);
   check(
     "they wait as invited, filed under the lab",
@@ -9511,8 +9588,14 @@ async function testLabStaff({ patient }) {
     ),
   );
 
-  denied("a lab can't accept an invitation itself", await accept(invited, invited.id));
-  succeeded("the invitation link activates them", await accept(server, invited.id));
+  denied(
+    "a lab can't accept an invitation itself",
+    await accept(invited, invited.id),
+  );
+  succeeded(
+    "the invitation link activates them",
+    await accept(server, invited.id),
+  );
   refused(
     "an invitation is accepted once",
     await accept(server, invited.id),
@@ -9818,7 +9901,11 @@ async function testLabStaff({ patient }) {
     "another lab can't take over someone this lab removed",
     !elsewhere.error && restoredId(elsewhere) === null,
   );
-  const stranger = await restore(lab, `nobody-${randomUUID()}@example.invalid`, "collector");
+  const stranger = await restore(
+    lab,
+    `nobody-${randomUUID()}@example.invalid`,
+    "collector",
+  );
   check(
     "an email that isn't a removed member gives nothing",
     !stranger.error && restoredId(stranger) === null,
@@ -9844,13 +9931,19 @@ async function testLabStaff({ patient }) {
       backRow.removed_at === null &&
       backRow.activated_at === null,
   );
-  check("they have no access until they accept", (await labOf(frontDesk)) === null);
+  check(
+    "they have no access until they accept",
+    (await labOf(frontDesk)) === null,
+  );
   const withdrawnAgain = await remove(lab, frontDesk.id);
   check(
     "withdrawing it keeps the used account (banned, not deleted)",
     withdrawnAgain.data?.[0]?.remove_lab_staff === "active",
   );
-  succeeded("and they can be invited back again", await restore(lab, deskEmail, "collector"));
+  succeeded(
+    "and they can be invited back again",
+    await restore(lab, deskEmail, "collector"),
+  );
   succeeded("and accept", await accept(server, frontDesk.id));
   check("access returns", (await labOf(frontDesk)) === lab.id);
 
@@ -10101,7 +10194,9 @@ async function testLabCollectors({ patient }) {
     await assign(frontDesk, homeId, collector.id),
   );
   const today = (
-    await db.query(`select (now() at time zone 'Asia/Karachi')::date::text as day`)
+    await db.query(
+      `select (now() at time zone 'Asia/Karachi')::date::text as day`,
+    )
   ).rows[0].day;
   const loadOf = async (userId, days) =>
     (await rpc(frontDesk, "get_lab_collectors", { p_days: days })).data?.find(
@@ -10152,7 +10247,8 @@ async function testLabCollectors({ patient }) {
     ).data?.length ?? 0;
   check(
     "a booking's history follows the booking",
-    (await eventsSeen(collector)) > 0 && (await eventsSeen(secondCollector)) === 0,
+    (await eventsSeen(collector)) > 0 &&
+      (await eventsSeen(secondCollector)) === 0,
   );
   const assignmentsSeen = async (caller) =>
     (await as(caller, `select booking_id from public.lab_booking_assignments`))
@@ -10197,7 +10293,10 @@ async function testLabCollectors({ patient }) {
   );
 
   const cancelledId = await visit(lab);
-  succeeded("assigned again", await assign(frontDesk, cancelledId, collector.id));
+  succeeded(
+    "assigned again",
+    await assign(frontDesk, cancelledId, collector.id),
+  );
   succeeded(
     "the front desk cancels it",
     await move(frontDesk, cancelledId, "cancelled", {
@@ -10234,12 +10333,18 @@ async function testLabCollectors({ patient }) {
   );
 
   const redoId = await visit(lab);
-  succeeded("a visit for the collector", await assign(frontDesk, redoId, collector.id));
+  succeeded(
+    "a visit for the collector",
+    await assign(frontDesk, redoId, collector.id),
+  );
   succeeded(
     "they collect it",
     await move(collector, redoId, "sample_collected"),
   );
-  const deskRedoNotices = await notices(frontDesk.id, "lab_booking_recollection_needed");
+  const deskRedoNotices = await notices(
+    frontDesk.id,
+    "lab_booking_recollection_needed",
+  );
   succeeded(
     "the pathologist asks for a new sample",
     await move(pathologist, redoId, "recollection_needed", {
@@ -10261,7 +10366,10 @@ async function testLabCollectors({ patient }) {
 
   const doneId = await visit(lab);
   const openId = await visit(lab);
-  succeeded("a visit for the second collector", await assign(frontDesk, doneId, secondCollector.id));
+  succeeded(
+    "a visit for the second collector",
+    await assign(frontDesk, doneId, secondCollector.id),
+  );
   succeeded("and another", await assign(frontDesk, openId, secondCollector.id));
   succeeded(
     "they collect the first",
@@ -10282,7 +10390,10 @@ async function testLabCollectors({ patient }) {
     "invalid_collector",
   );
 
-  succeeded("a visit for the collector", await assign(frontDesk, openId, collector.id));
+  succeeded(
+    "a visit for the collector",
+    await assign(frontDesk, openId, collector.id),
+  );
   succeeded(
     "the collector becomes a pathologist",
     await rpc(lab, "set_lab_staff_role", {
@@ -10568,7 +10679,12 @@ async function testLabSamples({ patient, secondPatient }) {
   // A confirmed booking for today, written as the database owner.
   const visit = async (
     labUser,
-    { person = patient, collection = "lab", status = "booked", items = ["cbc"] } = {},
+    {
+      person = patient,
+      collection = "lab",
+      status = "booked",
+      items = ["cbc"],
+    } = {},
   ) => {
     const id = (
       await db.query(
@@ -10674,8 +10790,9 @@ async function testLabSamples({ patient, secondPatient }) {
   );
   check(
     "as booked, even after the lab edits the package",
-    (await print(lab, editedLater)).data?.map((row) => row.sample_type).join() ===
-      "blood,urine",
+    (await print(lab, editedLater)).data
+      ?.map((row) => row.sample_type)
+      .join() === "blood,urine",
   );
   await db.query(
     `insert into public.lab_package_items (package_id, lab_id, lab_test_id) values ($1, $2, $3)`,
@@ -10724,7 +10841,8 @@ async function testLabSamples({ patient, secondPatient }) {
   check(
     "and fills in the collection",
     (await samplesOf(both)).every(
-      (row) => row.collected_by === collector.id && row.created_by === frontDesk.id,
+      (row) =>
+        row.collected_by === collector.id && row.created_by === frontDesk.id,
     ),
   );
   check(
@@ -10733,7 +10851,13 @@ async function testLabSamples({ patient, secondPatient }) {
   );
   succeeded(
     "the pathologist asks for a new sample",
-    await move(pathologist, both, "sample_collected", "recollection_needed", "sample_haemolysed"),
+    await move(
+      pathologist,
+      both,
+      "sample_collected",
+      "recollection_needed",
+      "sample_haemolysed",
+    ),
   );
   const retired = await samplesOf(both);
   check(
@@ -10741,7 +10865,8 @@ async function testLabSamples({ patient, secondPatient }) {
     retired.length === 2 &&
       retired.every(
         (row) =>
-          row.rejected_by === pathologist.id && row.rejection_reason === "sample_haemolysed",
+          row.rejected_by === pathologist.id &&
+          row.rejection_reason === "sample_haemolysed",
       ),
   );
   const again = await print(frontDesk, both);
@@ -10803,13 +10928,16 @@ async function testLabSamples({ patient, secondPatient }) {
     await print(frontDesk, cancelled),
     "not_printable",
   );
-  check(
-    "and gets no codes",
-    (await samplesOf(cancelled)).length === 0,
-  );
+  check("and gets no codes", (await samplesOf(cancelled)).length === 0);
   const printedThenCancelled = await visit(lab);
   await print(frontDesk, printedThenCancelled);
-  await move(frontDesk, printedThenCancelled, "booked", "cancelled", "patient_request");
+  await move(
+    frontDesk,
+    printedThenCancelled,
+    "booked",
+    "cancelled",
+    "patient_request",
+  );
   check(
     "cancelling retires codes printed ahead",
     (await samplesOf(printedThenCancelled)).every(
@@ -10829,9 +10957,11 @@ async function testLabSamples({ patient, secondPatient }) {
   // Reading samples.
   const readAs = async (caller, bookingId) =>
     (
-      await as(caller, `select code from public.lab_samples where booking_id = $1`, [
-        bookingId,
-      ])
+      await as(
+        caller,
+        `select code from public.lab_samples where booking_id = $1`,
+        [bookingId],
+      )
     ).data ?? [];
   check(
     "the lab's people read a booking's samples",
@@ -10928,6 +11058,585 @@ async function testLabSamples({ patient, secondPatient }) {
   );
 }
 
+async function testLabReportSignOff({ patient, secondPatient }) {
+  section("Report sign-off (LAB-17)");
+
+  const server = { role: "service_role" };
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  async function staffOf(role, name) {
+    const user = await createUser("lab", { confirmed: false });
+    await rpc(lab, "add_lab_staff", { p_user_id: user.id, p_role: role });
+    await rpc(server, "accept_lab_invite", { p_user_id: user.id });
+    await db.query(
+      `update auth.users set raw_user_meta_data = jsonb_build_object('full_name', $2::text)
+       where id = $1`,
+      [user.id, name],
+    );
+    return user;
+  }
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const technician = await staffOf("technician", "Tech Person");
+  const pathologist = await staffOf("pathologist", "Path Person");
+  const secondPathologist = await staffOf("pathologist", "Second Path");
+  const frontDesk = await staffOf("front_desk", "Desk Person");
+  const inCaller = (result) => ({ ...result, fn: "lab_caller" });
+  const can = async (caller, permission) =>
+    (await as(caller, `select private.lab_can($1) as ok`, [permission]))
+      .data?.[0]?.ok;
+
+  check(
+    "a lab can have technicians",
+    (
+      await db.query(
+        `select role, status from public.lab_members where user_id = $1`,
+        [technician.id],
+      )
+    ).rows[0]?.status === "active",
+  );
+  check(
+    "technicians upload reports but don't sign; pathologists and the admin sign",
+    (await can(technician, "reports.publish")) === true &&
+      (await can(technician, "reports.sign")) === false &&
+      (await can(pathologist, "reports.sign")) === true &&
+      (await can(lab, "reports.sign")) === true &&
+      (await can(frontDesk, "reports.sign")) === false,
+  );
+
+  // Sign-off details -----------------------------------------------------------
+  const saveSigner = (caller, userId, name, title) =>
+    rpc(caller, "save_lab_signer", {
+      p_user_id: userId,
+      p_name: name,
+      p_title: title,
+    });
+  refused(
+    "only the admin sets sign-off details",
+    inCaller(await saveSigner(pathologist, pathologist.id, "Dr Path", "MBBS")),
+    "not_permitted",
+  );
+  refused(
+    "the admin needs two-factor",
+    await saveSigner(
+      { ...lab, aal: "aal1" },
+      pathologist.id,
+      "Dr Path",
+      "MBBS",
+    ),
+    "second_factor_required",
+  );
+  refused(
+    "a technician can't be given sign-off details",
+    await saveSigner(lab, technician.id, "Tech Person", "BSc MLT"),
+    "cannot_sign",
+  );
+  refused(
+    "nor someone from another lab",
+    await saveSigner(lab, otherLab.id, "Dr Other", "MBBS"),
+    "member_not_found",
+  );
+  refused(
+    "a name needs a qualification",
+    await saveSigner(lab, pathologist.id, "Dr Path", " "),
+    "invalid_signer",
+  );
+  refused(
+    "letters the report's font can't print are refused",
+    await saveSigner(lab, pathologist.id, "ڈاکٹر عائشہ", "MBBS"),
+    "invalid_signer",
+  );
+  succeeded(
+    "the admin gives a pathologist their details, trimmed",
+    await saveSigner(
+      lab,
+      pathologist.id,
+      "  Dr Ayesha Khan ",
+      "MBBS, FCPS (Chemical Pathology)",
+    ),
+  );
+  const staffList = (await rpc(lab, "get_lab_staff")).data ?? [];
+  check(
+    "the staff list shows them",
+    staffList.some(
+      (row) =>
+        row.user_id === pathologist.id &&
+        row.signer_name === "Dr Ayesha Khan" &&
+        row.signer_title === "MBBS, FCPS (Chemical Pathology)",
+    ),
+  );
+  check(
+    "saving is audited, ids only",
+    (
+      await db.query(
+        `select details from public.audit_log
+         where action = 'lab.signer_saved' and target_id = $1`,
+        [pathologist.id],
+      )
+    ).rows[0]?.details?.cleared === false,
+  );
+
+  // A booking the lab is processing --------------------------------------------
+  const selfId = (
+    await db.query(
+      `select id from public.care_recipients where account_id = $1 and relation = 'self'`,
+      [patient.id],
+    )
+  ).rows[0].id;
+  const processing = async () =>
+    (
+      await db.query(
+        `insert into public.lab_bookings (
+           request_id, patient_id, care_recipient_id, lab_id, status, collection,
+           visit_date, lab_name, lab_address, lab_phone, patient_name,
+           care_recipient_name, care_recipient_relation, subtotal, total, confirmed_at
+         ) values (
+           gen_random_uuid(), $1, $2, $3, 'processing', 'lab',
+           (now() at time zone 'Asia/Karachi')::date, 'Sql Lab', 'Lahore',
+           '+92 300 0000000', 'Sql Patient', 'Sql Patient', 'self', 1000, 1000, now()
+         ) returning id`,
+        [patient.id, selfId, lab.id],
+      )
+    ).rows[0].id;
+  const uploadPath = async (bookingId) => {
+    const path = `${lab.id}/${bookingId}/${randomUUID()}.pdf`;
+    await rpc(server, "mark_upload_checked", {
+      p_bucket: "lab-reports",
+      p_path: path,
+      p_owner_id: lab.id,
+    });
+    return path;
+  };
+  const upload = async (caller, bookingId, notify = true) =>
+    rpc(caller, "publish_lab_report", {
+      p_booking_id: bookingId,
+      p_path: await uploadPath(bookingId),
+      p_notify_signers: notify,
+    });
+  // Signs with the caller's details as they stand, as the app stamps them,
+  // unless the test passes the ones it stamped.
+  const signOff = async (caller, reportId, path, stamped) => {
+    const current = (
+      await db.query(
+        `select signer_name, signer_title from public.lab_members where user_id = $1`,
+        [caller.id],
+      )
+    ).rows[0];
+    return rpc(caller, "sign_off_lab_report", {
+      p_report_id: reportId,
+      p_signed_path: path,
+      p_signer_name: stamped?.name ?? current?.signer_name ?? null,
+      p_signer_title: stamped?.title ?? current?.signer_title ?? null,
+    });
+  };
+  const sendBack = (caller, reportId, note) =>
+    rpc(caller, "return_lab_report", { p_report_id: reportId, p_note: note });
+  const reportRow = async (id) =>
+    (await db.query(`select * from public.lab_reports where id = $1`, [id]))
+      .rows[0];
+  const statusOf = async (bookingId) =>
+    (
+      await db.query(`select status from public.lab_bookings where id = $1`, [
+        bookingId,
+      ])
+    ).rows[0].status;
+  const noticesOf = async (userId, kind) =>
+    (
+      await db.query(
+        `select count(*)::int as n from public.notifications where user_id = $1 and kind = $2`,
+        [userId, kind],
+      )
+    ).rows[0].n;
+  const reportsSeen = async (caller, bookingId) =>
+    (
+      await as(
+        caller,
+        `select count(*)::int as n from public.lab_reports where booking_id = $1`,
+        [bookingId],
+      )
+    ).data?.[0]?.n ?? 0;
+
+  // Uploading -------------------------------------------------------------------
+  const bookingId = await processing();
+  const uploaded = await upload(technician, bookingId);
+  succeeded("a technician uploads a report", uploaded);
+  const firstId = idOf(uploaded);
+  const first = await reportRow(firstId);
+  check(
+    "it waits for sign-off, and the booking stays in processing",
+    first?.version === 1 &&
+      first.released_at === null &&
+      first.uploaded_by === technician.id &&
+      (await statusOf(bookingId)) === "processing",
+  );
+  check(
+    "everyone who signs is told, not the uploader or the front desk",
+    (await noticesOf(pathologist.id, "lab_report_to_sign")) === 1 &&
+      (await noticesOf(secondPathologist.id, "lab_report_to_sign")) === 1 &&
+      (await noticesOf(lab.id, "lab_report_to_sign")) === 1 &&
+      (await noticesOf(technician.id, "lab_report_to_sign")) === 0 &&
+      (await noticesOf(frontDesk.id, "lab_report_to_sign")) === 0,
+  );
+  check(
+    "the patient can't see a report waiting for sign-off; the lab can",
+    (await reportsSeen(patient, bookingId)) === 0 &&
+      (await reportsSeen(pathologist, bookingId)) === 1 &&
+      (await reportsSeen(secondPatient, bookingId)) === 0,
+  );
+  check(
+    "the patient isn't told anything yet",
+    (await noticesOf(patient.id, "lab_booking_report_ready")) === 0,
+  );
+
+  // Refusals ----------------------------------------------------------------------
+  const signedPath = await checkedSignedCopy(firstId);
+  refused(
+    "a technician can't sign off",
+    inCaller(await signOff(technician, firstId, signedPath)),
+    "not_permitted",
+  );
+  refused(
+    "a pathologist without sign-off details can't sign",
+    await signOff(secondPathologist, firstId, signedPath),
+    "signer_details_missing",
+  );
+  refused(
+    "signing needs two-factor",
+    await signOff({ ...pathologist, aal: "aal1" }, firstId, signedPath),
+    "second_factor_required",
+  );
+  refused(
+    "an unknown report is refused",
+    await signOff(pathologist, randomUUID(), signedPath),
+    "report_not_found",
+  );
+  refused(
+    "the unstamped upload can't be released as the signed copy",
+    await signOff(pathologist, firstId, first.storage_path),
+    "invalid_path",
+  );
+  // These two are raised by the shared check publishing also uses.
+  const inClaim = (result) => ({ ...result, fn: "claim_lab_report_upload" });
+  refused(
+    "a copy outside the booking's folder is refused",
+    inClaim(
+      await signOff(
+        pathologist,
+        firstId,
+        `${otherLab.id}/${bookingId}/${randomUUID()}.pdf`,
+      ),
+    ),
+    "invalid_path",
+  );
+  refused(
+    "a copy the server didn't check is refused",
+    inClaim(
+      await signOff(
+        pathologist,
+        firstId,
+        `${lab.id}/${bookingId}/${randomUUID()}.pdf`,
+      ),
+    ),
+    "upload_not_checked",
+  );
+  refused(
+    "a technician can't send a report back",
+    inCaller(await sendBack(technician, firstId, "Check page 2")),
+    "not_permitted",
+  );
+  refused(
+    "sending back needs a note",
+    await sendBack(pathologist, firstId, "  "),
+    "invalid_note",
+  );
+  refused(
+    "sending back needs two-factor",
+    await sendBack({ ...pathologist, aal: "aal1" }, firstId, "Check page 2"),
+    "second_factor_required",
+  );
+  refused(
+    "an unknown report can't be sent back",
+    await sendBack(pathologist, randomUUID(), "Check page 2"),
+    "report_not_found",
+  );
+  refused(
+    "another lab can't send it back",
+    await sendBack(otherLab, firstId, "Check page 2"),
+    "report_not_found",
+  );
+
+  // Sending back ------------------------------------------------------------------
+  succeeded(
+    "a pathologist sends it back with a note",
+    await sendBack(pathologist, firstId, " Wrong name\r\non page 2 "),
+  );
+  const returned = await reportRow(firstId);
+  check(
+    "it's set aside with the note, never released",
+    returned.replaced_at !== null &&
+      returned.returned_by === pathologist.id &&
+      returned.return_note === "Wrong name\non page 2" &&
+      returned.released_at === null,
+  );
+  check(
+    "the uploader is told",
+    (await noticesOf(technician.id, "lab_report_returned")) === 1,
+  );
+  check(
+    "sending back is audited, ids only",
+    (
+      await db.query(
+        `select details from public.audit_log
+         where action = 'lab_report.returned' and target_id = $1`,
+        [bookingId],
+      )
+    ).rows[0]?.details?.report_id === firstId,
+  );
+  refused(
+    "a report sent back can't be signed",
+    await signOff(pathologist, firstId, signedPath),
+    "report_not_pending",
+  );
+  refused(
+    "or sent back again",
+    await sendBack(pathologist, firstId, "Again"),
+    "report_not_pending",
+  );
+
+  // Signing off --------------------------------------------------------------------
+  const second = await upload(technician, bookingId);
+  succeeded("the technician uploads it again", second);
+  const secondId = idOf(second);
+  check(
+    "as the booking's second version",
+    (await reportRow(secondId))?.version === 2,
+  );
+  const stamped = await checkedSignedCopy(secondId);
+  refused(
+    "details changed since the stamp are refused, so the file and record agree",
+    await signOff(pathologist, secondId, stamped, {
+      name: "Dr Ayesha Khan",
+      title: "MBBS",
+    }),
+    "signer_details_changed",
+  );
+  succeeded(
+    "the pathologist signs it off",
+    await signOff(pathologist, secondId, stamped),
+  );
+  const signed = await reportRow(secondId);
+  check(
+    "the stamped copy is released, the upload kept, with the signer's details",
+    signed.storage_path === stamped &&
+      signed.original_storage_path !== null &&
+      signed.original_storage_path !== stamped &&
+      signed.signed_off_by === pathologist.id &&
+      signed.signer_name === "Dr Ayesha Khan" &&
+      signed.signer_title === "MBBS, FCPS (Chemical Pathology)" &&
+      signed.released_at !== null,
+  );
+  check(
+    "the booking is report ready and the patient is told",
+    (await statusOf(bookingId)) === "report_ready" &&
+      (await noticesOf(patient.id, "lab_booking_report_ready")) === 1,
+  );
+  check(
+    "the patient reads the signed report only, not the one sent back",
+    (await reportsSeen(patient, bookingId)) === 1,
+  );
+  denied(
+    "the patient can't read who signed it by id",
+    await as(
+      patient,
+      `select signed_off_by from public.lab_reports where id = $1`,
+      [secondId],
+    ),
+  );
+  refused(
+    "another pathologist without details can't sign it either",
+    await signOff(
+      secondPathologist,
+      secondId,
+      await checkedSignedCopy(secondId),
+    ),
+    "signer_details_missing",
+  );
+  refused(
+    "a signed report can't be signed again",
+    await signOff(pathologist, secondId, await checkedSignedCopy(secondId)),
+    "report_not_pending",
+  );
+  succeeded(
+    "the admin clears the pathologist's details",
+    await saveSigner(lab, pathologist.id, null, null),
+  );
+  check(
+    "a signed report keeps the details it was signed with",
+    (await reportRow(secondId)).signer_name === "Dr Ayesha Khan",
+  );
+
+  const history = async (caller, id) =>
+    (
+      (await rpc(caller, "get_lab_booking_history", { p_booking_id: id }))
+        .data ?? []
+    ).filter(
+      (step) => step.kind !== "status" || step.status === "report_ready",
+    );
+  const steps = await history(lab, bookingId);
+  check(
+    "the history shows each upload, the note and who signed it off",
+    steps.map((step) => step.kind).join() ===
+      "report_uploaded,report_returned,report_uploaded,report_signed_off" &&
+      steps[0].actor_name === "Tech Person" &&
+      steps[1].note === "Wrong name\non page 2" &&
+      steps[1].actor_name === "Path Person" &&
+      steps[3].actor_name === "Path Person" &&
+      steps[3].actor_role === "pathologist",
+  );
+
+  const collector = await staffOf("collector", "Collector Person");
+  const collectorSteps = await history(collector, bookingId);
+  check(
+    "a collector sees the report steps but not the note, which can hold results",
+    collectorSteps.some((step) => step.kind === "report_returned") &&
+      collectorSteps.every((step) => step.note === null),
+  );
+
+  // A report published before sign-off keeps its plain step, with no upload.
+  const legacyId = await processing();
+  await db.query(
+    `insert into public.lab_reports (
+       booking_id, lab_id, patient_id, care_recipient_id, version, storage_path,
+       created_at, released_at
+     ) values (
+       $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1,
+       $2::text || '/' || $1::text || '/' || gen_random_uuid() || '.pdf',
+       now() - interval '1 day', now() - interval '1 day'
+     )`,
+    [legacyId, lab.id, patient.id, selfId],
+  );
+  await db.query(
+    `update public.lab_bookings set status = 'report_ready' where id = $1`,
+    [legacyId],
+  );
+  check(
+    "an earlier report reads as released, not signed off",
+    (await history(lab, legacyId)).map((step) => step.kind).join() === "status",
+  );
+
+  // A signer uploading signs straight away, so nobody else is told.
+  await saveSigner(lab, pathologist.id, "Dr Ayesha Khan", "MBBS");
+  const ownBooking = await processing();
+  const before = await noticesOf(secondPathologist.id, "lab_report_to_sign");
+  const own = await upload(pathologist, ownBooking, false);
+  succeeded(
+    "a pathologist uploads and signs off their own",
+    await signOff(pathologist, idOf(own), await checkedSignedCopy(idOf(own))),
+  );
+  check(
+    "without telling the other signers",
+    (await noticesOf(secondPathologist.id, "lab_report_to_sign")) === before,
+  );
+
+  // If that sign-off fails, the uploader tells the other signers after all.
+  const ownFailed = idOf(await upload(pathologist, await processing(), false));
+  const announce = (caller, reportId) =>
+    rpc(caller, "announce_lab_report", { p_report_id: reportId });
+  refused(
+    "only the uploader announces their report",
+    await announce(technician, ownFailed),
+    "report_not_pending",
+  );
+  refused(
+    "announcing needs two-factor",
+    await announce({ ...pathologist, aal: "aal1" }, ownFailed),
+    "second_factor_required",
+  );
+  refused(
+    "the front desk can't announce reports",
+    inCaller(await announce(frontDesk, ownFailed)),
+    "not_permitted",
+  );
+  succeeded(
+    "the uploader announces it",
+    await announce(pathologist, ownFailed),
+  );
+  check(
+    "and the other signers are told",
+    (await noticesOf(secondPathologist.id, "lab_report_to_sign")) ===
+      before + 1,
+  );
+  refused(
+    "a released report isn't announced",
+    await announce(pathologist, idOf(own)),
+    "report_not_pending",
+  );
+
+  // Leaving processing sets a waiting report aside ------------------------------
+  const redoId = await processing();
+  const pendingId = idOf(await upload(technician, redoId));
+  succeeded(
+    "a new sample is asked for while a report waits",
+    await rpc(pathologist, "move_lab_booking", {
+      p_booking_id: redoId,
+      p_from_status: "processing",
+      p_to_status: "recollection_needed",
+      p_reason: "sample_haemolysed",
+      p_note: null,
+    }),
+  );
+  const retired = await reportRow(pendingId);
+  check(
+    "the waiting report is set aside, not sent back",
+    retired.replaced_at !== null && retired.returned_at === null,
+  );
+  // As if it hadn't been: the booking moved on but the report still waits.
+  await db.query(
+    `update public.lab_reports set replaced_at = null where id = $1`,
+    [pendingId],
+  );
+  refused(
+    "a report whose booking moved on can't be signed",
+    await signOff(pathologist, pendingId, await checkedSignedCopy(pendingId)),
+    "status_changed",
+  );
+
+  // Twenty versions at most.
+  const busyId = await processing();
+  await db.query(
+    `insert into public.lab_reports (
+       booking_id, lab_id, patient_id, care_recipient_id, version, storage_path, replaced_at
+     )
+     select $1::uuid, $2::uuid, $3::uuid, $4::uuid, v,
+       $2::text || '/' || $1::text || '/' || gen_random_uuid() || '.pdf', now()
+     from generate_series(1, 20) v`,
+    [busyId, lab.id, patient.id, selfId],
+  );
+  refused(
+    "a booking takes twenty uploads at most",
+    await upload(technician, busyId),
+    "too_many_versions",
+  );
+
+  // A role that can't sign drops the details.
+  await saveSigner(lab, secondPathologist.id, "Dr Second", "MBBS");
+  succeeded(
+    "a pathologist is made a technician",
+    await rpc(lab, "set_lab_staff_role", {
+      p_user_id: secondPathologist.id,
+      p_role: "technician",
+    }),
+  );
+  check(
+    "and loses their sign-off details",
+    (
+      await db.query(
+        `select signer_name, signer_title from public.lab_members where user_id = $1`,
+        [secondPathologist.id],
+      )
+    ).rows[0]?.signer_name === null,
+  );
+}
+
 async function testEveryRefusalIsTested() {
   section("Every refusal has a test (QA-02)");
 
@@ -11002,6 +11711,7 @@ try {
   await testLabStaff(await freshPatients());
   await testLabCollectors(await freshPatients());
   await testLabSamples(await freshPatients());
+  await testLabReportSignOff(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

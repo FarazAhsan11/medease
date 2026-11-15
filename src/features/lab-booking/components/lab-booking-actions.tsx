@@ -7,6 +7,7 @@ import {
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
+import { ReportSignerNote } from "@/features/lab-reports/components/report-signer-note";
 import { UploadReportDialog } from "@/features/lab-reports/components/upload-report-dialog";
 import {
   labRoleCan,
@@ -28,8 +29,14 @@ export function LabBookingActions({ booking, role }: LabBookingActionsProps) {
   const next = nextStatuses[booking.status].filter(can);
   if (next.length === 0) {
     return booking.reportId && labRoleCan(role, "reports.view") ? (
-      <div className="border-t pt-4">
-        <LabReportLink href={labRoutes.report(booking.reportId)} />
+      <div className="grid gap-2 border-t pt-4">
+        <LabReportLink
+          href={labRoutes.report(booking.reportId)}
+          className="w-fit"
+        />
+        {booking.reportSigner && (
+          <ReportSignerNote signer={booking.reportSigner} />
+        )}
       </div>
     ) : null;
   }
@@ -46,7 +53,24 @@ export function LabBookingActions({ booking, role }: LabBookingActionsProps) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-t pt-4">
       {forward === "report_ready" ? (
-        <UploadReportDialog bookingId={booking.id} summary={summary} />
+        booking.pendingReportId ? (
+          // Signed off or sent back from the Reports page (LAB-17).
+          <>
+            <LabReportLink href={labRoutes.report(booking.pendingReportId)} />
+            <a
+              href={labRoutes.reports}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Waiting for sign-off
+            </a>
+          </>
+        ) : (
+          <UploadReportDialog
+            bookingId={booking.id}
+            summary={summary}
+            canSign={labRoleCan(role, "reports.sign")}
+          />
+        )
       ) : (
         forward &&
         (beforeVisit ? (

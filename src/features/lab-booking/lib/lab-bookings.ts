@@ -10,6 +10,7 @@ import {
   type LabSampleRecord,
 } from "@/features/lab-samples/lib/samples";
 import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
+import type { LabSigner } from "@/features/lab-staff/lib/lab-staff";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
 // Match book_lab_test.
@@ -50,7 +51,7 @@ export const progressSteps = [
 ] as const satisfies readonly LabBookingStatus[];
 
 // The moves a lab can make from each status. Match move_lab_booking; report
-// ready comes only with the report (publish_lab_report).
+// ready comes only with a signed-off report (sign_off_lab_report, LAB-17).
 export const nextStatuses: Record<LabBookingStatus, LabBookingStatus[]> = {
   awaiting_payment: [],
   booked: ["sample_collected", "cancelled"],
@@ -265,8 +266,12 @@ export type LabBooking = {
   rescheduleCount: number;
   createdAt: string;
   items: LabBookingItem[];
-  // The current report, once the lab has published one (LAB-05).
+  // The current report, once released to the patient (LAB-05, LAB-17).
   reportId: string | null;
+  // Who signed it off; null for reports from before sign-off existed.
+  reportSigner: LabSigner | null;
+  // A report uploaded and waiting for sign-off. Only the lab reads these.
+  pendingReportId: string | null;
   // The doctor's order this books (LAB-08); its report goes to that doctor.
   labOrderId: string | null;
   // The ordering doctor's comment on the report. Only on the patient's list.
@@ -336,7 +341,13 @@ export type LabBookingRow = {
     kind: "status" | "rescheduled";
     created_at: string;
   }[];
-  lab_reports: { id: string; replaced_at: string | null }[];
+  lab_reports: {
+    id: string;
+    replaced_at: string | null;
+    released_at: string | null;
+    signer_name: string | null;
+    signer_title: string | null;
+  }[];
   lab_result_reviews?: {
     doctor_name: string;
     comment: string | null;
@@ -362,7 +373,7 @@ export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, 
   collection_fee, total, payment_method, payment_status, payment_due_at, status_reason,
   status_note, status_changed_at, cancelled_by, reschedule_count, created_at,
   lab_order_id, lab_booking_items (id, name, price, test_names, package_id),
-  lab_reports (id, replaced_at)`;
+  lab_reports (id, replaced_at, released_at, signer_name, signer_title)`;
 
 // The patient's list: also the tracker's steps and the doctor's comment.
 export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
@@ -400,6 +411,21 @@ function toDoctorComment(
     doctorName: review.doctor_name,
     comment: review.comment,
     commentedAt: review.commented_at,
+  };
+}
+
+// The booking's current report: released, or waiting for sign-off.
+function currentReports(reports: LabBookingRow["lab_reports"]) {
+  const current = reports.filter((report) => report.replaced_at === null);
+  const released = current.find((report) => report.released_at !== null);
+  return {
+    reportId: released?.id ?? null,
+    reportSigner:
+      released?.signer_name && released.signer_title
+        ? { name: released.signer_name, title: released.signer_title }
+        : null,
+    pendingReportId:
+      current.find((report) => report.released_at === null)?.id ?? null,
   };
 }
 
@@ -446,8 +472,7 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     rescheduleCount: row.reschedule_count,
     createdAt: row.created_at,
     steps: stepTimes(row.lab_booking_events),
-    reportId:
-      row.lab_reports.find((report) => report.replaced_at === null)?.id ?? null,
+    ...currentReports(row.lab_reports),
     labOrderId: row.lab_order_id,
     doctorComment: toDoctorComment(row.lab_result_reviews),
     collectorId: row.assignment?.[0]?.collector_id ?? null,

@@ -14,6 +14,7 @@ import {
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
+import { ReportSignerNote } from "@/features/lab-reports/components/report-signer-note";
 import { formatFee, telHref } from "@/lib/format";
 
 type LabBookingCardProps = {
@@ -120,6 +121,12 @@ export function LabBookingCard({
                       ? "Also in your health records, and sent to your doctor."
                       : "Also in your health records."}
                   </p>
+                  {booking.reportSigner && (
+                    <ReportSignerNote
+                      signer={booking.reportSigner}
+                      className="basis-full"
+                    />
+                  )}
                 </div>
               ) : (
                 <p className="mt-4 text-xs text-muted-foreground">

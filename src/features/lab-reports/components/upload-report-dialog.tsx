@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   MAX_REPORT_MB,
@@ -28,10 +29,13 @@ type UploadReportDialogProps = {
   bookingId: string;
   // "Ali Raza · CBC, HbA1c"
   summary: string;
+  // The uploader may sign off reports, so can do it in the same step.
+  canSign: boolean;
 };
 
-// Publishing the report is the booking's last step: the patient is told
-// straight away, so the lab confirms whose report it is first.
+// The report waits for a pathologist's sign-off before the patient sees it
+// (LAB-17); a pathologist uploading can sign it off at once. Either way the
+// lab confirms whose report it is first.
 export function UploadReportDialog(props: UploadReportDialogProps) {
   const [open, setOpen] = useState(false);
 
@@ -52,6 +56,7 @@ export function UploadReportDialog(props: UploadReportDialogProps) {
 function UploadReportForm({
   bookingId,
   summary,
+  canSign,
   onDone,
 }: UploadReportDialogProps & { onDone: () => void }) {
   const id = useId();
@@ -66,10 +71,10 @@ function UploadReportForm({
     <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       <input type="hidden" name="bookingId" value={bookingId} />
       <AlertDialogHeader>
-        <AlertDialogTitle>Publish the report?</AlertDialogTitle>
+        <AlertDialogTitle>Upload the report?</AlertDialogTitle>
         <AlertDialogDescription>
-          {summary}. Check it&apos;s this person&apos;s report: they&apos;re
-          told it&apos;s ready and can open it in MedEase straight away.
+          {summary}. Check it&apos;s this person&apos;s report. They&apos;re
+          told it&apos;s ready once a pathologist signs it off.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <FormField
@@ -86,11 +91,23 @@ function UploadReportForm({
           {...fieldErrorProps(id, fileError)}
         />
       </FormField>
+      {canSign && (
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <Checkbox name="signNow" value="1" className="mt-0.5" />
+          <span>
+            I&apos;ve reviewed it: sign it off now
+            <span className="block text-xs text-muted-foreground">
+              Your name and qualification are stamped on every page, and the
+              patient can open it straight away.
+            </span>
+          </span>
+        </label>
+      )}
       <AlertDialogFooter>
         <AlertDialogCancel disabled={pending}>Back</AlertDialogCancel>
         <Button type="submit" disabled={pending} className="gap-2">
           {pending && <Loader2Icon className="animate-spin" aria-hidden />}
-          {pending ? "Publishing…" : "Publish report"}
+          {pending ? "Uploading…" : "Upload report"}
         </Button>
       </AlertDialogFooter>
     </form>

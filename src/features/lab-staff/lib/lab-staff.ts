@@ -14,7 +14,15 @@ export type LabStaffMember = {
   // The latest unused invitation link; null once it's used, expired or failed
   // to send.
   inviteExpiresAt: string | null;
+  // The name and qualification stamped on reports they sign off (LAB-17).
+  signer: LabSigner | null;
 };
+
+export type LabSigner = { name: string; title: string };
+
+// "Dr Ayesha Khan, MBBS, FCPS (Chemical Pathology)"
+export const signerLine = (signer: LabSigner) =>
+  `${signer.name}, ${signer.title}`;
 
 export const isInviteLive = (member: LabStaffMember, now = new Date()) =>
   member.inviteExpiresAt !== null && new Date(member.inviteExpiresAt) > now;
@@ -27,6 +35,9 @@ export const labStaffErrorMessages: Record<string, string> = {
   invalid_user: "We couldn't set up this account. Please try again.",
   member_not_found:
     "This person is no longer on your staff list. Refresh the page.",
+  cannot_sign: "Only pathologists and the lab admin sign off reports.",
+  invalid_signer:
+    "Enter a name and a qualification in English letters, as they should print on reports.",
 };
 
 export const EMAIL_IN_USE_MESSAGE =

@@ -60,7 +60,13 @@ export const sampleLabelErrorMessages: Record<string, string> = {
 // One step in a booking's history, as get_lab_booking_history returns it.
 export const historyRowSchema = z.object({
   status: z.string(),
-  kind: z.enum(["status", "rescheduled"]),
+  kind: z.enum([
+    "status",
+    "rescheduled",
+    "report_uploaded",
+    "report_returned",
+    "report_signed_off",
+  ]),
   reason: z.string().nullable(),
   note: z.string().nullable(),
   visit_date: z.string().nullable(),

@@ -6,19 +6,20 @@ A lab is one organisation with several people signing in. The account that regis
 
 What each role can do. The database holds the matrix (`private.lab_role_can`); `src/features/lab-staff/lib/lab-permissions.ts` repeats it to decide which pages and buttons to show.
 
-| Permission | Lab admin | Front desk | Sample collector | Pathologist |
-| --- | --- | --- | --- | --- |
-| See bookings (`bookings.view`) | yes | yes | lab visits and own home visits | yes |
-| See every booking (`bookings.view_all`) | yes | yes | | yes |
-| Send a collector on a home visit (`bookings.assign`) | yes | yes | | |
-| Mark a sample collected, print sample labels (`bookings.collect`) | yes | yes | yes | |
-| Move to processing, ask for a new sample (`bookings.process`) | yes | | | yes |
-| Cancel a booking (`bookings.cancel`) | yes | yes | | |
-| Open reports (`reports.view`) | yes | yes | | yes |
-| Upload a report (`reports.publish`) | yes | | | yes |
-| Test catalog, home collection, lab profile and verification, staff | yes | | | |
+| Permission | Lab admin | Front desk | Sample collector | Technician | Pathologist |
+| --- | --- | --- | --- | --- | --- |
+| See bookings (`bookings.view`) | yes | yes | lab visits and own home visits | yes | yes |
+| See every booking (`bookings.view_all`) | yes | yes | | yes | yes |
+| Send a collector on a home visit (`bookings.assign`) | yes | yes | | | |
+| Mark a sample collected, print sample labels (`bookings.collect`) | yes | yes | yes | | |
+| Move to processing, ask for a new sample (`bookings.process`) | yes | | | yes | yes |
+| Cancel a booking (`bookings.cancel`) | yes | yes | | | |
+| Open reports (`reports.view`) | yes | yes | | yes | yes |
+| Upload a report (`reports.publish`) | yes | | | yes | yes |
+| Sign off a report, or send it back (`reports.sign`) | yes, with sign-off details | | | | yes, with sign-off details |
+| Test catalog, home collection, lab profile and verification, staff | yes | | | | |
 
-This follows the WHO laboratory quality checklist's split of rights into read, enter and change, given per job. "Pathologist" covers the people who run and report tests. Sign-off rights (LAB-17) will be given to this role.
+This follows the WHO laboratory quality checklist's split of rights into read, enter and change, given per job. "Technician" runs tests and uploads reports; "Pathologist" does the same and also signs reports off for release (LAB-17, [lab-reports.md](./lab-reports.md)). Signing also needs **sign-off details**, the name and qualification printed on the report, which only the admin sets (`save_lab_signer`, from **Sign-off details** on the staff list). Without them a pathologist, or the admin, can upload but not sign.
 
 There is one lab admin per lab: the account that registered it. The admin can't be removed or demoted, so a lab can never lose its last admin. Handing the lab to someone else is a support task for now.
 
@@ -59,7 +60,7 @@ Booking notices (new, cancelled, rescheduled) go through `private.notify_lab`, o
 
 ## Not in this step
 
-- Sign-off (LAB-17) and the collector's day view (LAB-21) build on these roles. Sample tracking with who did each step (LAB-16) is built: [lab-samples.md](./lab-samples.md).
+- The collector's day view (LAB-21) builds on these roles. Sign-off is built: [lab-reports.md](./lab-reports.md). Sample tracking with who did each step (LAB-16) is built: [lab-samples.md](./lab-samples.md).
 - More than one admin, and moving the lab to a new admin.
 - Staff accept the same documents as the lab admin, including the partner terms. Whether staff should accept only the terms and privacy policy is for counsel (CMPL-03).
 

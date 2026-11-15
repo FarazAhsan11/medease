@@ -10,13 +10,15 @@ type PublishedReportsCardProps = {
   reports: LabReportSummary[];
 };
 
-// The lab's latest published reports, to check one again.
+// The lab's latest released reports, to check one again.
 export function PublishedReportsCard({ reports }: PublishedReportsCardProps) {
   return (
     <PanelCard
       title="Recently published"
       description={
-        reports.length === 0 ? "Reports you publish appear here." : undefined
+        reports.length === 0
+          ? "Reports appear here once they're signed off."
+          : undefined
       }
       className="h-fit"
     >
@@ -45,8 +47,16 @@ export function PublishedReportsCard({ reports }: PublishedReportsCardProps) {
                     </span>
                     <span className="block text-xs break-words text-muted-foreground">
                       {tests} ·{" "}
-                      {formatDateTime(report.publishedAt, report.timezone)}
+                      {formatDateTime(
+                        report.publishedAt ?? report.uploadedAt,
+                        report.timezone,
+                      )}
                     </span>
+                    {report.signer && (
+                      <span className="block text-xs break-words text-muted-foreground">
+                        Signed off by {report.signer.name}
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 text-xs font-medium text-primary">
                     View

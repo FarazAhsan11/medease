@@ -1,4 +1,5 @@
 import { PanelCard } from "@/components/shared/panel-card";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
   formatBookingWhen,
   itemsSummary,
@@ -11,13 +12,16 @@ type AwaitingReportsCardProps = {
   more: boolean;
   // Front desk staff see the list but don't upload.
   canUpload: boolean;
+  canSign: boolean;
 };
 
-// Bookings the lab is processing, each waiting for its report.
+// Bookings the lab is processing, each waiting for its report or for that
+// report's sign-off (LAB-17).
 export function AwaitingReportsCard({
   bookings,
   more,
   canUpload,
+  canSign,
 }: AwaitingReportsCardProps) {
   return (
     <PanelCard
@@ -45,11 +49,16 @@ export function AwaitingReportsCard({
                     {items} · {formatBookingWhen(booking)}
                   </p>
                 </div>
-                {canUpload && (
-                  <UploadReportDialog
-                    bookingId={booking.id}
-                    summary={`${booking.careRecipientName} · ${items}`}
-                  />
+                {booking.pendingReportId ? (
+                  <StatusBadge tone="info">Waiting for sign-off</StatusBadge>
+                ) : (
+                  canUpload && (
+                    <UploadReportDialog
+                      bookingId={booking.id}
+                      summary={`${booking.careRecipientName} · ${items}`}
+                      canSign={canSign}
+                    />
+                  )
                 )}
               </li>
             );

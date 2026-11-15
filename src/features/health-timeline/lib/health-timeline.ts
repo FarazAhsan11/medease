@@ -125,16 +125,20 @@ export function buildTimeline(
     kind: document.kind,
   }));
 
-  const reports = labReports.map((report): TimelineEntry => ({
-    type: "lab_report",
-    id: report.id,
-    dateKey: toDateKey(report.publishedAt, report.timezone),
-    at: report.publishedAt,
-    labName: report.labName,
-    testNames: report.testNames,
-    careRecipientName: report.careRecipientName,
-    careRecipientRelation: report.careRecipientRelation,
-  }));
+  const reports = labReports.map((report): TimelineEntry => {
+    // A patient only reads released reports, so this is always set.
+    const at = report.publishedAt ?? report.uploadedAt;
+    return {
+      type: "lab_report",
+      id: report.id,
+      dateKey: toDateKey(at, report.timezone),
+      at,
+      labName: report.labName,
+      testNames: report.testNames,
+      careRecipientName: report.careRecipientName,
+      careRecipientRelation: report.careRecipientRelation,
+    };
+  });
 
   return [...visits, ...issued, ...reports, ...files].sort(
     (a, b) => b.dateKey.localeCompare(a.dateKey) || b.at.localeCompare(a.at),

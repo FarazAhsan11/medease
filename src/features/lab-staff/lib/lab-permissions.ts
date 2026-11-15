@@ -7,6 +7,7 @@ import { z } from "zod";
 export const labStaffRoles = [
   "front_desk",
   "collector",
+  "technician",
   "pathologist",
 ] as const;
 export const labMemberRoleSchema = z.enum(["admin", ...labStaffRoles]);
@@ -24,6 +25,7 @@ export type LabPermission =
   | "bookings.cancel"
   | "reports.view"
   | "reports.publish"
+  | "reports.sign"
   | "catalog"
   | "home_collection"
   | "profile"
@@ -39,12 +41,20 @@ const staffPermissions: Record<LabStaffRole, readonly LabPermission[]> = {
     "reports.view",
   ],
   collector: ["bookings.view", "bookings.collect"],
+  technician: [
+    "bookings.view",
+    "bookings.view_all",
+    "bookings.process",
+    "reports.view",
+    "reports.publish",
+  ],
   pathologist: [
     "bookings.view",
     "bookings.view_all",
     "bookings.process",
     "reports.view",
     "reports.publish",
+    "reports.sign",
   ],
 };
 
@@ -56,6 +66,7 @@ export const labRoleLabels: Record<LabMemberRole, string> = {
   admin: "Lab admin",
   front_desk: "Front desk",
   collector: "Sample collector",
+  technician: "Lab technician",
   pathologist: "Pathologist",
 };
 
@@ -64,7 +75,10 @@ export const labRoleDescriptions: Record<LabStaffRole, string> = {
     "Sees bookings and reports, sends collectors on home visits, marks samples collected, cancels.",
   collector:
     "Sees lab visits and the home visits given to them, and marks samples collected.",
-  pathologist: "Moves samples into processing and uploads reports.",
+  technician:
+    "Moves samples into processing and uploads reports, which wait for a pathologist's sign-off.",
+  pathologist:
+    "Does what a technician does, and signs off reports so patients can open them.",
 };
 
 // The staff role also sits in app_metadata (written only with the secret key),
