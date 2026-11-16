@@ -11637,6 +11637,337 @@ async function testLabReportSignOff({ patient, secondPatient }) {
   );
 }
 
+async function testLabCollectorDay({ patient }) {
+  section("Collector's day and cash (LAB-21)");
+
+  const server = { role: "service_role" };
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  async function staffOf(labUser, role) {
+    const user = await createUser("lab", { confirmed: false });
+    succeeded(
+      `the admin adds a ${role}`,
+      await rpc(labUser, "add_lab_staff", { p_user_id: user.id, p_role: role }),
+    );
+    succeeded(
+      "they accept",
+      await rpc(server, "accept_lab_invite", { p_user_id: user.id }),
+    );
+    return user;
+  }
+  const collector = await staffOf(lab, "collector");
+  const secondCollector = await staffOf(lab, "collector");
+  const frontDesk = await staffOf(lab, "front_desk");
+  const pathologist = await staffOf(lab, "pathologist");
+  const otherCollector = await staffOf(otherLab, "collector");
+
+  const selfId = (
+    await db.query(
+      `select id from public.care_recipients
+       where account_id = $1 and relation = 'self'`,
+      [patient.id],
+    )
+  ).rows[0].id;
+  // A confirmed booking, written as the database owner: cash unless online,
+  // today unless `daysAhead`.
+  const visit = async (
+    labUser,
+    { collection = "home", status = "booked", online = false, daysAhead = 0 } = {},
+  ) =>
+    (
+      await db.query(
+        `insert into public.lab_bookings (
+           request_id, patient_id, care_recipient_id, lab_id, status, collection,
+           visit_date, slot_starts_at, slot_ends_at, lab_name, lab_address,
+           lab_phone, patient_name, care_recipient_name, care_recipient_relation,
+           street_address, area, city, contact_phone, subtotal, total, confirmed_at,
+           payment_method, payment_status, payment_due_at
+         ) values (
+           gen_random_uuid(), $1, $2, $3, $4, $5,
+           (now() at time zone 'Asia/Karachi')::date + $7::int,
+           case when $5 = 'home' then now() + make_interval(days => $7::int, hours => 1) end,
+           case when $5 = 'home' then now() + make_interval(days => $7::int, hours => 2) end,
+           'Sql Lab', 'Lahore', '+92 300 0000000', 'Sql Patient', 'Sql Patient',
+           'self',
+           case when $5 = 'home' then 'House 1' end,
+           case when $5 = 'home' then 'Model Town' end,
+           case when $5 = 'home' then 'Lahore' end,
+           case when $5 = 'home' then '+92 300 1234567' end,
+           1200, 1200, now(),
+           case when $6 then 'online' else 'cash' end,
+           case when $6 then 'paid' else 'unpaid' end,
+           case when $6 then now() end
+         ) returning id`,
+        [patient.id, selfId, labUser.id, status, collection, online, daysAhead],
+      )
+    ).rows[0].id;
+  const assign = (bookingId, collectorId) =>
+    rpc(lab, "assign_lab_collector", {
+      p_booking_id: bookingId,
+      p_collector_id: collectorId,
+    });
+  const booking = async (id) =>
+    (await db.query(`select * from public.lab_bookings where id = $1`, [id]))
+      .rows[0];
+  const cashRow = async (id) =>
+    (
+      await db.query(
+        `select * from public.lab_cash_payments where booking_id = $1`,
+        [id],
+      )
+    ).rows[0];
+  const collect = (caller, id, cash, from = "booked") =>
+    rpc(caller, "collect_lab_booking", {
+      p_booking_id: id,
+      p_from_status: from,
+      p_cash_amount: cash,
+    });
+  const recordCash = (caller, id, amount = 1200) =>
+    rpc(caller, "record_lab_cash", { p_booking_id: id, p_amount: amount });
+  // Raised by the private helper both functions share.
+  const inPrivate = (result) => ({ ...result, fn: "record_lab_cash" });
+
+  const cashHome = await visit(lab);
+  const onlineHome = await visit(lab, { online: true });
+  const secondHome = await visit(lab);
+  const tomorrowHome = await visit(lab, { daysAhead: 1 });
+  const labVisit = await visit(lab, { collection: "lab" });
+  const cancelled = await visit(lab, { collection: "lab" });
+  succeeded(
+    "the lab cancels a visit",
+    await rpc(lab, "move_lab_booking", {
+      p_booking_id: cancelled,
+      p_from_status: "booked",
+      p_to_status: "cancelled",
+      p_reason: "patient_request",
+    }),
+  );
+  const otherLabVisit = await visit(otherLab, { collection: "lab" });
+  for (const [id, person] of [
+    [cashHome, collector],
+    [onlineHome, collector],
+    [tomorrowHome, collector],
+    [secondHome, secondCollector],
+  ])
+    succeeded("the front desk's admin assigns a visit", await assign(id, person.id));
+
+  // Collecting with the cash
+  refused(
+    "collecting needs a second factor",
+    await collect({ ...collector, aal: "aal1" }, cashHome, 1200),
+    "second_factor_required",
+  );
+  refused(
+    "a pathologist can't collect",
+    { ...(await collect(pathologist, cashHome, 1200)), fn: "lab_caller" },
+    "not_permitted",
+  );
+  refused(
+    "a collector can't collect another collector's home visit",
+    { ...(await collect(collector, secondHome, 1200)), fn: "lab_booking_for" },
+    "booking_not_found",
+  );
+  refused(
+    "the amount must be the booking's total",
+    inPrivate(await collect(collector, cashHome, 1000)),
+    "amount_changed",
+  );
+  check(
+    "a refused amount leaves the sample uncollected too",
+    (await booking(cashHome)).status === "booked" && !(await cashRow(cashHome)),
+  );
+  refused(
+    "a visit isn't collected before its day",
+    { ...(await collect(collector, tomorrowHome, 1200)), fn: "move_lab_booking" },
+    "too_early",
+  );
+  succeeded(
+    "the collector collects and takes the cash in one step",
+    await collect(collector, cashHome, 1200),
+  );
+  {
+    const row = await booking(cashHome);
+    const cash = await cashRow(cashHome);
+    check(
+      "the booking is collected and paid, and the cash is theirs on today's date",
+      row.status === "sample_collected" &&
+        row.payment_status === "paid" &&
+        cash?.amount === 1200 &&
+        cash.received_by === collector.id,
+    );
+  }
+  refused(
+    "cash can't be taken twice",
+    await recordCash(collector, cashHome),
+    "already_paid",
+  );
+  refused(
+    "an online booking has no cash to take",
+    inPrivate(await collect(collector, onlineHome, 1200)),
+    "not_cash",
+  );
+  check(
+    "a refused cash step undoes the collection",
+    (await booking(onlineHome)).status === "booked",
+  );
+  succeeded(
+    "an online visit is collected with no cash",
+    await collect(collector, onlineHome, null),
+  );
+
+  // Cash at the counter
+  refused(
+    "recording cash needs a second factor",
+    await recordCash({ ...frontDesk, aal: "aal1" }, labVisit),
+    "second_factor_required",
+  );
+  refused(
+    "recording cash needs a booking",
+    await recordCash(frontDesk, null),
+    "booking_not_found",
+  );
+  refused(
+    "a cancelled booking takes no cash",
+    await recordCash(frontDesk, cancelled),
+    "not_payable",
+  );
+  refused(
+    "another lab's booking isn't found",
+    { ...(await recordCash(frontDesk, otherLabVisit)), fn: "lab_booking_for" },
+    "booking_not_found",
+  );
+  refused(
+    "another lab's collector can't record this lab's cash",
+    { ...(await recordCash(otherCollector, labVisit)), fn: "lab_booking_for" },
+    "booking_not_found",
+  );
+  succeeded(
+    "the front desk records cash for a lab visit before the sample",
+    await recordCash(frontDesk, labVisit),
+  );
+  check(
+    "the lab visit is paid and still booked",
+    (await booking(labVisit)).payment_status === "paid" &&
+      (await booking(labVisit)).status === "booked",
+  );
+  denied(
+    "nobody writes cash rows directly",
+    await as(
+      frontDesk,
+      `insert into public.lab_cash_payments (booking_id, lab_id, amount, received_day)
+       values ($1, $2, 1, current_date)`,
+      [secondHome, lab.id],
+    ),
+  );
+
+  // Who reads cash
+  const cashSeen = async (caller) =>
+    (await as(caller, `select booking_id from public.lab_cash_payments`, []))
+      .data?.length ?? -1;
+  check(
+    "a collector reads their own cash, the front desk all of it, the patient none",
+    (await cashSeen(collector)) === 1 &&
+      (await cashSeen(secondCollector)) === 0 &&
+      (await cashSeen(frontDesk)) === 2 &&
+      (await cashSeen(patient)) === 0,
+  );
+  check(
+    "the second factor guards cash rows",
+    (await cashSeen({ ...frontDesk, aal: "aal1" })) === 0,
+  );
+
+  // The day's summary
+  const today = (
+    await db.query(`select (now() at time zone 'Asia/Karachi')::date::text as d`)
+  ).rows[0].d;
+  const summary = (caller, day = today) =>
+    rpc(caller, "get_lab_cash_summary", { p_day: day });
+  refused(
+    "the summary needs a second factor",
+    await summary({ ...collector, aal: "aal1" }),
+    "second_factor_required",
+  );
+  refused("the summary needs a day", await summary(collector, null), "invalid_day");
+  refused(
+    "a pathologist has no cash summary",
+    { ...(await summary(pathologist)), fn: "lab_caller" },
+    "not_permitted",
+  );
+  {
+    const { data } = await summary(collector);
+    check(
+      "a collector sees only their own line: 2 visits, 2 collected, Rs 1,200 cash",
+      data?.length === 1 &&
+        data[0].user_id === collector.id &&
+        data[0].visits === 2 &&
+        data[0].collected === 2 &&
+        data[0].cash_count === 1 &&
+        Number(data[0].cash_total) === 1200,
+      JSON.stringify(data),
+    );
+  }
+  {
+    const { data } = await summary(frontDesk);
+    const line = (id) => data?.find((row) => row.user_id === id);
+    check(
+      "the front desk sees everyone, counter cash included",
+      data?.length === 3 &&
+        line(secondCollector.id)?.visits === 1 &&
+        line(secondCollector.id)?.collected === 0 &&
+        line(frontDesk.id)?.cash_count === 1 &&
+        line(frontDesk.id)?.visits === 0 &&
+        line(collector.id)?.full_name !== undefined,
+      JSON.stringify(data),
+    );
+  }
+
+  // History
+  const { data: history } = await rpc(lab, "get_lab_booking_history", {
+    p_booking_id: cashHome,
+  });
+  const cashStep = history?.find((step) => step.kind === "cash_received");
+  check(
+    "the booking's history shows who took the cash and how much",
+    cashStep?.note === "1200" &&
+      cashStep.actor === "staff" &&
+      cashStep.actor_role === "collector",
+    JSON.stringify(cashStep),
+  );
+  await db.query(`delete from auth.users where id = $1`, [frontDesk.id]);
+  const { data: afterDelete } = await rpc(lab, "get_lab_booking_history", {
+    p_booking_id: labVisit,
+  });
+  const orphan = afterDelete?.find((step) => step.kind === "cash_received");
+  check(
+    "a deleted account keeps the cash, shown as a former staff member",
+    (await cashRow(labVisit))?.received_by === null &&
+      orphan?.actor === "staff" &&
+      orphan.actor_name === null,
+    JSON.stringify(orphan),
+  );
+
+  // Money records outlive the patient's account.
+  const before = (await summary(lab)).data;
+  await db.query(`delete from auth.users where id = $1`, [patient.id]);
+  const after = (await summary(lab)).data;
+  const total = (rows) =>
+    (rows ?? []).reduce((sum, row) => sum + Number(row.cash_total), 0);
+  check(
+    "a patient deleting their account leaves the lab's cash records",
+    Number(
+      (
+        await db.query(
+          `select count(*) from public.lab_cash_payments where lab_id = $1`,
+          [lab.id],
+        )
+      ).rows[0].count,
+    ) === 2 &&
+      total(before) === 2400 &&
+      total(after) === 2400,
+    `${total(before)} -> ${total(after)}`,
+  );
+}
+
 async function testEveryRefusalIsTested() {
   section("Every refusal has a test (QA-02)");
 
@@ -11712,6 +12043,7 @@ try {
   await testLabCollectors(await freshPatients());
   await testLabSamples(await freshPatients());
   await testLabReportSignOff(await freshPatients());
+  await testLabCollectorDay(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

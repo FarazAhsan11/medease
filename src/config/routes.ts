@@ -121,6 +121,9 @@ export const labRoutes = {
   // One booking: its samples and who did each step (LAB-16).
   booking: (bookingId: string) => `/lab/bookings/${bookingId}`,
   bookingLabels: (bookingId: string) => `/lab/bookings/${bookingId}/labels`,
+  // The collector's day of home visits and cash (LAB-21); today without a day.
+  collections: "/lab/collections",
+  collectionsOn: (day: string) => `/lab/collections?day=${day}`,
   reports: "/lab/reports",
   // Opens the report on a short-lived signed link.
   report: (reportId: string) => `/lab/reports/${reportId}`,

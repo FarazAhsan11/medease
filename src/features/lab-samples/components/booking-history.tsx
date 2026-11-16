@@ -7,6 +7,7 @@ import {
 import type { BookingHistoryStep } from "@/features/lab-samples/lib/samples";
 import { labRoleLabels } from "@/features/lab-staff/lib/lab-permissions";
 import { formatDateKey, formatDateTime } from "@/lib/datetime";
+import { formatFee } from "@/lib/format";
 
 type BookingHistoryProps = {
   steps: BookingHistoryStep[];
@@ -46,6 +47,11 @@ export function BookingHistory({ steps, timezone }: BookingHistoryProps) {
 
 function stepTitle(step: BookingHistoryStep, timezone: string) {
   if (step.kind === "report_uploaded") return "Report uploaded";
+  // The note carries the amount (LAB-21).
+  if (step.kind === "cash_received")
+    return step.note
+      ? `Cash received, ${formatFee(Number(step.note))}`
+      : "Cash received";
   if (step.kind === "report_returned") return "Report sent back";
   if (step.kind === "report_signed_off")
     return "Report signed off and released";

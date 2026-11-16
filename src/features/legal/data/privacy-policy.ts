@@ -8,8 +8,8 @@ export const privacyPolicy: LegalDocument = {
   slug: "privacy",
   title: "Privacy Policy",
   summary: `What personal data ${name} holds, why we hold it, who can see it and how long we keep it.`,
-  version: "1.2",
-  updated: "15 November 2026",
+  version: "1.3",
+  updated: "16 November 2026",
   sections: [
     {
       title: "Who we are",
@@ -27,7 +27,7 @@ export const privacyPolicy: LegalDocument = {
           "Medical profile: date of birth, gender, blood group, height, weight, allergies, long-term conditions and current medicines.",
           "Family members: the same medical profile, and their relation to you, for anyone you add to your account.",
           "Appointments: the doctor, date and time, status, the reason for the visit and any reason given for cancelling.",
-          "Lab bookings: the lab, the tests or packages, the day of a lab visit or the window for home collection, the collection address and contact, the name, relation, date of birth and gender of the person being tested, the price paid in cash, and each step of the booking (sample collected, processing, report ready, a new sample needed or a cancellation), with when it happened and any reason or note the lab gives, or that you give when you cancel, and each new day or window you move it to. When the lab releases the report, the PDF it uploads, with the name and qualification of the lab staff member who signed it off and when.",
+          "Lab bookings: the lab, the tests or packages, the day of a lab visit or the window for home collection, the collection address and contact, the name, relation, date of birth and gender of the person being tested, the price, whether it was paid in cash and when the lab recorded the payment, and each step of the booking (sample collected, processing, report ready, a new sample needed or a cancellation), with when it happened and any reason or note the lab gives, or that you give when you cancel, and each new day or window you move it to. When the lab releases the report, the PDF it uploads, with the name and qualification of the lab staff member who signed it off and when.",
           "Clinical records: prescriptions your doctor issues, the visit summary your doctor writes for you (diagnosis, advice and any follow-up date), the lab tests your doctor orders (with how urgent they are and any note), whether your doctor has reviewed a report from those tests and any comment they leave on it, and the private notes your doctor keeps.",
           "Messages: what you and a doctor write to each other, and when each message was sent and read.",
           "Documents you upload: the file (PDF, JPG or PNG), the name, type and date you give it, and its size. Only you can see them; doctors cannot.",
@@ -59,7 +59,7 @@ export const privacyPolicy: LegalDocument = {
         [
           "You, through your account.",
           "A doctor, only for patients who have an appointment with them. Their private notes are not shown to patients.",
-          "A lab, only for bookings made with it: the tests, the day or window, the name, age and gender of the person being tested, the name and phone number of the account holder who booked, and whether a doctor ordered the tests (not which doctor). For home collection, also the address and the contact name and phone number there. The lab records each step of the booking, and you see what it records. If you cancel or move a booking, the lab sees the new time, or your reason and note. The lab uploads the report, and you open it in your records.",
+          "A lab, only for bookings made with it: the tests, the day or window, the name, age and gender of the person being tested, the name and phone number of the account holder who booked, and whether a doctor ordered the tests (not which doctor). For home collection, also the address and the contact name and phone number there; the collector can open the address in a map app on their phone to find the way. The lab records each step of the booking, and you see what it records. If you cancel or move a booking, the lab sees the new time, or your reason and note. The lab uploads the report, and you open it in your records.",
           "The doctor who ordered your lab tests, when you book them from that order: which lab you chose, which of the ordered tests it does, the day, how far the booking has got and the report. The doctor doesn't see your address, phone number or what you paid. The report covers the whole booking, so book other tests separately if you'd rather the doctor didn't see them. The doctor can leave a comment on the report, which you see with it.",
           "Messages, only by you and the doctor you are writing to. You can message a doctor for 7 days after a visit, and the doctor can give you longer.",
           "Our administrators, who review doctor and lab verification documents. Clinical records are not part of that work, and sensitive actions are logged.",
@@ -98,6 +98,12 @@ export const privacyPolicy: LegalDocument = {
               "Google",
               "Helping two browsers connect for a video call",
               "IP addresses only",
+              "United States and other countries",
+            ],
+            [
+              "Google Maps",
+              "Showing a home collection address on the collector's phone, only when they open it",
+              "The collection address (street, area and city), nothing about the tests",
               "United States and other countries",
             ],
           ],

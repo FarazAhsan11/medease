@@ -382,9 +382,10 @@ export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
 
 // The lab's list: also who goes to each home visit and the sample codes. Row
 // level security shows a collector only their own home visits.
+export const OPEN_SAMPLE_COLUMNS = `samples:lab_samples (code, sample_type, rejected_at)`;
 export const LAB_SIDE_BOOKING_COLUMNS = `${LAB_BOOKING_COLUMNS},
   assignment:lab_booking_assignments (collector_id),
-  samples:lab_samples (code, sample_type, rejected_at)`;
+  ${OPEN_SAMPLE_COLUMNS}`;
 
 // One booking's page: every container it has had, rejected ones included.
 export const LAB_BOOKING_DETAIL_COLUMNS = `${LAB_BOOKING_COLUMNS},
@@ -496,7 +497,8 @@ export function paymentSummary(
     "paymentMethod" | "paymentStatus" | "paymentDueAt" | "status" | "timezone"
   >,
 ) {
-  if (booking.paymentMethod === "cash") return "pay in cash";
+  if (booking.paymentMethod === "cash")
+    return booking.paymentStatus === "paid" ? "paid in cash" : "pay in cash";
   if (booking.status === "awaiting_payment" && booking.paymentDueAt) {
     return `pay online by ${formatTime(booking.paymentDueAt, booking.timezone)}`;
   }

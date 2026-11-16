@@ -72,9 +72,9 @@ export const labRoleLabels: Record<LabMemberRole, string> = {
 
 export const labRoleDescriptions: Record<LabStaffRole, string> = {
   front_desk:
-    "Sees bookings and reports, sends collectors on home visits, marks samples collected, cancels.",
+    "Sees bookings and reports, sends collectors on home visits, marks samples collected, records cash, cancels.",
   collector:
-    "Sees lab visits and the home visits given to them, and marks samples collected.",
+    "Sees lab visits and the home visits given to them, marks samples collected and records the cash taken.",
   technician:
     "Moves samples into processing and uploads reports, which wait for a pathologist's sign-off.",
   pathologist:

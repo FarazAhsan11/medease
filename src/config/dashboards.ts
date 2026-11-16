@@ -10,6 +10,7 @@ import {
   KeyRoundIcon,
   LayoutDashboardIcon,
   PillIcon,
+  RouteIcon,
   ScrollTextIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -125,6 +126,12 @@ export const dashboards: Record<DashboardRole, DashboardConfig> = {
     nav: [
       { title: "Overview", href: "/lab", icon: LayoutDashboardIcon },
       { title: "Bookings", href: "/lab/bookings", icon: ClipboardListIcon },
+      {
+        title: "Collections",
+        href: labRoutes.collections,
+        icon: RouteIcon,
+        permission: "bookings.collect",
+      },
       {
         title: "Test catalog",
         href: labRoutes.tests,
