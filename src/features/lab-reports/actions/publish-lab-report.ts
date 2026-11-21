@@ -30,8 +30,10 @@ import { createClient } from "@/lib/supabase/server";
 
 // Runs after the browser has uploaded the report: checks the file, records it
 // as checked, and files it through publish_lab_report to wait for sign-off
-// (LAB-17). A signer who chose to sign it at once then signs it off, which
-// releases it to the patient. A file that fails or isn't filed is deleted.
+// (LAB-17), or, with a reason, through publish_lab_correction as a correction
+// of the released report (LAB-18). A signer who chose to sign it at once then
+// signs it off, which releases it to the patient. A file that fails or isn't
+// filed is deleted.
 export const publishLabReport = withFormErrors<FormState, unknown>(
   async (_previousState, input) => {
     const member = await requireLabMember("reports.publish");
@@ -41,7 +43,8 @@ export const publishLabReport = withFormErrors<FormState, unknown>(
       return formError(REPORT_UPLOAD_FAILED_MESSAGE, "validation_failed");
     }
 
-    const { bookingId, path } = parsed.data;
+    const { bookingId, path, reason } = parsed.data;
+    const correcting = reason !== undefined;
     const signNow = parsed.data.signNow && memberCan(member, "reports.sign");
     // Only a path in this booking's folder in the lab's own space is touched.
     if (!isReportPath(labId, bookingId, path)) {
@@ -72,12 +75,19 @@ export const publishLabReport = withFormErrors<FormState, unknown>(
     }
 
     const supabase = await createClient();
-    const { data: reportId, error } = await supabase.rpc("publish_lab_report", {
-      p_booking_id: bookingId,
-      p_path: path,
-      // Nobody else needs to look at a report its uploader signs now.
-      p_notify_signers: !signNow,
-    });
+    // Nobody else needs to look at a report its uploader signs now.
+    const { data: reportId, error } = correcting
+      ? await supabase.rpc("publish_lab_correction", {
+          p_booking_id: bookingId,
+          p_path: path,
+          p_reason: reason,
+          p_notify_signers: !signNow,
+        })
+      : await supabase.rpc("publish_lab_report", {
+          p_booking_id: bookingId,
+          p_path: path,
+          p_notify_signers: !signNow,
+        });
     if (error) {
       // Only when the database refused it. A lost response (no code) may
       // follow a commit, and then the file is the patient's report.
@@ -87,7 +97,9 @@ export const publishLabReport = withFormErrors<FormState, unknown>(
       return databaseErrorState(
         error,
         labReportErrorMessages,
-        "Uploading a lab report",
+        correcting
+          ? "Uploading a lab report correction"
+          : "Uploading a lab report",
       );
     }
 
@@ -116,8 +128,9 @@ export const publishLabReport = withFormErrors<FormState, unknown>(
     refresh();
     return {
       status: "success",
-      message:
-        "Uploaded. It reaches the patient once a pathologist signs it off.",
+      message: correcting
+        ? "Uploaded. It replaces the current report once a pathologist signs it off."
+        : "Uploaded. It reaches the patient once a pathologist signs it off.",
     };
   },
 );

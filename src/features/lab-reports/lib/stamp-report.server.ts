@@ -11,11 +11,15 @@ import {
 
 import { signerLine, type LabSigner } from "@/features/lab-staff/lib/lab-staff";
 
-// The sign-off stamp (LAB-17): two lines under every page, in a strip added
-// below the lab's own content, so nothing the lab printed is covered or moved.
-// Design: docs/lab-reports.md ("The stamp").
+// The sign-off stamp (LAB-17): lines under every page, in a strip added below
+// the lab's own content, so nothing the lab printed is covered or moved. A
+// correction (LAB-18) adds what it replaces and why. Design:
+// docs/lab-reports.md ("The stamp").
 
-const STRIP = 26;
+// The strip's padding: with two 7pt lines it's 26pt tall.
+const PADDING = 8;
+// A line too long for the page wraps onto at most this many.
+const MAX_WRAPPED_LINES = 3;
 const MARGIN = 8;
 const MAX_SIZE = 7;
 const MIN_SIZE = 5;
@@ -41,19 +45,67 @@ function signedAt(at: Date, timeZone: string) {
   }).format(at);
 }
 
-export function stampLines(signer: LabSigner, at: Date, timeZone: string) {
+// What a correction prints: why, and when the report it replaces was
+// released, so a reader can tell the two apart (ISO 15189:2022, 7.4.1.8).
+export type StampCorrection = {
+  reason: string;
+  replacesReleasedAt: string;
+};
+
+export function stampLines(
+  signer: LabSigner,
+  at: Date,
+  timeZone: string,
+  correction?: StampCorrection | null,
+) {
   return [
+    ...(correction
+      ? [
+          `CORRECTED REPORT. It replaces the report released on ${signedAt(new Date(correction.replacesReleasedAt), timeZone)}.`,
+          `Reason for correction: ${correction.reason}`,
+        ]
+      : []),
     `Reviewed and signed off by ${signerLine(signer)}`,
     `Released electronically in MedEase on ${signedAt(at, timeZone)}`,
   ].map(printable);
 }
 
-// The largest size, down to MIN_SIZE, at which a line fits; shortened with an
-// ellipsis on a page too narrow even for that.
+// The largest size, down to MIN_SIZE, at which a line fits; on a page too
+// narrow even for that, wrapped at MIN_SIZE onto up to MAX_WRAPPED_LINES.
 function fit(font: PDFFont, line: string, width: number) {
   for (let size = MAX_SIZE; size >= MIN_SIZE; size -= 0.5) {
-    if (font.widthOfTextAtSize(line, size) <= width) return { line, size };
+    if (font.widthOfTextAtSize(line, size) <= width) return [{ line, size }];
   }
+  const wrapped: string[] = [];
+  let rest = line;
+  while (rest && wrapped.length < MAX_WRAPPED_LINES - 1) {
+    const words = rest.split(" ");
+    let taken = words[0];
+    let count = 1;
+    while (
+      count < words.length &&
+      font.widthOfTextAtSize(`${taken} ${words[count]}`, MIN_SIZE) <= width
+    ) {
+      taken = `${taken} ${words[count]}`;
+      count++;
+    }
+    // A single word too wide for the page is shortened below.
+    if (font.widthOfTextAtSize(taken, MIN_SIZE) > width) break;
+    wrapped.push(taken);
+    rest = words.slice(count).join(" ");
+  }
+  if (!rest) return wrapped.map((part) => ({ line: part, size: MIN_SIZE }));
+  if (font.widthOfTextAtSize(rest, MIN_SIZE) <= width) {
+    return [...wrapped, rest].map((part) => ({ line: part, size: MIN_SIZE }));
+  }
+  return [
+    ...wrapped.map((part) => ({ line: part, size: MIN_SIZE })),
+    shorten(font, rest, width),
+  ];
+}
+
+// Cut with an ellipsis to fit at MIN_SIZE.
+function shorten(font: PDFFont, line: string, width: number) {
   let short = line;
   while (
     short.length > 1 &&
@@ -73,15 +125,18 @@ function stampPage(page: PDFPage, font: PDFFont, lines: string[]) {
   const sideways = angle === 90 || angle === 270;
   const width = (sideways ? box.height : box.width) - 2 * MARGIN;
   const { x, y, width: w, height: h } = box;
+  const fitted = lines.flatMap((line) => fit(font, line, width));
+  const strip =
+    PADDING + fitted.reduce((total, { size }) => total + size + LINE_GAP, 0);
 
   const grown =
     angle === 90
-      ? { x, y, width: w + STRIP, height: h }
+      ? { x, y, width: w + strip, height: h }
       : angle === 180
-        ? { x, y, width: w, height: h + STRIP }
+        ? { x, y, width: w, height: h + strip }
         : angle === 270
-          ? { x: x - STRIP, y, width: w + STRIP, height: h }
-          : { x, y: y - STRIP, width: w, height: h + STRIP };
+          ? { x: x - strip, y, width: w + strip, height: h }
+          : { x, y: y - strip, width: w, height: h + strip };
 
   const media = page.getMediaBox();
   const left = Math.min(media.x, grown.x);
@@ -102,17 +157,16 @@ function stampPage(page: PDFPage, font: PDFFont, lines: string[]) {
   }
 
   // Baseline offsets from the strip's outer edge, last line nearest it.
-  const fitted = lines.map((line) => fit(font, line, width));
   let offset = 6;
   for (const { line, size } of [...fitted].reverse()) {
     const at =
       angle === 90
-        ? { x: x + w + STRIP - offset, y: y + MARGIN }
+        ? { x: x + w + strip - offset, y: y + MARGIN }
         : angle === 180
-          ? { x: x + w - MARGIN, y: y + h + STRIP - offset }
+          ? { x: x + w - MARGIN, y: y + h + strip - offset }
           : angle === 270
-            ? { x: x - STRIP + offset, y: y + h - MARGIN }
-            : { x: x + MARGIN, y: y - STRIP + offset };
+            ? { x: x - strip + offset, y: y + h - MARGIN }
+            : { x: x + MARGIN, y: y - strip + offset };
     page.drawText(line, {
       ...at,
       size,

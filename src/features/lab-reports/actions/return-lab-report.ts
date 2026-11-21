@@ -52,7 +52,9 @@ export const returnLabReport = withFormErrors(
     refresh();
     return {
       status: "success",
-      message: "Sent back. The booking waits for a new upload.",
+      // A first report or a correction: either way the patient sees no change.
+      message:
+        "Sent back. The uploader is told, and the patient sees no change.",
     };
   },
 );

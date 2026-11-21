@@ -22,11 +22,13 @@ import { createClient } from "@/lib/supabase/server";
 type PendingReport = {
   booking_id: string;
   storage_path: string;
+  corrects_report_id: string | null;
+  correction_reason: string | null;
   lab_bookings: { timezone: string };
 };
 
-// Signs off a report waiting in the signer's lab (LAB-17): stamps their details
-// on a copy of the upload, stores it beside the original, and has
+// Signs off a report waiting in the signer's lab (LAB-17): stamps their details,
+// and for a correction what it replaces and why (LAB-18), on a copy of the upload, stores it beside the original, and has
 // sign_off_lab_report release it. The caller has checked the member may sign.
 // The report row is read with the signer's own session first, so the secret
 // key only touches a file their lab owns.
@@ -37,7 +39,9 @@ export async function signOffReport(
   const supabase = await createClient();
   const { data: report, error } = await supabase
     .from("lab_reports")
-    .select("booking_id, storage_path, lab_bookings (timezone)")
+    .select(
+      "booking_id, storage_path, corrects_report_id, correction_reason, lab_bookings (timezone)",
+    )
     .eq("id", reportId)
     .eq("lab_id", member.labId)
     .is("replaced_at", null)
@@ -49,6 +53,25 @@ export async function signOffReport(
       labReportErrorMessages.report_not_pending,
       "report_not_pending",
     );
+  }
+
+  // A correction prints when the report it replaces was released (LAB-18).
+  let replacesReleasedAt: string | null = null;
+  if (report.corrects_report_id) {
+    const { data: previous, error: previousError } = await supabase
+      .from("lab_reports")
+      .select("released_at")
+      .eq("id", report.corrects_report_id)
+      .maybeSingle<{ released_at: string | null }>();
+    if (previousError) throw new Error(`lab_reports: ${previousError.message}`);
+    replacesReleasedAt = previous?.released_at ?? null;
+    // Replaced or gone meanwhile: the database would refuse it too.
+    if (!replacesReleasedAt) {
+      return formError(
+        labReportErrorMessages.report_not_pending,
+        "report_not_pending",
+      );
+    }
   }
 
   const signer = await getOwnSigner(member.user.id);
@@ -72,7 +95,14 @@ export async function signOffReport(
   try {
     stamped = await stampSignOff(
       new Uint8Array(await file.arrayBuffer()),
-      stampLines(signer, new Date(), report.lab_bookings.timezone),
+      stampLines(
+        signer,
+        new Date(),
+        report.lab_bookings.timezone,
+        report.correction_reason && replacesReleasedAt
+          ? { reason: report.correction_reason, replacesReleasedAt }
+          : null,
+      ),
     );
   } catch (stampError) {
     if (stampError instanceof UnstampableReportError) {
@@ -121,6 +151,8 @@ export async function signOffReport(
 
   return {
     status: "success",
-    message: "Signed off. The patient can open it now.",
+    message: report.correction_reason
+      ? "Signed off. It replaces the earlier report, and the patient is told it was corrected."
+      : "Signed off. The patient can open it now.",
   };
 }

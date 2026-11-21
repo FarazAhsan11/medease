@@ -10,6 +10,7 @@ import { CollectVisitDialog } from "@/features/lab-collections/components/collec
 import { RecordCashButton } from "@/features/lab-collections/components/record-cash-button";
 import { takesCash } from "@/features/lab-collections/lib/collections";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
+import { ReportCorrectionNote } from "@/features/lab-reports/components/report-correction-note";
 import { ReportSignerNote } from "@/features/lab-reports/components/report-signer-note";
 import { UploadReportDialog } from "@/features/lab-reports/components/upload-report-dialog";
 import {
@@ -42,18 +43,52 @@ export function LabBookingActions({ booking, role }: LabBookingActionsProps) {
   );
   if (next.length === 0) {
     const report = booking.reportId && labRoleCan(role, "reports.view");
+    // A released report is corrected with a new upload (LAB-18).
+    const correct =
+      booking.status === "report_ready" &&
+      booking.reportId &&
+      labRoleCan(role, "reports.publish");
     if (!report && !cash) return null;
     return (
       <div className="grid gap-2 border-t pt-4">
         {cash && <div>{cash}</div>}
         {report && booking.reportId && (
-          <LabReportLink
-            href={labRoutes.report(booking.reportId)}
-            className="w-fit"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <LabReportLink href={labRoutes.report(booking.reportId)} />
+            {correct &&
+              (booking.pendingReportId ? (
+                <>
+                  <LabReportLink
+                    href={labRoutes.report(booking.pendingReportId)}
+                    label="View correction"
+                  />
+                  <a
+                    href={labRoutes.reports}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Correction waiting for sign-off
+                  </a>
+                </>
+              ) : (
+                <UploadReportDialog
+                  bookingId={booking.id}
+                  summary={summary}
+                  canSign={labRoleCan(role, "reports.sign")}
+                  correcting
+                />
+              ))}
+          </div>
         )}
         {report && booking.reportSigner && (
           <ReportSignerNote signer={booking.reportSigner} />
+        )}
+        {report && booking.reportCorrection && (
+          <ReportCorrectionNote
+            correction={booking.reportCorrection}
+            previousHref={labRoutes.report(
+              booking.reportCorrection.previousReportId,
+            )}
+          />
         )}
       </div>
     );

@@ -34,7 +34,7 @@ export function ResultsInboxItem({ result, now }: ResultsInboxItemProps) {
               {priorityLabels[result.priority]}
             </StatusBadge>
           )}
-          {result.version > 1 && (
+          {result.correction && (
             <StatusBadge tone="warning">Corrected report</StatusBadge>
           )}
           {result.reviewedAt && (
@@ -60,6 +60,7 @@ export function ResultsInboxItem({ result, now }: ResultsInboxItemProps) {
         timezone={result.timezone}
         comment={result.comment}
         reviewedAt={result.reviewedAt}
+        correction={result.correction}
         note={
           result.reviewedAt
             ? undefined

@@ -63,8 +63,8 @@ function ReturnReportForm({
       <AlertDialogHeader>
         <AlertDialogTitle>Send the report back?</AlertDialogTitle>
         <AlertDialogDescription>
-          {summary}. Whoever uploaded it is told, and the booking waits for a
-          new upload. The patient sees nothing.
+          {summary}. Whoever uploaded it is told and can upload a new one. The
+          patient sees no change.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <FormField id={id} label="What needs changing" error={noteError}>

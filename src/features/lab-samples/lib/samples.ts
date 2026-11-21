@@ -66,6 +66,8 @@ export const historyRowSchema = z.object({
     "report_uploaded",
     "report_returned",
     "report_signed_off",
+    "correction_uploaded",
+    "report_corrected",
     "cash_received",
   ]),
   reason: z.string().nullable(),

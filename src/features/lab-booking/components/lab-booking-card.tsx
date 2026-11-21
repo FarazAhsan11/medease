@@ -14,6 +14,7 @@ import {
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
+import { ReportCorrectionNote } from "@/features/lab-reports/components/report-correction-note";
 import { ReportSignerNote } from "@/features/lab-reports/components/report-signer-note";
 import { formatFee, telHref } from "@/lib/format";
 
@@ -124,6 +125,15 @@ export function LabBookingCard({
                   {booking.reportSigner && (
                     <ReportSignerNote
                       signer={booking.reportSigner}
+                      className="basis-full"
+                    />
+                  )}
+                  {booking.reportCorrection && (
+                    <ReportCorrectionNote
+                      correction={booking.reportCorrection}
+                      previousHref={patientRoutes.labReport(
+                        booking.reportCorrection.previousReportId,
+                      )}
                       className="basis-full"
                     />
                   )}

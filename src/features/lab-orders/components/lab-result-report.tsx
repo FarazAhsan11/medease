@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { doctorRoutes } from "@/config/routes";
 import { LabResultReviewForm } from "@/features/lab-orders/components/lab-result-review-form";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
+import { ReportCorrectionNote } from "@/features/lab-reports/components/report-correction-note";
+import type { ReportCorrection } from "@/features/lab-reports/lib/report-correction";
 import { formatDateTime } from "@/lib/datetime";
 
 type LabResultReportProps = {
@@ -12,6 +14,8 @@ type LabResultReportProps = {
   timezone: string;
   comment: string | null;
   reviewedAt: string | null;
+  // Set when the report corrects an earlier one (LAB-18).
+  correction: ReportCorrection | null;
   // More links beside the report's.
   links?: ReactNode;
   // Said after the published time, e.g. how long it has waited.
@@ -27,6 +31,7 @@ export function LabResultReport({
   timezone,
   comment,
   reviewedAt,
+  correction,
   links,
   note,
 }: LabResultReportProps) {
@@ -42,6 +47,18 @@ export function LabResultReport({
           </p>
         )}
       </div>
+      {correction && (
+        <ReportCorrectionNote
+          correction={correction}
+          previousHref={doctorRoutes.labReport(correction.previousReportId)}
+        />
+      )}
+      {correction && !reviewedAt && comment && (
+        <p className="text-xs text-muted-foreground">
+          Your comment was about the earlier version, so the patient
+          doesn&apos;t see it until you review this one.
+        </p>
+      )}
       <LabResultReviewForm
         // Start again from the saved review after a save.
         key={`${reviewedAt}:${comment}`}

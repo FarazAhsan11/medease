@@ -30,6 +30,14 @@ export const UNSTAMPABLE_REPORT_MESSAGE =
 // A note sent back with a report (return_lab_report).
 export const MAX_RETURN_NOTE = 500;
 
+// Why a released report was corrected (LAB-18). It's printed on the stamp, so
+// one line of letters the stamp's standard font can print, as the database
+// checks.
+export const MIN_CORRECTION_REASON = 3;
+export const MAX_CORRECTION_REASON = 200;
+export const CORRECTION_REASON_PATTERN = /^[\x20-\x7e\xa0-\xff]+$/;
+export const CORRECTION_REASON_MESSAGE = `Say what was corrected in ${MIN_CORRECTION_REASON} to ${MAX_CORRECTION_REASON} characters, in English letters.`;
+
 export const labReportErrorMessages: Record<string, string> = {
   not_lab: "Only lab accounts can work with reports.",
   not_permitted: "Your role in this lab can't do this.",
@@ -39,7 +47,7 @@ export const labReportErrorMessages: Record<string, string> = {
   invalid_path: REPORT_UPLOAD_FAILED_MESSAGE,
   upload_not_checked: REPORT_UPLOAD_FAILED_MESSAGE,
   report_awaiting_sign_off:
-    "A report for this booking is already waiting for sign-off. A pathologist can send it back if it needs replacing.",
+    "A report or correction for this booking is already waiting for sign-off. A pathologist can send it back if it needs replacing.",
   too_many_versions:
     "This booking has had 20 uploads. Contact MedEase support to add another.",
   signer_details_missing:
@@ -49,5 +57,6 @@ export const labReportErrorMessages: Record<string, string> = {
   report_not_found: "This report isn't in your list.",
   report_not_pending:
     "This report was already signed off or sent back, perhaps from another tab. The list now shows where it is.",
+  invalid_reason: CORRECTION_REASON_MESSAGE,
   invalid_note: `Write a note of up to ${MAX_RETURN_NOTE} characters saying what needs changing.`,
 };

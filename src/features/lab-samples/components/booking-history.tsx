@@ -25,7 +25,8 @@ export function BookingHistory({ steps, timezone }: BookingHistoryProps) {
             aria-hidden
           />
           <p className="font-medium">{stepTitle(step, timezone)}</p>
-          {step.kind === "report_returned" && step.note && (
+          {/* Notes and correction reasons, for people who open reports. */}
+          {notedKinds.has(step.kind) && step.note && (
             <p className="break-words whitespace-pre-line text-muted-foreground">
               {step.note}
             </p>
@@ -45,14 +46,27 @@ export function BookingHistory({ steps, timezone }: BookingHistoryProps) {
   );
 }
 
+const notedKinds = new Set<BookingHistoryStep["kind"]>([
+  "report_returned",
+  "correction_uploaded",
+  "report_corrected",
+]);
+
 function stepTitle(step: BookingHistoryStep, timezone: string) {
   if (step.kind === "report_uploaded") return "Report uploaded";
+  // Corrections of a released report (LAB-18).
+  if (step.kind === "correction_uploaded") return "Corrected report uploaded";
+  if (step.kind === "report_corrected")
+    return "Corrected report signed off and released";
   // The note carries the amount (LAB-21).
   if (step.kind === "cash_received")
     return step.note
       ? `Cash received, ${formatFee(Number(step.note))}`
       : "Cash received";
-  if (step.kind === "report_returned") return "Report sent back";
+  if (step.kind === "report_returned")
+    return step.status === "report_ready"
+      ? "Correction sent back"
+      : "Report sent back";
   if (step.kind === "report_signed_off")
     return "Report signed off and released";
   if (step.kind === "rescheduled") {

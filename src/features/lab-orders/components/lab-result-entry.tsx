@@ -42,6 +42,7 @@ export function LabResultEntry({ order, result }: LabResultEntryProps) {
           timezone={result.timezone}
           comment={result.comment}
           reviewedAt={result.reviewedAt}
+          correction={result.reportCorrection}
         />
       )}
     </li>

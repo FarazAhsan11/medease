@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 // doctor, with their second factor; the filters keep each query on its index.
 
 const SUMMARY_COLUMNS = `id, booking_id, created_at, released_at, signer_name, signer_title,
+  corrects_report_id, correction_reason,
   lab_bookings (lab_name, timezone, care_recipient_name, care_recipient_relation,
     lab_booking_items (name))`;
 

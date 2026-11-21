@@ -2,6 +2,7 @@ import { PanelCard } from "@/components/shared/panel-card";
 import { labRoutes } from "@/config/routes";
 import { itemsSummary } from "@/features/lab-booking/lib/lab-bookings";
 import { LabReportLink } from "@/features/lab-reports/components/lab-report-link";
+import { ReportCorrectionNote } from "@/features/lab-reports/components/report-correction-note";
 import { ReturnReportDialog } from "@/features/lab-reports/components/return-report-dialog";
 import { SignOffReportDialog } from "@/features/lab-reports/components/sign-off-report-dialog";
 import type { LabReportSummary } from "@/features/lab-reports/lib/lab-report-summary";
@@ -58,6 +59,16 @@ export function ReportsToSignCard({
                     {tests} · Uploaded{" "}
                     {formatDateTime(report.uploadedAt, report.timezone)}
                   </p>
+                  {report.correction && (
+                    <ReportCorrectionNote
+                      correction={report.correction}
+                      previousHref={labRoutes.report(
+                        report.correction.previousReportId,
+                      )}
+                      label="Corrects the released report:"
+                      className="mt-2"
+                    />
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <LabReportLink href={labRoutes.report(report.id)} />

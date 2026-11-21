@@ -2,6 +2,7 @@ import type { Appointment } from "@/features/appointments/lib/appointments";
 import type { BookedFor } from "@/features/family/lib/relations";
 import { daysBetweenDateKeys, toDateKey } from "@/lib/datetime";
 import type { LabBookingStatus } from "@/features/lab-booking/lib/lab-bookings";
+import type { ReportCorrection } from "@/features/lab-reports/lib/report-correction";
 import {
   getPrescribeBlock,
   PRESCRIBE_WINDOW_DAYS,
@@ -104,6 +105,8 @@ export type OrderResult = {
   testIds: string[];
   reportId: string | null;
   reportPublishedAt: string | null;
+  // Set when the report corrects an earlier one (LAB-18).
+  reportCorrection: ReportCorrection | null;
   comment: string | null;
   reviewedAt: string | null;
 };
@@ -121,6 +124,8 @@ export type InboxResult = BookedFor & {
   testNames: string[];
   publishedAt: string;
   version: number;
+  // Set when the report corrects an earlier one (LAB-18).
+  correction: ReportCorrection | null;
   reviewedAt: string | null;
   comment: string | null;
 };

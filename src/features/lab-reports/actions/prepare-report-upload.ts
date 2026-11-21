@@ -20,7 +20,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 // Hands the browser a signed link to upload a report into the booking's own
-// folder: only for the lab's own booking, while it's being processed.
+// folder: only for the lab's own booking, while it's being processed, or, for
+// a correction (LAB-18), once its report is out.
 export const prepareReportUpload = withFormErrors<
   PreparedReportUploadState,
   unknown
@@ -37,7 +38,7 @@ export const prepareReportUpload = withFormErrors<
 
   // Read with the lab's own session: row level security limits it to the
   // lab's bookings. publish_lab_report checks again.
-  const { bookingId } = parsed.data;
+  const { bookingId, correcting } = parsed.data;
   const supabase = await createClient();
   const { data: booking, error } = await supabase
     .from("lab_bookings")
@@ -51,7 +52,7 @@ export const prepareReportUpload = withFormErrors<
       "booking_not_found",
     );
   }
-  if (booking.status !== "processing") {
+  if (booking.status !== (correcting ? "report_ready" : "processing")) {
     refresh();
     return formError(labReportErrorMessages.status_changed, "status_changed");
   }

@@ -70,12 +70,15 @@ function describe(entry: Entry): {
     case "lab_report":
       return {
         icon: FlaskConicalIcon,
-        title: `Lab report: ${itemsSummary(
+        title: `${entry.correctionReason ? "Corrected lab report" : "Lab report"}: ${itemsSummary(
           entry.testNames.map((name) => ({ name })),
         )}`,
         details: (
           <>
             <p>{entry.labName}</p>
+            {entry.correctionReason && (
+              <p className="break-words">Corrected: {entry.correctionReason}</p>
+            )}
             {entry.careRecipientRelation !== "self" && (
               <p>For {entry.careRecipientName}</p>
             )}

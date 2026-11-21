@@ -1,4 +1,8 @@
 import type { CareRecipientRelation } from "@/features/family/lib/relations";
+import {
+  toReportCorrection,
+  type ReportCorrection,
+} from "@/features/lab-reports/lib/report-correction";
 import type { LabSigner } from "@/features/lab-staff/lib/lab-staff";
 
 // A report with what's needed to list it: whose it is, which tests, which lab,
@@ -11,6 +15,8 @@ export type LabReportSummary = {
   publishedAt: string | null;
   // Null for reports published before sign-off existed.
   signer: LabSigner | null;
+  // Set when it corrects a released report (LAB-18).
+  correction: ReportCorrection | null;
   labName: string;
   timezone: string;
   careRecipientName: string;
@@ -25,6 +31,8 @@ export type LabReportSummaryRow = {
   released_at: string | null;
   signer_name: string | null;
   signer_title: string | null;
+  corrects_report_id: string | null;
+  correction_reason: string | null;
   lab_bookings: {
     lab_name: string;
     timezone: string;
@@ -45,6 +53,7 @@ export function toLabReportSummary(row: LabReportSummaryRow): LabReportSummary {
       row.signer_name && row.signer_title
         ? { name: row.signer_name, title: row.signer_title }
         : null,
+    correction: toReportCorrection(row),
     labName: booking.lab_name,
     timezone: booking.timezone,
     careRecipientName: booking.care_recipient_name,

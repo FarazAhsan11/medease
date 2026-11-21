@@ -2397,12 +2397,14 @@ async function testLabResultsInbox({ patient, secondPatient }) {
     await review(cbc.bookingId, "All normal."),
   );
   check(
-    "which marks it reviewed without telling the patient again",
+    // The patient's screens hid the comment while it was about the earlier
+    // version (LAB-18), so they're told it stands.
+    "which marks it reviewed and tells the patient the comment stands",
     (await count(doctor)) === 0 &&
       (await bookingView())?.reviewed_at !== null &&
       new Date((await reviewRow()).reviewed_at) >
         new Date(Date.now() - 60 * MINUTE) &&
-      (await patientNotices()) === before.notices &&
+      (await patientNotices()) === before.notices + 1 &&
       (await audits()).join() ===
         [...before.audits, "lab_result.reviewed"].join(),
   );
@@ -11637,6 +11639,342 @@ async function testLabReportSignOff({ patient, secondPatient }) {
   );
 }
 
+async function testLabReportCorrections({ patient, secondPatient }) {
+  section("Corrected reports (LAB-18)");
+
+  const server = { role: "service_role" };
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const doctor = await createDoctor();
+  const visit = await startedVisit(doctor, patient);
+  const orderId = idOf(
+    await rpc(doctor, "save_lab_order", {
+      p_appointment_id: visit,
+      p_test_ids: ["cbc"],
+      p_priority: "routine",
+    }),
+  );
+  const lab = await createLab({ status: "approved" });
+  const otherLab = await createLab({ status: "approved" });
+  const testId = idOf(
+    await rpc(lab, "save_lab_test", {
+      p_test_type_id: "cbc",
+      p_price: 1000,
+      p_turnaround_hours: 24,
+      p_home_collection: false,
+      p_preparation: null,
+      p_listed: true,
+    }),
+  );
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+  }).format(new Date());
+  const bookingId = idOf(
+    await rpc(patient, "book_lab_test", {
+      p_request_id: randomUUID(),
+      p_lab_id: lab.id,
+      p_lab_test_ids: [testId],
+      p_package_ids: [],
+      p_collection: "lab",
+      p_visit_date: today,
+      p_slot_starts_at: null,
+      p_address_id: null,
+      p_care_recipient_id: null,
+      p_lab_order_id: orderId,
+    }),
+  );
+  for (const [from, to] of [
+    ["booked", "sample_collected"],
+    ["sample_collected", "processing"],
+  ]) {
+    await rpc(lab, "move_lab_booking", {
+      p_booking_id: bookingId,
+      p_from_status: from,
+      p_to_status: to,
+      p_reason: null,
+      p_note: null,
+    });
+  }
+  const checkedPath = async () => {
+    const path = `${lab.id}/${bookingId}/${randomUUID()}.pdf`;
+    await rpc(server, "mark_upload_checked", {
+      p_bucket: "lab-reports",
+      p_path: path,
+      p_owner_id: lab.id,
+    });
+    return path;
+  };
+  const correct = async (caller, reason, id = bookingId) =>
+    rpc(caller, "publish_lab_correction", {
+      p_booking_id: id,
+      p_path: await checkedPath(),
+      p_reason: reason,
+      p_notify_signers: true,
+    });
+  const reportRow = async (id) =>
+    (await db.query(`select * from public.lab_reports where id = $1`, [id]))
+      .rows[0];
+  const noticesOf = async (userId, kind) =>
+    (
+      await db.query(
+        `select count(*)::int as n from public.notifications where user_id = $1 and kind = $2`,
+        [userId, kind],
+      )
+    ).rows[0].n;
+  const visibleTo = async (caller) =>
+    (
+      (
+        await as(
+          caller,
+          `select id from public.lab_reports where booking_id = $1 order by version`,
+          [bookingId],
+        )
+      ).data ?? []
+    ).map((row) => row.id);
+  const toReview = async () =>
+    (await rpc(doctor, "count_lab_results_to_review")).data?.[0]
+      ?.count_lab_results_to_review;
+
+  refused(
+    "a report still being processed can't be corrected",
+    await correct(lab, "Wrong units"),
+    "status_changed",
+  );
+
+  const firstId = idOf(
+    await rpc(lab, "publish_lab_report", {
+      p_booking_id: bookingId,
+      p_path: await checkedPath(),
+    }),
+  );
+  await signOffReport(lab, firstId);
+  await rpc(doctor, "review_lab_result", {
+    p_booking_id: bookingId,
+    p_comment: null,
+  });
+  check("the doctor has reviewed the first report", (await toReview()) === 0);
+
+  refused(
+    "correcting needs a second factor",
+    await correct({ ...lab, aal: "aal1" }, "Wrong units"),
+    "second_factor_required",
+  );
+  refused(
+    "a correction needs a reason",
+    await correct(lab, "  "),
+    "invalid_reason",
+  );
+  refused(
+    "in letters the stamp can print",
+    await correct(lab, "غلط نتیجہ"),
+    "invalid_reason",
+  );
+  refused(
+    "of 200 characters or fewer",
+    await correct(lab, "x".repeat(201)),
+    "invalid_reason",
+  );
+  refused(
+    "another lab can't correct it",
+    await correct(otherLab, "Wrong units"),
+    "booking_not_found",
+  );
+
+  const correction = await correct(
+    lab,
+    "  Potassium was\nentered in the wrong units ",
+  );
+  succeeded("the lab uploads a correction", correction);
+  const correctionId = idOf(correction);
+  const pending = await reportRow(correctionId);
+  check(
+    "it names the report it corrects and the reason, on one line, and waits for sign-off",
+    pending.corrects_report_id === firstId &&
+      pending.correction_reason ===
+        "Potassium was entered in the wrong units" &&
+      pending.version === 2 &&
+      pending.released_at === null,
+  );
+  const status = async () =>
+    (
+      await db.query(`select status from public.lab_bookings where id = $1`, [
+        bookingId,
+      ])
+    ).rows[0].status;
+  check(
+    "the booking stays report ready, and the patient and doctor still read only the first report",
+    (await status()) === "report_ready" &&
+      (await visibleTo(patient)).join() === firstId &&
+      (await visibleTo(doctor)).join() === firstId &&
+      (await visibleTo(secondPatient)).length === 0,
+  );
+  refused(
+    "only one correction waits at a time",
+    await correct(lab, "Another fix"),
+    "report_awaiting_sign_off",
+  );
+  succeeded(
+    "the doctor can still review while a correction waits",
+    await rpc(doctor, "review_lab_result", {
+      p_booking_id: bookingId,
+      p_comment: "Looks fine",
+    }),
+  );
+  check(
+    "without marking the waiting correction reviewed",
+    (await reportRow(correctionId)).reviewed_at === null,
+  );
+
+  succeeded(
+    "a signer sends the correction back",
+    await rpc(lab, "return_lab_report", {
+      p_report_id: correctionId,
+      p_note: "Attach the right file",
+    }),
+  );
+  check(
+    "the first report stays current and the booking report ready",
+    (await reportRow(firstId)).replaced_at === null &&
+      (await status()) === "report_ready",
+  );
+
+  const secondId = idOf(await correct(lab, "Potassium units corrected"));
+  const patientNotices = await noticesOf(
+    patient.id,
+    "lab_booking_report_ready",
+  );
+  const doctorReady = await noticesOf(doctor.id, "lab_result_ready");
+  succeeded(
+    "the correction is signed off",
+    await signOffReport(lab, secondId),
+  );
+  const released = await reportRow(secondId);
+  const replaced = await reportRow(firstId);
+  check(
+    "it's released and the first report is marked replaced, not deleted",
+    released.released_at !== null &&
+      replaced.replaced_at !== null &&
+      replaced.released_at !== null &&
+      (await status()) === "report_ready",
+  );
+  check(
+    "the patient and the doctor can still open both",
+    (await visibleTo(patient)).join() === `${firstId},${secondId}` &&
+      (await visibleTo(doctor)).join() === `${firstId},${secondId}`,
+  );
+  check(
+    "the patient and the doctor are told it was corrected, not that it's ready",
+    (await noticesOf(patient.id, "lab_booking_report_corrected")) === 1 &&
+      (await noticesOf(doctor.id, "lab_result_corrected")) === 1 &&
+      (await noticesOf(patient.id, "lab_booking_report_ready")) ===
+        patientNotices &&
+      (await noticesOf(doctor.id, "lab_result_ready")) === doctorReady,
+  );
+  check(
+    "the corrected report is back in the doctor's inbox",
+    (await toReview()) === 1,
+  );
+  const inboxRow = (
+    await rpc(doctor, "get_lab_results_inbox", { p_reviewed: false })
+  ).data?.[0];
+  check(
+    "with the reason and the report it replaced",
+    inboxRow?.report_id === secondId &&
+      inboxRow.correction_reason === "Potassium units corrected" &&
+      inboxRow.previous_report_id === firstId,
+  );
+  const orderRow = (
+    await rpc(doctor, "get_lab_order_bookings", { p_appointment_id: visit })
+  ).data?.[0];
+  check(
+    "the visit's lab tests show the corrected report",
+    orderRow?.report_id === secondId &&
+      orderRow.correction_reason === "Potassium units corrected" &&
+      orderRow.previous_report_id === firstId &&
+      orderRow.reviewed_at === null,
+  );
+  const review = async () =>
+    (
+      await db.query(
+        `select comment, commented_at from public.lab_result_reviews where booking_id = $1`,
+        [bookingId],
+      )
+    ).rows[0];
+  const before = await review();
+  check(
+    "the comment predates the corrected report, so the patient's screens hide it",
+    before.comment === "Looks fine" &&
+      new Date(before.commented_at) < new Date(released.released_at),
+  );
+  const commentNotices = await noticesOf(patient.id, "lab_result_comment");
+  succeeded(
+    "the doctor reviews the corrected report, keeping the comment",
+    await rpc(doctor, "review_lab_result", {
+      p_booking_id: bookingId,
+      p_comment: "Looks fine",
+    }),
+  );
+  const after = await review();
+  check(
+    "which dates the comment again and tells the patient",
+    new Date(after.commented_at) >= new Date(released.released_at) &&
+      (await noticesOf(patient.id, "lab_result_comment")) ===
+        commentNotices + 1 &&
+      (await reportRow(secondId)).reviewed_at !== null,
+  );
+  succeeded(
+    "saving it again changes nothing",
+    await rpc(doctor, "review_lab_result", {
+      p_booking_id: bookingId,
+      p_comment: "Looks fine",
+    }),
+  );
+  check(
+    "no new date or notice",
+    (await review()).commented_at.getTime() ===
+      after.commented_at.getTime() &&
+      (await noticesOf(patient.id, "lab_result_comment")) ===
+        commentNotices + 1,
+  );
+  const history = (
+    await rpc(lab, "get_lab_booking_history", { p_booking_id: bookingId })
+  ).data;
+  check(
+    "the lab's history shows each correction upload, the one sent back and the release",
+    history?.filter((row) => row.kind === "correction_uploaded").length === 2 &&
+      history.some(
+        (row) =>
+          row.kind === "report_returned" &&
+          row.note === "Attach the right file",
+      ) &&
+      history.some(
+        (row) =>
+          row.kind === "report_corrected" &&
+          row.note === "Potassium units corrected",
+      ) &&
+      history.filter((row) => row.kind === "report_signed_off").length === 1,
+  );
+  check(
+    "the correction is audited, ids only",
+    (
+      await db.query(
+        `select details from public.audit_log
+         where action = 'lab_report.corrected' and target_id = $1`,
+        [bookingId],
+      )
+    ).rows[0]?.details?.corrects === firstId,
+  );
+
+  await db.query(
+    `update public.lab_reports set version = 20 where id = $1`,
+    [secondId],
+  );
+  refused(
+    "a booking keeps at most 20 versions",
+    await correct(lab, "One more fix"),
+    "too_many_versions",
+  );
+}
+
 async function testLabCollectorDay({ patient }) {
   section("Collector's day and cash (LAB-21)");
 
@@ -12043,6 +12381,7 @@ try {
   await testLabCollectors(await freshPatients());
   await testLabSamples(await freshPatients());
   await testLabReportSignOff(await freshPatients());
+  await testLabReportCorrections(await freshPatients());
   await testLabCollectorDay(await freshPatients());
   await testConsents();
   await testUpgrade();

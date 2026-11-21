@@ -60,6 +60,8 @@ export type TimelineEntry =
       type: "lab_report";
       labName: string;
       testNames: string[];
+      // Why it was corrected, when it replaced an earlier report (LAB-18).
+      correctionReason: string | null;
       careRecipientName: string;
       careRecipientRelation: CareRecipientRelation;
     })
@@ -135,6 +137,7 @@ export function buildTimeline(
       at,
       labName: report.labName,
       testNames: report.testNames,
+      correctionReason: report.correction?.reason ?? null,
       careRecipientName: report.careRecipientName,
       careRecipientRelation: report.careRecipientRelation,
     };

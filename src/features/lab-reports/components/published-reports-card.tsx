@@ -54,7 +54,10 @@ export function PublishedReportsCard({ reports }: PublishedReportsCardProps) {
                     </span>
                     {report.signer && (
                       <span className="block text-xs break-words text-muted-foreground">
-                        Signed off by {report.signer.name}
+                        {report.correction
+                          ? "Corrected, signed off"
+                          : "Signed off"}{" "}
+                        by {report.signer.name}
                       </span>
                     )}
                   </span>

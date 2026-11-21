@@ -5,12 +5,17 @@ import { cn } from "@/lib/utils";
 
 type LabReportLinkProps = {
   href: string;
+  label?: string;
   className?: string;
 };
 
 // Opens the report in a new tab. A plain link: the route answers with a
 // redirect to the file on a short-lived signed link.
-export function LabReportLink({ href, className }: LabReportLinkProps) {
+export function LabReportLink({
+  href,
+  label = "View report",
+  className,
+}: LabReportLinkProps) {
   return (
     <a
       href={href}
@@ -23,7 +28,7 @@ export function LabReportLink({ href, className }: LabReportLinkProps) {
       )}
     >
       <FileTextIcon aria-hidden />
-      View report
+      {label}
     </a>
   );
 }

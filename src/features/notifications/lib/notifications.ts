@@ -33,6 +33,8 @@ const titles = {
   lab_booking_unassigned: "A home collection left your list",
   lab_report_to_sign: "A lab report is waiting for sign-off",
   lab_report_returned: "A lab report you uploaded was sent back",
+  lab_booking_report_corrected: "Your lab report was corrected",
+  lab_result_corrected: "A lab report you ordered was corrected",
 } as const;
 
 export type NotificationKind = keyof typeof titles;

@@ -10,6 +10,10 @@ import {
   type LabSampleRecord,
 } from "@/features/lab-samples/lib/samples";
 import type { LabMemberRole } from "@/features/lab-staff/lib/lab-permissions";
+import {
+  toReportCorrection,
+  type ReportCorrection,
+} from "@/features/lab-reports/lib/report-correction";
 import type { LabSigner } from "@/features/lab-staff/lib/lab-staff";
 import { formatDate, formatDateTime, formatTime } from "@/lib/datetime";
 
@@ -270,7 +274,10 @@ export type LabBooking = {
   reportId: string | null;
   // Who signed it off; null for reports from before sign-off existed.
   reportSigner: LabSigner | null;
-  // A report uploaded and waiting for sign-off. Only the lab reads these.
+  // Set when the current report corrects an earlier one (LAB-18).
+  reportCorrection: ReportCorrection | null;
+  // A report or correction uploaded and waiting for sign-off. Only the lab
+  // reads these.
   pendingReportId: string | null;
   // The doctor's order this books (LAB-08); its report goes to that doctor.
   labOrderId: string | null;
@@ -347,6 +354,8 @@ export type LabBookingRow = {
     released_at: string | null;
     signer_name: string | null;
     signer_title: string | null;
+    corrects_report_id: string | null;
+    correction_reason: string | null;
   }[];
   lab_result_reviews?: {
     doctor_name: string;
@@ -373,7 +382,8 @@ export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, 
   collection_fee, total, payment_method, payment_status, payment_due_at, status_reason,
   status_note, status_changed_at, cancelled_by, reschedule_count, created_at,
   lab_order_id, lab_booking_items (id, name, price, test_names, package_id),
-  lab_reports (id, replaced_at, released_at, signer_name, signer_title)`;
+  lab_reports (id, replaced_at, released_at, signer_name, signer_title,
+    corrects_report_id, correction_reason)`;
 
 // The patient's list: also the tracker's steps and the doctor's comment.
 export const LAB_BOOKING_WITH_STEPS_COLUMNS = `${LAB_BOOKING_COLUMNS},
@@ -404,10 +414,16 @@ function stepTimes(events: LabBookingRow["lab_booking_events"]) {
   return steps;
 }
 
+// A comment written before the current report was released was about an
+// earlier version: hidden until the doctor reviews the correction (LAB-18),
+// which dates the comment again.
 function toDoctorComment(
   review: LabBookingRow["lab_result_reviews"],
+  releasedAt: string | null,
 ): DoctorComment | null {
   if (!review?.comment || !review.commented_at) return null;
+  if (releasedAt && Date.parse(review.commented_at) < Date.parse(releasedAt))
+    return null;
   return {
     doctorName: review.doctor_name,
     comment: review.comment,
@@ -425,6 +441,7 @@ function currentReports(reports: LabBookingRow["lab_reports"]) {
       released?.signer_name && released.signer_title
         ? { name: released.signer_name, title: released.signer_title }
         : null,
+    reportCorrection: toReportCorrection(released ?? null),
     pendingReportId:
       current.find((report) => report.released_at === null)?.id ?? null,
   };
@@ -475,7 +492,12 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     steps: stepTimes(row.lab_booking_events),
     ...currentReports(row.lab_reports),
     labOrderId: row.lab_order_id,
-    doctorComment: toDoctorComment(row.lab_result_reviews),
+    doctorComment: toDoctorComment(
+      row.lab_result_reviews,
+      row.lab_reports.find(
+        (report) => report.replaced_at === null && report.released_at !== null,
+      )?.released_at ?? null,
+    ),
     collectorId: row.assignment?.[0]?.collector_id ?? null,
     samples: openSamples(row.samples ?? []),
     items: [...row.lab_booking_items]

@@ -1,4 +1,4 @@
-# Lab reports: sign-off and release (LAB-17)
+# Lab reports: sign-off, release and corrections (LAB-17, LAB-18)
 
 Uploading, storing and opening reports is LAB-05 ([lab-booking.md](./lab-booking.md), "Reports"). This adds the step between upload and patient: a report reaches the patient, and the ordering doctor, only after someone the lab has authorised reviews it and signs it off, and their name and qualification are printed on the report.
 
@@ -32,6 +32,20 @@ A booking that leaves processing other than by release (a new sample needed, a c
 - **Lab**: the booking card says "Waiting for sign-off" while pending, and the signer after release. The booking history (LAB-16) adds "Report uploaded", "Report sent back" and "Report signed off and released" steps. The note shows only to people who can open reports, since it can describe results; collectors see the step without it. Reports from before this keep their "Report ready" step and show no separate upload.
 - `require_lab_report` (the trigger that refuses `report_ready` without a report) now needs a **released** report, so `move_lab_booking` still can't mark a booking ready by itself.
 
+## Corrections (LAB-18)
+
+A released report is never edited. When it turns out wrong, the lab corrects it with a new version, the way prescriptions are versioned. This follows ISO 15189:2022 clause 7.4.1.8: the reason is recorded and printed on the revised report, the revision is clearly marked and points to the report it replaces, the original is kept, and the user is told.
+
+1. **Upload.** On a report-ready booking, anyone with `reports.publish` gets **Correct report** on the booking card. They upload the whole report again with a reason (3 to 200 characters, one line, Latin-1 because it's stamped; line breaks collapse to spaces). `publish_lab_correction(booking, path, reason, notify_signers)` files it as a pending version with `corrects_report_id` (the released report) and `correction_reason`. The booking stays report ready, and the patient and the doctor keep seeing the released report. One upload waits at a time (`report_awaiting_sign_off`), and the 20-version limit counts corrections too.
+2. **Sign off or send back.** Corrections join **To sign off** with the reason and a link to the version they replace. Sending one back works as for any report, and the released report stays current. Signing off locks the booking, the correction, then the old report; marks the old one replaced; releases the correction; and leaves the booking report ready. A signer can sign their own correction straight away, as with uploads.
+3. **Who is told.** The patient gets `lab_booking_report_corrected` and the ordering doctor `lab_result_corrected` (from `route_lab_report`), never a second "ready". In-app only, like report-ready notices, so no email names a result. The corrected version isn't reviewed yet, so it returns to the doctor's **To review** list (review is per version, PRC-11). `review_lab_result` now reads and marks only the released report, so a waiting correction is never marked reviewed early. The doctor's comment was about the earlier results, so the patient's screens hide a comment dated before the current report's release; reviewing the correction dates the comment again and tells the patient (`lab_result_comment`), even when the text is unchanged.
+
+**The stamp** on a correction adds two lines above the sign-off: "CORRECTED REPORT. It replaces the report released on {date}." and "Reason for correction: {reason}". The strip grows with the number of lines (26pt for two 7pt lines). A line too long for the page wraps at 5pt onto up to three lines before it's cut with an ellipsis.
+
+**What each side sees.** The patient's booking card, the doctor's visit lab tests and results inbox, and the lab's booking card show a **Corrected report** note with the reason and a **Version it replaces** link. Replaced versions stay readable through the same RLS policies (patient and ordering doctor: released ones; lab: all). The health timeline lists it as "Corrected lab report", dated by its release. The lab's history adds "Corrected report uploaded", "Correction sent back" and "Corrected report signed off and released", with the reason shown only to people who open reports.
+
+**Database** (`supabase/migrations/20261121120000_lab_report_corrections.sql`): `lab_reports.corrects_report_id` and `correction_reason` (`lab_reports_correction_check`), both in the column grant. `lab_reports_current_idx` is replaced by two unique partial indexes: one current released report per booking (`lab_reports_current_released_idx`) and one pending (`lab_reports_pending_idx`), so a correction can wait while the released one stays visible. `get_lab_order_bookings` and `get_lab_results_inbox` return `correction_reason` and `previous_report_id`. Audit: `lab_report.correction_uploaded` and `lab_report.corrected`. Tests: `testLabReportCorrections` in `scripts/test-sql.mjs`.
+
 ## The stamp
 
 `src/features/lab-reports/lib/stamp-report.server.ts`, with `pdf-lib`:
@@ -58,7 +72,7 @@ Signing off and sending back count with the 600 status moves an hour per account
 
 ## Not yet
 
-- Corrected reports (LAB-18) will add a version after release. The unique current report per booking and the pending checks will need revisiting so a correction can wait for sign-off while the released one stays visible.
+- A released correction can't be withdrawn; a further correction replaces it.
 - A stamped copy left behind when a sign-off's response was lost has no cleanup yet; the general cleanup job for unreferenced files (see lab-booking.md, "Not yet") covers it.
 - Non-Latin names on the stamp would need an embedded font.
 
@@ -68,4 +82,5 @@ Signing off and sending back count with the 600 status moves an hour per account
 - WHO Laboratory Quality Stepwise Implementation tool, authorisation of results: https://extranet.who.int/lqsi/node/143
 - NCI Clinical Research Operations, review and release of results (who may authorise): https://ccrod.cancer.gov/confluence/x/y4CCBw
 - College of American Pathologists, Remote Sign-Out FAQs (electronic signature applied in the LIS by the authorised pathologist): https://documents.cap.org/documents/Remote-Sign-Out-FAQs.pdf
+- ISO 15189:2022 (FDIS text), clause 7.4.1.8, amendments to reported results, and 8.4.2, amendment of records: https://nata.com.au/files/2022/09/ISO_FDIS_15189_E.pdf
 - pdf-lib, page boxes and `drawText` with rotation: https://pdf-lib.js.org/docs/api/classes/pdfpage

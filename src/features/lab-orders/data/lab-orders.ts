@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import type { BookedFor } from "@/features/family/lib/relations";
+import { toReportCorrection } from "@/features/lab-reports/lib/report-correction";
 import {
   LAB_ORDER_COLUMNS,
   RECENT_ORDER_DAYS,
@@ -153,7 +154,19 @@ type OrderResultRow = {
   report_published_at: string | null;
   comment: string | null;
   reviewed_at: string | null;
+  correction_reason: string | null;
+  previous_report_id: string | null;
 };
+
+// A corrected report's reason and the version it replaced (LAB-18).
+const correctionOf = (row: {
+  correction_reason: string | null;
+  previous_report_id: string | null;
+}) =>
+  toReportCorrection({
+    corrects_report_id: row.previous_report_id,
+    correction_reason: row.correction_reason,
+  });
 
 // The doctor's view of the bookings and results for a visit's order. The
 // doctor can't read bookings, so a database function returns only what they
@@ -178,6 +191,7 @@ export async function getOrderResults(
     testIds: row.ordered_test_ids,
     reportId: row.report_id,
     reportPublishedAt: row.report_published_at,
+    reportCorrection: correctionOf(row),
     comment: row.comment,
     reviewedAt: row.reviewed_at,
   }));
@@ -200,6 +214,8 @@ type InboxRow = {
   version: number;
   reviewed_at: string | null;
   comment: string | null;
+  correction_reason: string | null;
+  previous_report_id: string | null;
 };
 
 // One page of the doctor's results inbox (PRC-11): still to review, the one
@@ -236,6 +252,7 @@ export async function getResultsInbox(
       testNames: row.test_names,
       publishedAt: row.published_at,
       version: row.version,
+      correction: correctionOf(row),
       reviewedAt: row.reviewed_at,
       comment: row.comment,
     })),
