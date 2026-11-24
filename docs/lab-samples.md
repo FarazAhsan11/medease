@@ -49,3 +49,27 @@ Each sample gets a code and a barcode label, and the lab sees every step of a bo
 - DICOM PS3.17, specimen and container identifiers: https://dicom.nema.org/medical/dicom/2024c/output/chtml/part17/sect_NN.3.5.html
 - MDN, `@page` `size`: https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
 - bwip-js: https://github.com/metafloor/bwip-js
+
+# Turnaround (LAB-19)
+
+Each test in a lab's catalog already carries the hours the lab promises (LAB-02). LAB-19 keeps that promise on each booking and measures it.
+
+## Choices
+
+- **The promise is kept as booked.** `lab_booking_items.turnaround_hours` is filled by the same insert trigger as the item's sample types: a test's hours, or a package's slowest test. Later catalog edits don't change a booking already placed. The booking's promise is its slowest item.
+- **The clock runs from collection to release.** ISO 15189 leaves the start and stop points to each lab, but asks for a set time per examination, agreed with users, and regular checks that it is met. We count from the sample being collected (what the patient lives through, transport included for home visits) to the report's first release after sign-off (when the patient can open it). The labs' own catalog wording ("results in 24 hours") matches that.
+- **The database keeps the clock.** A `before update of status` trigger (`track_lab_turnaround`) sets `turnaround_started_at` and `report_due_at` when a sample is collected, clears them when a new sample is needed or the booking is cancelled (a new sample restarts the clock), and sets `reported_at` on the first release. Corrections (LAB-18) don't move the booking, so `reported_at` stays the first release. Every path that moves a booking (`move_lab_booking`, `collect_lab_booking`, sign-off) goes through it, and nobody can write the columns directly. Bookings from before LAB-19 took their clock from their history; finished ones got no due time, since today's catalog hours may not be what was promised, so they count as released but not as on time or late.
+- **What each side sees.** Before collection the patient sees "usually ready within 24 hours of the sample being taken"; once collected, "expected by" the due time, and past it a note to call the lab. The lab sees the due time on each booking in the lab and on the reports page, a red "overdue by" badge once past it, and the reports page lists the soonest due first.
+- **The lab's record.** `get_lab_turnaround(days)` (anyone with `bookings.view_all`, second factor needed) returns samples past due now and, over the last 30 days, reports released, how many had a promise and came on time, and the median hours from collection to report. It shows above the "In the lab" list. Both counts run on partial indexes: `(lab_id, report_due_at)` for bookings in the lab and `(lab_id, reported_at)` for released ones.
+- **No alerts yet.** Overdue bookings are highlighted, not emailed: notifying the lab would need a scheduled job, and the list already puts them in front of the people doing the work.
+
+## Code
+
+- Migration: `supabase/migrations/20261124120000_lab_turnaround.sql`.
+- `src/features/lab-booking/lib/report-timing.ts`, `components/report-timing-note.tsx`, `components/turnaround-summary.tsx`, `data/lab-turnaround.ts`.
+
+## Sources
+
+- ISO 15189:2022, Medical laboratories, turnaround times per examination and their review (summary in INAB's notification on TATs): https://www.inab.ie/inab-documents/notifications/notification-on-turnaround-times-tats.pdf
+- Hawkins, Laboratory turnaround time (Clin Biochem Rev, 2007): https://pmc.ncbi.nlm.nih.gov/articles/PMC2282400
+- Turnaround time definitions vary; report the start and stop points used (BMC Med Inform Decis Mak, 2011): https://bmcmedinformdecismak.biomedcentral.com/articles/10.1186/1472-6947-11-34

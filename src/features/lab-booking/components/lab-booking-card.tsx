@@ -7,6 +7,7 @@ import { DoctorCommentNote } from "@/features/lab-booking/components/doctor-comm
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
 import { OrderTracker } from "@/features/lab-booking/components/order-tracker";
+import { ReportTimingNote } from "@/features/lab-booking/components/report-timing-note";
 import { PatientLabBookingActions } from "@/features/lab-booking/components/patient-lab-booking-actions";
 import {
   formatBookingWhen,
@@ -110,6 +111,11 @@ export function LabBookingCard({
               status={booking.status}
               steps={{ booked: booking.createdAt, ...booking.steps }}
               timezone={booking.timezone}
+            />
+            <ReportTimingNote
+              booking={booking}
+              audience="patient"
+              className="mt-4"
             />
             {booking.status === "report_ready" &&
               (booking.reportId ? (

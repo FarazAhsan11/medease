@@ -158,16 +158,27 @@ export async function getLabBookings(labId: string, stage: LabBookingStage) {
   return { ...list, earlier: null };
 }
 
-// Bookings waiting for their report, the longest-waiting visit first.
-export function getLabBookingsAwaitingReport(labId: string) {
-  return readLabBookings(
-    labId,
-    ["processing"],
-    true,
-    {},
-    LAB_BOOKINGS_SHOWN,
-    LAB_BOOKING_COLUMNS,
-  );
+// Bookings waiting for their report, soonest due first (LAB-19), on the
+// lab's due-time index; any without a promise after them, oldest visit first.
+export async function getLabBookingsAwaitingReport(labId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("lab_bookings")
+    .select(LAB_BOOKING_COLUMNS)
+    .eq("lab_id", labId)
+    .eq("status", "processing")
+    .order("report_due_at", { ascending: true, nullsFirst: false })
+    .order("visit_date", { ascending: true })
+    .order("slot_starts_at", { ascending: true, nullsFirst: true })
+    .order("created_at", { ascending: true })
+    .limit(LAB_BOOKINGS_SHOWN + 1)
+    .returns<LabBookingRow[]>();
+
+  if (error) throw new Error(`lab_bookings: ${error.message}`);
+  return {
+    bookings: data.slice(0, LAB_BOOKINGS_SHOWN).map(toLabBooking),
+    more: data.length > LAB_BOOKINGS_SHOWN,
+  };
 }
 
 // How many bookings wait at each open stage, for the tabs.

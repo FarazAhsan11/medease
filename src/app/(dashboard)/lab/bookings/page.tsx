@@ -13,6 +13,8 @@ import {
   LAB_BOOKINGS_SHOWN,
 } from "@/features/lab-booking/data/lab-bookings";
 import { getLabCollectors } from "@/features/lab-booking/data/lab-collectors";
+import { getLabTurnaround } from "@/features/lab-booking/data/lab-turnaround";
+import { TurnaroundSummary } from "@/features/lab-booking/components/turnaround-summary";
 import {
   LAB_TIMEZONE,
   labBookingStages,
@@ -44,9 +46,11 @@ export default async function LabBookingsPage({
   const member = await requireLabMember("bookings.view");
   const assigns = memberCan(member, "bookings.assign");
   const sees = memberCan(member, "bookings.view_all");
-  const [{ bookings, more, earlier }, counts] = await Promise.all([
+  const [{ bookings, more, earlier }, counts, turnaround] = await Promise.all([
     getLabBookings(member.labId, stage),
     getOpenLabBookingCounts(member.labId),
+    // The lab's promise kept (LAB-19), with the samples it's about.
+    stage === "in-lab" && sees ? getLabTurnaround() : null,
   ]);
   // Names for the list, and for the picker each person's visits on the days
   // shown. Only those who assign collectors need them.
@@ -78,6 +82,7 @@ export default async function LabBookingsPage({
         active={stage}
         counts={counts}
       />
+      {turnaround && <TurnaroundSummary turnaround={turnaround} />}
       {bookings.length === 0 && leftOver.length === 0 ? (
         <EmptyState
           icon={ClipboardListIcon}

@@ -290,6 +290,12 @@ export type LabBooking = {
   // When each step happened, newest move per status. Only on the patient's
   // list, which shows the tracker.
   steps: Partial<Record<LabBookingStatus, string>>;
+  // The lab's promise (LAB-19): the slowest item's hours as booked, null when
+  // no item has one; when the report is due once the sample is in, and when
+  // it was first released.
+  turnaroundHours: number | null;
+  reportDueAt: string | null;
+  reportedAt: string | null;
 };
 
 // Someone a home visit can go to, with their visits still to make per day.
@@ -343,6 +349,8 @@ export type LabBookingRow = {
   cancelled_by: "patient" | "lab" | "system" | null;
   reschedule_count: number;
   created_at: string;
+  report_due_at: string | null;
+  reported_at: string | null;
   lab_booking_events?: {
     status: LabBookingStatus;
     kind: "status" | "rescheduled";
@@ -372,6 +380,7 @@ export type LabBookingRow = {
     price: number;
     test_names: string[];
     package_id: string | null;
+    turnaround_hours: number | null;
   }[];
 };
 
@@ -381,7 +390,8 @@ export const LAB_BOOKING_COLUMNS = `id, lab_id, status, collection, visit_date, 
   street_address, area, city, landmark, contact_name, contact_phone, subtotal,
   collection_fee, total, payment_method, payment_status, payment_due_at, status_reason,
   status_note, status_changed_at, cancelled_by, reschedule_count, created_at,
-  lab_order_id, lab_booking_items (id, name, price, test_names, package_id),
+  report_due_at, reported_at, lab_order_id,
+  lab_booking_items (id, name, price, test_names, package_id, turnaround_hours),
   lab_reports (id, replaced_at, released_at, signer_name, signer_title,
     corrects_report_id, correction_reason)`;
 
@@ -412,6 +422,14 @@ function stepTimes(events: LabBookingRow["lab_booking_events"]) {
       steps[event.status] = event.created_at;
   }
   return steps;
+}
+
+// The booking's promise is its slowest item's (match track_lab_turnaround).
+function slowestItem(items: LabBookingRow["lab_booking_items"]) {
+  const hours = items.flatMap((item) =>
+    item.turnaround_hours === null ? [] : [item.turnaround_hours],
+  );
+  return hours.length > 0 ? Math.max(...hours) : null;
 }
 
 // A comment written before the current report was released was about an
@@ -490,6 +508,9 @@ export function toLabBooking(row: LabBookingRow): LabBooking {
     rescheduleCount: row.reschedule_count,
     createdAt: row.created_at,
     steps: stepTimes(row.lab_booking_events),
+    turnaroundHours: slowestItem(row.lab_booking_items),
+    reportDueAt: row.report_due_at,
+    reportedAt: row.reported_at,
     ...currentReports(row.lab_reports),
     labOrderId: row.lab_order_id,
     doctorComment: toDoctorComment(

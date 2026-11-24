@@ -5,6 +5,7 @@ import { LabBookingActions } from "@/features/lab-booking/components/lab-booking
 import { LabBookingCollector } from "@/features/lab-booking/components/lab-booking-collector";
 import { LabBookingStatusBadge } from "@/features/lab-booking/components/lab-booking-status-badge";
 import { LabBookingStatusReason } from "@/features/lab-booking/components/lab-booking-status-reason";
+import { ReportTimingNote } from "@/features/lab-booking/components/report-timing-note";
 import { bookedByLabel } from "@/features/family/lib/relations";
 import { BookingSampleBar } from "@/features/lab-samples/components/booking-sample-bar";
 import {
@@ -98,6 +99,7 @@ export function LabBookingEntry({
               Doctor&apos;s order
             </StatusBadge>
           )}
+          <ReportTimingNote booking={booking} audience="lab" className="mt-2" />
           {booking.rescheduleCount > 0 && canPatientChange(booking) && (
             <p className="mt-1 text-xs font-medium text-foreground">
               The patient moved this to a new {home ? "window" : "day"}.

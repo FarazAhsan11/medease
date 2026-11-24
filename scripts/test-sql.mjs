@@ -12306,6 +12306,222 @@ async function testLabCollectorDay({ patient }) {
   );
 }
 
+async function testLabTurnaround({ patient }) {
+  section("Turnaround (LAB-19)");
+
+  const server = { role: "service_role" };
+  const idOf = (result) => result.data?.[0]?.[result.fn];
+  const lab = await createLab({ status: "approved" });
+  const collector = await createUser("lab", { confirmed: false });
+  await rpc(lab, "add_lab_staff", {
+    p_user_id: collector.id,
+    p_role: "collector",
+  });
+  await rpc(server, "accept_lab_invite", { p_user_id: collector.id });
+
+  const testOf = async (typeId, hours) =>
+    (
+      await db.query(
+        `insert into public.lab_tests (lab_id, test_type_id, price, turnaround_hours)
+         values ($1, $2, 500, $3) returning id`,
+        [lab.id, typeId, hours],
+      )
+    ).rows[0].id;
+  const cbc = await testOf("cbc", 24);
+  const urine = await testOf("urine-re", 72);
+  const packageId = (
+    await db.query(
+      `insert into public.lab_packages (lab_id, name, price) values ($1, 'Tat Package', 900)
+       returning id`,
+      [lab.id],
+    )
+  ).rows[0].id;
+  await db.query(
+    `insert into public.lab_package_items (package_id, lab_id, lab_test_id)
+     values ($1, $2, $3)`,
+    [packageId, lab.id, urine],
+  );
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+  }).format(new Date());
+  const booked = await rpc(patient, "book_lab_test", {
+    p_request_id: randomUUID(),
+    p_lab_id: lab.id,
+    p_lab_test_ids: [cbc],
+    p_package_ids: [packageId],
+    p_collection: "lab",
+    p_visit_date: today,
+    p_slot_starts_at: null,
+    p_address_id: null,
+    p_care_recipient_id: null,
+    p_lab_order_id: null,
+  });
+  succeeded("the patient books a test and a package", booked);
+  const bookingId = idOf(booked);
+
+  const items = async () =>
+    (
+      await db.query(
+        `select package_id is not null as package, turnaround_hours
+         from public.lab_booking_items where booking_id = $1 order by 1`,
+        [bookingId],
+      )
+    ).rows;
+  const clock = async () =>
+    (
+      await db.query(
+        `select turnaround_started_at, report_due_at, reported_at,
+                extract(epoch from report_due_at - turnaround_started_at) / 3600 as hours
+         from public.lab_bookings where id = $1`,
+        [bookingId],
+      )
+    ).rows[0];
+  const move = (from, to, reason = null) =>
+    rpc(lab, "move_lab_booking", {
+      p_booking_id: bookingId,
+      p_from_status: from,
+      p_to_status: to,
+      p_reason: reason,
+      p_note: null,
+    });
+
+  const kept = await items();
+  check(
+    "each item keeps its promised hours: the test's, the package's slowest",
+    kept[0]?.turnaround_hours === 24 && kept[1]?.turnaround_hours === 72,
+    JSON.stringify(kept),
+  );
+  await db.query(
+    `update public.lab_tests set turnaround_hours = 6 where id = any($1)`,
+    [[cbc, urine]],
+  );
+  check(
+    "a later catalog change doesn't change a booking's promise",
+    (await items()).every((item) => item.turnaround_hours >= 24),
+  );
+  check(
+    "no clock runs before the sample is taken",
+    (await clock()).report_due_at === null,
+  );
+
+  await move("booked", "sample_collected");
+  let now = await clock();
+  check(
+    "collecting starts the clock at the slowest item",
+    now.turnaround_started_at !== null && Number(now.hours) === 72,
+    String(now.hours),
+  );
+  const seen = await as(
+    patient,
+    `select report_due_at from public.lab_bookings where id = $1`,
+    [bookingId],
+  );
+  check(
+    "the patient reads when to expect the report",
+    seen.data?.[0]?.report_due_at !== null &&
+      seen.data?.[0]?.report_due_at !== undefined,
+  );
+  denied(
+    "the lab can't move the due time itself",
+    await as(
+      lab,
+      `update public.lab_bookings set report_due_at = now() + interval '900 hours'
+       where id = $1`,
+      [bookingId],
+    ),
+  );
+
+  await move("sample_collected", "recollection_needed", "sample_clotted");
+  now = await clock();
+  check(
+    "asking for a new sample stops the clock",
+    now.report_due_at === null && now.turnaround_started_at === null,
+  );
+  await move("recollection_needed", "sample_collected");
+  check(
+    "the new sample starts it again",
+    Number((await clock()).hours) === 72,
+  );
+  await move("sample_collected", "processing");
+
+  const summary = async (caller = lab, days = 30) =>
+    rpc(caller, "get_lab_turnaround", { p_days: days });
+  refused(
+    "a patient can't read a lab's record",
+    await summary(patient),
+    "not_lab",
+  );
+  refused(
+    "a collector can't read the lab's record",
+    await summary(collector),
+    "not_permitted",
+  );
+  refused(
+    "the record needs a second factor",
+    await summary({ ...lab, aal: "aal1" }),
+    "second_factor_required",
+  );
+  check(
+    "nothing is overdue while within the promise",
+    (await summary()).data?.[0]?.overdue === 0,
+  );
+  await db.query(
+    `update public.lab_bookings
+     set turnaround_started_at = now() - interval '80 hours',
+         report_due_at = now() - interval '8 hours'
+     where id = $1`,
+    [bookingId],
+  );
+  check(
+    "a sample past its promise counts as overdue",
+    (await summary()).data?.[0]?.overdue === 1,
+  );
+
+  const path = `${lab.id}/${bookingId}/${randomUUID()}.pdf`;
+  await rpc(server, "mark_upload_checked", {
+    p_bucket: "lab-reports",
+    p_path: path,
+    p_owner_id: lab.id,
+  });
+  const reportId = idOf(
+    await rpc(lab, "publish_lab_report", {
+      p_booking_id: bookingId,
+      p_path: path,
+    }),
+  );
+  check(
+    "a report waiting for sign-off isn't released yet",
+    (await clock()).reported_at === null,
+  );
+  await signOffReport(lab, reportId);
+  now = await clock();
+  check("releasing the report records when", now.reported_at !== null);
+
+  const record = (await summary()).data?.[0];
+  check(
+    "the record counts the late report and its hours",
+    record?.overdue === 0 &&
+      record?.reported === 1 &&
+      record?.timed === 1 &&
+      record?.on_time === 0 &&
+      Number(record?.median_hours) >= 79,
+    JSON.stringify(record),
+  );
+  await db.query(
+    `update public.lab_bookings set report_due_at = now() + interval '1 hour'
+     where id = $1`,
+    [bookingId],
+  );
+  check(
+    "a report before its due time counts as on time",
+    (await summary()).data?.[0]?.on_time === 1,
+  );
+  check(
+    "the record's window is bounded",
+    (await summary(lab, 100000)).data?.[0]?.reported === 1,
+  );
+}
+
 async function testEveryRefusalIsTested() {
   section("Every refusal has a test (QA-02)");
 
@@ -12383,6 +12599,7 @@ try {
   await testLabReportSignOff(await freshPatients());
   await testLabReportCorrections(await freshPatients());
   await testLabCollectorDay(await freshPatients());
+  await testLabTurnaround(await freshPatients());
   await testConsents();
   await testUpgrade();
   await testReminderUpgrade();

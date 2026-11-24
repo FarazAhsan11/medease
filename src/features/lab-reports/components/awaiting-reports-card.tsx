@@ -5,6 +5,7 @@ import {
   itemsSummary,
   type LabBooking,
 } from "@/features/lab-booking/lib/lab-bookings";
+import { ReportTimingNote } from "@/features/lab-booking/components/report-timing-note";
 import { UploadReportDialog } from "@/features/lab-reports/components/upload-report-dialog";
 
 type AwaitingReportsCardProps = {
@@ -29,7 +30,7 @@ export function AwaitingReportsCard({
       description={
         bookings.length === 0
           ? "Bookings appear here once you start processing them."
-          : `${bookings.length}${more ? "+" : ""} being processed, longest waiting first`
+          : `${bookings.length}${more ? "+" : ""} being processed, soonest due first`
       }
     >
       {bookings.length > 0 && (
@@ -48,6 +49,11 @@ export function AwaitingReportsCard({
                   <p className="text-xs break-words text-muted-foreground">
                     {items} · {formatBookingWhen(booking)}
                   </p>
+                  <ReportTimingNote
+                    booking={booking}
+                    audience="lab"
+                    className="mt-1.5"
+                  />
                 </div>
                 {booking.pendingReportId ? (
                   <StatusBadge tone="info">Waiting for sign-off</StatusBadge>
