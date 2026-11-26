@@ -65,7 +65,7 @@ Requirements, plan and progress: `docs/srs.md`. When work builds or fixes a requ
 ## Rules
 
 - This is being built for launch as a startup: build every feature to hold up under real use, with indexed queries, no per-row or per-event round trips, rate limits on writes, and checks in the database.
-- Before planning a feature, search the web for current best practice (official docs first) and write the choices and sources into its design doc.
+- Before planning a feature, check current guidance: library and API docs through Context7 first; best practice, security, compliance, platform limits and vendor choices through a web search (official sources first). Keep it short: a few targeted queries, standard search mode unless results are thin, and only for decisions the feature actually has to make. Write the choices and sources into its design doc.
 - When a feature from `docs/srs.md` is built: first review the diff with the `code-review` skill and fix what it finds, then test the whole feature end to end once (lint, typecheck, `test:sql`, and the feature in a browser, including the pages it touches), so nothing that already worked breaks. Test once after the review, not after every step.
 - Build every feature from small reusable components, one per kebab-case file. Reuse existing components before creating new ones.
 - Any page that waits on the server gets a `loading.tsx` using `PageSkeleton` (`@/components/shared/page-skeleton`): it shows the page straight away and lets dynamic routes prefetch. `NavigationProgress` in the shell covers every link and GET form with no extra code; GET forms use `Form` from `next/form`.
